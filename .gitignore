@@ -5,7 +5,6 @@
 **/*.exe
 *.pyc
 .DS_Store
-/CMakeLists.txt
 OpenGL-tutorial_v*
 Thumbs.db
 bin-*/*
