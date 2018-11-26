@@ -5,6 +5,8 @@
 #include <stb_image_write.h>
 #endif
 
+#include <fstream>
+
 // Used for validating return values of Vulkan API calls.
 #define VK_CHECK_RESULT(f)                                                                              \
 {                                                                                                       \
@@ -16,6 +18,13 @@
     }                                                                                                   \
 }
 
+struct UniformBufferObject{
+    float brightness;
+    float colorR;
+    float colorG;
+    float colorB;
+};
+
 void ComputeApplication::run() {
     // Buffer size of the storage buffer that will contain the rendered mandelbrot set.
     bufferSize = sizeof(Pixel) * WIDTH * HEIGHT;
@@ -26,10 +35,16 @@ void ComputeApplication::run() {
     findPhysicalDevice();
     createDevice();
     createBuffer();
+
+    //still testing
+    createUniformBuffer();
+    writeUniformBuffer();
+
     createDescriptorSetLayout();
     createDescriptorSet();
     createComputePipeline();
     createCommandBuffer();
+
     // Finally, run the recorded command buffer.
     runCommandBuffer();
 
@@ -147,7 +162,7 @@ void ComputeApplication::createInstance() {
     applicationInfo.applicationVersion = 0;
     applicationInfo.pEngineName = "awesomeengine";
     applicationInfo.engineVersion = 0;
-    applicationInfo.apiVersion = VK_API_VERSION_1_0;;
+    applicationInfo.apiVersion = VK_API_VERSION_1_1;;
     
     VkInstanceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -246,20 +261,20 @@ uint32_t ComputeApplication::getComputeQueueFamilyIndex() {
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
     // Now find a family that supports compute.
-    uint32_t i = 0;
-    for (; i < queueFamilies.size(); ++i) {
-        VkQueueFamilyProperties props = queueFamilies[i];
+    uint32_t currFamilyIndex;
+    for (currFamilyIndex = 0; currFamilyIndex < queueFamilies.size(); ++currFamilyIndex) {
+        VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
 
-        if (props.queueCount > 0 && (props.queueFlags & VK_QUEUE_COMPUTE_BIT)) {
-            // found a queue with compute. We're done!
+        if (currFamily.queueCount > 0 && (currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+            // found a queue family with compute. We're done!
             break;
         }
     }
 
-    if (i == queueFamilies.size()) {
+    if (currFamilyIndex == queueFamilies.size()) {
         throw std::runtime_error("could not find a queue family that supports operations");
     }
-    return i;
+    return currFamilyIndex;
 }
 
 void ComputeApplication::createDevice() {
@@ -311,6 +326,7 @@ uint32_t ComputeApplication::findMemoryType(uint32_t memoryTypeBits, VkMemoryPro
     See the documentation of VkPhysicalDeviceMemoryProperties for a detailed description. 
     */
     for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i) {
+        //if this memory type's index is set inside memoryTypeBits and it has all the specified properties
         if ((memoryTypeBits & (1 << i)) &&
             ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties))
             return i;
@@ -367,6 +383,50 @@ void ComputeApplication::createBuffer() {
     VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
 }
 
+void ComputeApplication::createUniformBuffer(){
+
+    //buffer
+    VkBufferCreateInfo uniformBufferCreateInfo = {};
+    uniformBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    uniformBufferCreateInfo.size = sizeof(UniformBufferObject);
+    uniformBufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    uniformBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VK_CHECK_RESULT(vkCreateBuffer(device, &uniformBufferCreateInfo, NULL, &uniformBuffer)); // create buffer.
+
+    //memory
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(device, uniformBuffer, &memoryRequirements);
+
+    VkMemoryAllocateInfo allocateInfo = {};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocateInfo.allocationSize = memoryRequirements.size;
+    allocateInfo.memoryTypeIndex = findMemoryType(
+        memoryRequirements.memoryTypeBits,  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+    //allocate memory on device
+    VK_CHECK_RESULT(vkAllocateMemory(device, &allocateInfo, NULL, &uniformBufferMemory));
+
+    //bind buffer memory to buffer
+    VK_CHECK_RESULT(vkBindBufferMemory(device, uniformBuffer, uniformBufferMemory,0));
+
+}
+void ComputeApplication::writeUniformBuffer(){
+
+    UniformBufferObject ubo;
+    ubo.brightness = 1.0f;
+    ubo.colorR = 1.0f;
+    ubo.colorG = 1.0f;
+    ubo.colorB = 1.0f;
+
+    void* data;
+
+    vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &data);
+
+    memcpy(data, &ubo, sizeof(ubo));
+
+    vkUnmapMemory(device, uniformBufferMemory);
+
+}
 void ComputeApplication::createDescriptorSetLayout() {
     /*
     Here we specify a descriptor set layout. This allows us to bind our descriptors to 
@@ -389,11 +449,21 @@ void ComputeApplication::createDescriptorSetLayout() {
     storageBufferBinding.descriptorCount = 1;
     storageBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+    //define a binding for the UBO
+    VkDescriptorSetLayoutBinding uniformBufferBinding = {};
+    uniformBufferBinding.binding = 1;
+    uniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uniformBufferBinding.descriptorCount = 1;
+    uniformBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    //put all bindings in an array
+    std::array<VkDescriptorSetLayoutBinding, 2> allBindings = {storageBufferBinding, uniformBufferBinding};
+
     //create descriptor set layout for one binding to a storage buffer
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
     descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorSetLayoutCreateInfo.bindingCount = 1; // only a single binding in this descriptor set layout. 
-    descriptorSetLayoutCreateInfo.pBindings = &storageBufferBinding; 
+    descriptorSetLayoutCreateInfo.bindingCount = 1; //number of bindings
+    descriptorSetLayoutCreateInfo.pBindings = &storageBufferBinding;
 
     // Create the descriptor set layout. 
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
@@ -456,36 +526,25 @@ void ComputeApplication::createDescriptorSet() {
     vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, NULL);
 }
 
-// Read file into array of bytes, and cast to uint32_t*, then return.
-// The data has been padded, so that it fits into an array uint32_t.
-uint32_t* ComputeApplication::readFile(uint32_t& length, const char* filename) {
 
-    FILE* fp = fopen(filename, "rb");
-    if (fp == NULL) {
-        printf("Could not find or open file: %s\n", filename);
+std::vector<char> ComputeApplication::readFile(const std::string& filename) {
+
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("failed to open file!");
     }
 
-    // get file size.
-    fseek(fp, 0, SEEK_END);
-    long filesize = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
+    size_t fileSize = (size_t) file.tellg();
+    std::vector<char> buffer(fileSize);
 
-    long filesizepadded = long(ceil(filesize / 4.0)) * 4;
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
 
-    // read file contents.
-    char *str = new char[filesizepadded];
-    fread(str, filesize, sizeof(char), fp);
-    fclose(fp);
+    file.close();
 
-    // data padding. 
-    for (int i = filesize; i < filesizepadded; i++) {
-        str[i] = 0;
-    }
-
-    length = filesizepadded;
-    return (uint32_t *)str;
+    return buffer;
 }
-
 void ComputeApplication::createComputePipeline() {
     /*
     We create a compute pipeline here. 
@@ -494,17 +553,14 @@ void ComputeApplication::createComputePipeline() {
     /*
     Create a shader module. A shader module basically just encapsulates some shader code.
     */
-    uint32_t filelength;
-    // the code in comp.spv was created by running the command:
-    // glslangValidator.exe -V shader.comp
-    uint32_t* code = readFile(filelength, "shaders/comp.spv");
+
+    //create shader module
+    std::vector<char> shaderCode = readFile("shaders/comp.spv");
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.pCode = code;
-    createInfo.codeSize = filelength;
-    
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
+    createInfo.codeSize = shaderCode.size();
     VK_CHECK_RESULT(vkCreateShaderModule(device, &createInfo, NULL, &computeShaderModule));
-    delete[] code;
 
     /*
     Now let us actually create the compute pipeline.
@@ -642,8 +698,15 @@ void ComputeApplication::cleanup() {
         func(instance, debugReportCallback, NULL);
     }
 
+    //free export image
     vkFreeMemory(device, bufferMemory, NULL);
     vkDestroyBuffer(device, buffer, NULL);  
+
+    //free uniform buffer
+    vkFreeMemory(device, uniformBufferMemory, NULL);
+    vkDestroyBuffer(device, uniformBuffer, NULL);
+
+
     vkDestroyShaderModule(device, computeShaderModule, NULL);
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);

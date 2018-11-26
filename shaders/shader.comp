@@ -4,6 +4,7 @@
 #define WIDTH 3200
 #define HEIGHT 2400
 #define WORKGROUP_SIZE 32
+
 layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
 
 struct Pixel{
@@ -14,6 +15,15 @@ layout(std140, binding = 0) buffer buf
 {
    Pixel imageData[];
 };
+
+layout(binding = 1) uniform UniformBufferObject
+{
+  float brightness;
+  float colorR;
+  float colorG;
+  float colorB;
+
+}ubo;
 
 float rand(vec2 co);
 

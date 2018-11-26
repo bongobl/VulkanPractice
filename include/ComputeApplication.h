@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vulkan/vulkan.h>
 
+#include <array>
 #include <vector>
 #include <string.h>
 #include <assert.h>
@@ -102,10 +103,15 @@ class ComputeApplication{
     */
     uint32_t queueFamilyIndex;
 
+    //for our uniform buffer, in progress
+    VkBuffer uniformBuffer;
+    VkDeviceMemory uniformBufferMemory;
+
 public:
 
 	void run();
 
+private:
     void saveRenderedImage();
 
     void createInstance();
@@ -122,14 +128,15 @@ public:
 
     void createBuffer();
 
+
+    void createUniformBuffer(); //work in progress
+    void writeUniformBuffer();  //work in progress
+
     void createDescriptorSetLayout();
 
     void createDescriptorSet();
 
-    // Read file into array of bytes, and cast to uint32_t*, then return.
-    // The data has been padded, so that it fits into an array uint32_t.
-    uint32_t* readFile(uint32_t& length, const char* filename);
-
+    std::vector<char> readFile(const std::string& filename);
     void createComputePipeline();
 
     void createCommandBuffer();
