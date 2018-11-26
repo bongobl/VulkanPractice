@@ -15,6 +15,6 @@ int main() {
     }
     
     //open image
-    system("mandelbrot.png");
+    system("simpleImage.png");
     return EXIT_SUCCESS;
 }

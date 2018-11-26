@@ -77,7 +77,7 @@ void ComputeApplication::saveRenderedImage() {
     vkUnmapMemory(device, bufferMemory);
 
     // Now we save the acquired color data to a .png.
-    stbi_write_png("mandelbrot.png", WIDTH, HEIGHT, 4, image.data(), WIDTH * 4);
+    stbi_write_png("simpleImage.png", WIDTH, HEIGHT, 4, image.data(), WIDTH * 4);
 }
 
 
@@ -393,7 +393,7 @@ void ComputeApplication::createUniformBuffer(){
     uniformBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     VK_CHECK_RESULT(vkCreateBuffer(device, &uniformBufferCreateInfo, NULL, &uniformBuffer)); // create buffer.
 
-    //memory
+    //bufer memory
     VkMemoryRequirements memoryRequirements;
     vkGetBufferMemoryRequirements(device, uniformBuffer, &memoryRequirements);
 
@@ -413,10 +413,10 @@ void ComputeApplication::createUniformBuffer(){
 void ComputeApplication::writeUniformBuffer(){
 
     UniformBufferObject ubo;
-    ubo.brightness = 1.0f;
+    ubo.brightness = 0.6f;
     ubo.colorR = 1.0f;
-    ubo.colorG = 1.0f;
-    ubo.colorB = 1.0f;
+    ubo.colorG = 0.0f;
+    ubo.colorB = 0.0f;
 
     void* data;
 
@@ -462,8 +462,8 @@ void ComputeApplication::createDescriptorSetLayout() {
     //create descriptor set layout for one binding to a storage buffer
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
     descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorSetLayoutCreateInfo.bindingCount = 1; //number of bindings
-    descriptorSetLayoutCreateInfo.pBindings = &storageBufferBinding;
+    descriptorSetLayoutCreateInfo.bindingCount = 2; //number of bindings
+    descriptorSetLayoutCreateInfo.pBindings = allBindings.data();
 
     // Create the descriptor set layout. 
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
@@ -478,15 +478,17 @@ void ComputeApplication::createDescriptorSet() {
     /*
     Our descriptor pool can only allocate a single storage buffer.
     */
-    VkDescriptorPoolSize descriptorPoolSize = {};
-    descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptorPoolSize.descriptorCount = 1;
+    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[0].descriptorCount = 1;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[1].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolCreateInfo.maxSets = 1; // we only need to allocate one descriptor set from the pool.
-    descriptorPoolCreateInfo.poolSizeCount = 1;
-    descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+    descriptorPoolCreateInfo.poolSizeCount = 2; //2 descriptors total
+    descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
     // create descriptor pool.
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
@@ -514,16 +516,32 @@ void ComputeApplication::createDescriptorSet() {
     descriptorBufferInfo.offset = 0;
     descriptorBufferInfo.range = bufferSize;
 
-    VkWriteDescriptorSet writeDescriptorSet = {};
-    writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writeDescriptorSet.dstSet = descriptorSet; // write to this descriptor set.
-    writeDescriptorSet.dstBinding = 0; // write to the first, and only binding.
-    writeDescriptorSet.descriptorCount = 1; // update a single descriptor.
-    writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // storage buffer.
-    writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+    // Specify the uniform buffer info
+    VkDescriptorBufferInfo descriptorUniformBufferInfo = {};
+    descriptorUniformBufferInfo.buffer = uniformBuffer;
+    descriptorUniformBufferInfo.offset = 0;
+    descriptorUniformBufferInfo.range = sizeof(UniformBufferObject);
+
+
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = descriptorSet; // write to this descriptor set.
+    descriptorWrites[0].dstBinding = 0; // write to the first, and only binding.
+    descriptorWrites[0].descriptorCount = 1; // update a single descriptor.
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // storage buffer.
+    descriptorWrites[0].pBufferInfo = &descriptorBufferInfo;
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = descriptorSet;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;	//??????
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pBufferInfo = &descriptorUniformBufferInfo;
 
     // perform the update of the descriptor set.
-    vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, NULL);
+    vkUpdateDescriptorSets(device, 2, descriptorWrites.data(), 0, NULL);
 }
 
 
