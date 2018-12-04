@@ -25,6 +25,7 @@ layout(binding = 1) uniform UniformBufferObject
 
 }ubo;
 
+
 void main() {
 
 
@@ -37,8 +38,18 @@ void main() {
   float x = float(gl_GlobalInvocationID.x) / float(WIDTH);
   float y = float(gl_GlobalInvocationID.y) / float(HEIGHT);
 
-  int imageIndex = int(WIDTH * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
+  
+
   vec3 color = vec3(ubo.colorR, ubo.colorG, ubo.colorB);
 
+  float aspectRatio = float(WIDTH) / HEIGHT;
+
+  vec2 fromCenter = vec2(x,y) - vec2(0.5f,0.5f);
+  fromCenter.x = fromCenter.x * aspectRatio;
+  
+  float dist = min(1, length(fromCenter) * 2);
+  color = (1 - dist) * color + dist * vec3(0,0,0);
+
+  int imageIndex = int(WIDTH * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
   imageData[imageIndex].value = vec4(ubo.brightness * color,1);
 }
