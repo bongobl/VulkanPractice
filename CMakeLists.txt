@@ -36,7 +36,7 @@ target_link_libraries(vulkan_minimal_compute ${ALL_LIBS} )
 
 
 set(RESOURCE_DIRECTORIES
-    "shaders/"
+    "resources/"
 )
 
 #post build, copy runtime resources to directory

@@ -12,8 +12,9 @@
 
 #include <fstream>
 
-int ComputeApplication::OUTPUT_WIDTH = -1;
-int ComputeApplication::OUTPUT_HEIGHT = -1;
+uint32_t ComputeApplication::OUTPUT_WIDTH = -1;
+uint32_t ComputeApplication::OUTPUT_HEIGHT = -1;
+
 // Used for validating return values of Vulkan API calls.
 #define VK_CHECK_RESULT(f)                                                                              \
 {                                                                                                       \
@@ -76,7 +77,7 @@ void ComputeApplication::run() {
 
 void ComputeApplication::loadImage(){
 
-	string imageName = "vulkan-logo.png";
+	string imageName = "resources/images/vulkan-logo.png";
 
     //read in the file here
     int numChannels = -1;
@@ -628,7 +629,7 @@ void ComputeApplication::createComputePipeline() {
 
     
     //Create a shader module. A shader module basically just encapsulates some shader code.
-    std::vector<char> shaderCode = readFile("shaders/comp.spv");
+    std::vector<char> shaderCode = readFile("resources/shaders/comp.spv");
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());

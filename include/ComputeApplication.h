@@ -20,8 +20,8 @@ const bool enableValidationLayers = true;
 using namespace std;
 class ComputeApplication{
 
-	static int OUTPUT_WIDTH;
-	static int OUTPUT_HEIGHT;
+	static uint32_t OUTPUT_WIDTH;
+	static uint32_t OUTPUT_HEIGHT;
 	
 	struct Pixel {
         float r, g, b, a;
