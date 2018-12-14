@@ -1,5 +1,10 @@
 #include "../include/ComputeApplication.h"
 
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+#endif
+
 #ifndef STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
@@ -23,6 +28,8 @@ struct UniformBufferObject{
     float colorR;
     float colorG;
     float colorB;
+
+    
 };
 
 void ComputeApplication::run() {
@@ -30,17 +37,16 @@ void ComputeApplication::run() {
     storageBufferSize = sizeof(Pixel) * WIDTH * HEIGHT;
 
     
-    // Initialize vulkan:
+    // Initialize vulkan
     createInstance();
     findPhysicalDevice();
     createDevice();
     
-    //create buffer resources on GPU
+    //create and init buffer resources on GPU
     createStorageBuffer();
+    writeToStorageBuffer();
     createUniformBuffer();
-
-    //write to Uniform buffer on GPU
-    writeUniformBuffer();
+    writeToUniformBuffer();
 
     //create descriptor resources
     createDescriptorSetLayout();
@@ -55,14 +61,25 @@ void ComputeApplication::run() {
     // Finally, run the recorded command buffer.
     runCommandBuffer();
 
-    // The former command rendered a mandelbrot set to a buffer.
     // Save that buffer as a png on disk.
     saveRenderedImage();
 
-    // Clean up all vulkan resources.
+    // Clean up all Vulkan resources.
     cleanup();
 }
 
+void ComputeApplication::loadImage(){
+
+    //read in the file here
+    int numChannels = -1;
+    int tempWidth, tempHeight;
+    unsigned char* data;
+    data = stbi_load("temp string", &tempWidth, &tempHeight, &numChannels, STBI_rgb_alpha);
+    if (numChannels == -1) {
+        std::cerr << "Image: Image name " << "temp string" << " not found" << std::endl;
+        return;
+    }
+}
 void ComputeApplication::saveRenderedImage() {
     void* mappedMemory = NULL;
     
@@ -84,7 +101,7 @@ void ComputeApplication::saveRenderedImage() {
     vkUnmapMemory(device, storageBufferMemory);
 
     // Now we save the acquired color data to a .png.
-    stbi_write_png("simpleImage.png", WIDTH, HEIGHT, 4, image.data(), WIDTH * 4);
+    stbi_write_png("Simple Image.png", WIDTH, HEIGHT, 4, image.data(), WIDTH * 4);
 }
 
 
@@ -382,6 +399,23 @@ void ComputeApplication::createStorageBuffer() {
     VK_CHECK_RESULT(vkBindBufferMemory(device, storageBuffer, storageBufferMemory, 0));
 }
 
+void ComputeApplication::writeToStorageBuffer(){
+
+    void* mappedMemory;
+
+    vkMapMemory(device, storageBufferMemory, 0, storageBufferSize, 0, &mappedMemory);
+    Pixel* pixelPointer = (Pixel*)mappedMemory;
+
+    for (int i = 0; i < WIDTH*HEIGHT; i += 1) {
+        pixelPointer[i].r = 0;
+        pixelPointer[i].g = 1;
+        pixelPointer[i].b = 1;
+        pixelPointer[i].a = 1;
+    }
+
+    // Done reading, so unmap.
+    vkUnmapMemory(device, storageBufferMemory);
+}
 void ComputeApplication::createUniformBuffer(){
 
     //buffer
@@ -409,13 +443,13 @@ void ComputeApplication::createUniformBuffer(){
     VK_CHECK_RESULT(vkBindBufferMemory(device, uniformBuffer, uniformBufferMemory,0));
 
 }
-void ComputeApplication::writeUniformBuffer(){
+void ComputeApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
     ubo.brightness = 1.0f;
-    ubo.colorR = 0.8f;
-    ubo.colorG = 0.5f;
-    ubo.colorB = 1.0f;
+    ubo.colorR = 0.0f;
+    ubo.colorG = 1.0f;
+    ubo.colorB = 0.0f;
 
     void* data;
 

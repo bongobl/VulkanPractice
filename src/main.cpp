@@ -15,6 +15,6 @@ int main() {
     }
     
     //open image
-    system("simpleImage.png");
+    system("\"Simple Image.png\"");
     return EXIT_SUCCESS;
 }

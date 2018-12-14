@@ -47,9 +47,13 @@ void main() {
   vec2 fromCenter = vec2(x,y) - vec2(0.5f,0.5f);
   fromCenter.x = fromCenter.x * aspectRatio;
   
-  float dist = min(1, length(fromCenter) * 2);
-  color = (1 - dist) * color + dist * vec3(0,0,0);
+  if( pow(fromCenter.x,2) / pow(0.45f,2) + pow(fromCenter.y,2) / pow(0.3f,2) > 1  ){
+    color = vec3(0,0,0);
+  }
 
   int imageIndex = int(WIDTH * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
   imageData[imageIndex].value = vec4(ubo.brightness * color,1);
+  
+  //vec4 temps = imageData[imageIndex].value;
+  //imageData[imageIndex].value = temps;
 }

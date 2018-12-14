@@ -25,6 +25,10 @@ class ComputeApplication{
         float r, g, b, a;
     };
 
+    // size of our storage buffer in bytes.
+    uint32_t storageBufferSize; 
+
+
     //In order to use Vulkan, you must create an instance. 
     VkInstance instance;
 
@@ -39,7 +43,24 @@ class ComputeApplication{
     //us to interact with the physical device. 
     VkDevice device;
 
-    //Compute shader used to generate final image
+    //for storage buffer, which will be mapped into CPU memory and exported
+    VkBuffer storageBuffer;
+    VkDeviceMemory storageBufferMemory;
+    
+    //Uniform buffer used to pass simple parameters to compute shader
+    VkBuffer uniformBuffer;
+    VkDeviceMemory uniformBufferMemory;
+
+    //Descriptors provide a way of accessing resources in shaders. They allow us to use 
+    //things like uniform buffers, storage buffers and images in GLSL. 
+    //A single descriptor represents a single resource, and several descriptors are organized
+    //into descriptor sets, which are basically just collections of descriptors.
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSet descriptorSet;
+    VkDescriptorSetLayout descriptorSetLayout;
+    
+
+    //Compute shader used to generate final image, encapsulates shader code
     VkShaderModule computeShaderModule;
 
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
@@ -54,26 +75,6 @@ class ComputeApplication{
     VkCommandBuffer commandBuffer;
 
     
-
-    //Descriptors provide a way of accessing resources in shaders. They allow us to use 
-    //things like uniform buffers, storage buffers and images in GLSL. 
-    //A single descriptor represents a single resource, and several descriptors are organized
-    //into descriptor sets, which are basically just collections of descriptors.
-    VkDescriptorPool descriptorPool;
-    VkDescriptorSet descriptorSet;
-    VkDescriptorSetLayout descriptorSetLayout;
-
-    //for storage buffer, which will be mapped into CPU memory and exported
-    VkBuffer storageBuffer;
-    VkDeviceMemory storageBufferMemory;
-    
-    //Uniform buffer used to pass simple parameters to compute shader
-    VkBuffer uniformBuffer;
-    VkDeviceMemory uniformBufferMemory;
-
-    // size of our storage buffer in bytes.
-    uint32_t storageBufferSize; 
-
     //used to enable a basic validation layer
     std::vector<const char *> enabledLayers;
 
@@ -98,34 +99,40 @@ public:
 	void run();
 
 private:
+
+    //Load and saving image
+    void loadImage();
     void saveRenderedImage();
 
     void createInstance();
-
     void findPhysicalDevice();
+    void createDevice();
 
     // Returns the index of a queue family that supports compute operations. 
     uint32_t getComputeQueueFamilyIndex();
 
-    void createDevice();
+
+
+    void createStorageBuffer();
+    void writeToStorageBuffer();
+
+    void createUniformBuffer();
+    void writeToUniformBuffer();
 
     // find memory type with desired properties.
     uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 
-    void createStorageBuffer();
-
-
-    void createUniformBuffer(); //work in progress
-    void writeUniformBuffer();  //work in progress
 
     void createDescriptorSetLayout();
 
     void createDescriptorSet();
 
-    std::vector<char> readFile(const std::string& filename);
+    
     void createComputePipeline();
 
+    std::vector<char> readFile(const std::string& filename);
     void createCommandBuffer();
+
 
     void runCommandBuffer();
 
