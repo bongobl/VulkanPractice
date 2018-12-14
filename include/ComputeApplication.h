@@ -8,8 +8,7 @@
 #include <stdexcept>
 #include <cmath>
 
-const int WIDTH = 3200; // Width of image to render
-const int HEIGHT = 2400; // Height of image to render
+
 const int WORKGROUP_SIZE = 32; //Workgroup size in compute shader.
 
 #ifdef NDEBUG
@@ -21,6 +20,9 @@ const bool enableValidationLayers = true;
 using namespace std;
 class ComputeApplication{
 
+	static int OUTPUT_WIDTH;
+	static int OUTPUT_HEIGHT;
+	
 	struct Pixel {
         float r, g, b, a;
     };
@@ -28,6 +30,8 @@ class ComputeApplication{
     // size of our storage buffer in bytes.
     uint32_t storageBufferSize; 
 
+    //input image data
+    unsigned char* inputImageData;
 
     //In order to use Vulkan, you must create an instance. 
     VkInstance instance;
@@ -104,6 +108,7 @@ private:
     void loadImage();
     void saveRenderedImage();
 
+    //app info
     void createInstance();
     void findPhysicalDevice();
     void createDevice();
@@ -112,7 +117,7 @@ private:
     uint32_t getComputeQueueFamilyIndex();
 
 
-
+    //GPU buffers
     void createStorageBuffer();
     void writeToStorageBuffer();
 

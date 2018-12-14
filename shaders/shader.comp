@@ -1,8 +1,6 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-#define WIDTH 3200
-#define HEIGHT 2400
 #define WORKGROUP_SIZE 32
 
 layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
@@ -23,6 +21,11 @@ layout(binding = 1) uniform UniformBufferObject
   float colorG;
   float colorB;
 
+  uint width;
+  uint height;
+  uint padding1;
+  uint padding2;
+
 }ubo;
 
 
@@ -31,18 +34,18 @@ void main() {
 
   //In order to fit the work into workgroups, some unnecessary threads are launched.
   //We terminate those threads here. 
-  if(gl_GlobalInvocationID.x >= WIDTH || gl_GlobalInvocationID.y >= HEIGHT){
+  if(gl_GlobalInvocationID.x >= ubo.width || gl_GlobalInvocationID.y >= ubo.height){
     return;
   }
 
-  float x = float(gl_GlobalInvocationID.x) / float(WIDTH);
-  float y = float(gl_GlobalInvocationID.y) / float(HEIGHT);
+  float x = float(gl_GlobalInvocationID.x) / float(ubo.width);
+  float y = float(gl_GlobalInvocationID.y) / float(ubo.height);
 
   
 
   vec3 color = vec3(ubo.colorR, ubo.colorG, ubo.colorB);
 
-  float aspectRatio = float(WIDTH) / HEIGHT;
+  float aspectRatio = float(ubo.width) / ubo.height;
 
   vec2 fromCenter = vec2(x,y) - vec2(0.5f,0.5f);
   fromCenter.x = fromCenter.x * aspectRatio;
@@ -51,9 +54,12 @@ void main() {
     color = vec3(0,0,0);
   }
 
-  int imageIndex = int(WIDTH * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
-  imageData[imageIndex].value = vec4(ubo.brightness * color,1);
+  int imageIndex = int(ubo.width * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
+  //imageData[imageIndex].value = vec4(ubo.brightness * color,1);
   
-  //vec4 temps = imageData[imageIndex].value;
-  //imageData[imageIndex].value = temps;
+  vec4 temps = imageData[imageIndex].value;
+
+  imageData[imageIndex].value = temps;
+  imageData[imageIndex].value.r = temps.g;
+  imageData[imageIndex].value.g = temps.r;
 }

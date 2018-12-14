@@ -12,6 +12,8 @@
 
 #include <fstream>
 
+int ComputeApplication::OUTPUT_WIDTH = -1;
+int ComputeApplication::OUTPUT_HEIGHT = -1;
 // Used for validating return values of Vulkan API calls.
 #define VK_CHECK_RESULT(f)                                                                              \
 {                                                                                                       \
@@ -29,12 +31,13 @@ struct UniformBufferObject{
     float colorG;
     float colorB;
 
-    
+    uint32_t width;
+    uint32_t height;
+    uint32_t padding1;
+    uint32_t padding2;
 };
 
 void ComputeApplication::run() {
-    // Buffer size of the storage buffer that will contain the rendered mandelbrot set.
-    storageBufferSize = sizeof(Pixel) * WIDTH * HEIGHT;
 
     
     // Initialize vulkan
@@ -42,6 +45,9 @@ void ComputeApplication::run() {
     findPhysicalDevice();
     createDevice();
     
+    //also sets the width and height
+    loadImage();
+
     //create and init buffer resources on GPU
     createStorageBuffer();
     writeToStorageBuffer();
@@ -70,16 +76,28 @@ void ComputeApplication::run() {
 
 void ComputeApplication::loadImage(){
 
+	string imageName = "vulkan-logo.png";
+
     //read in the file here
     int numChannels = -1;
-    int tempWidth, tempHeight;
-    unsigned char* data;
-    data = stbi_load("temp string", &tempWidth, &tempHeight, &numChannels, STBI_rgb_alpha);
+    int imageWidth, imageHeight;
+
+    //load image
+    inputImageData = stbi_load(imageName.c_str(), &imageWidth, &imageHeight, &numChannels, STBI_rgb_alpha);
     if (numChannels == -1) {
-        std::cerr << "Image: Image name " << "temp string" << " not found" << std::endl;
-        return;
+        std::string error =  "Compute Application::loadImage: failed to load image " + imageName + "\n";
+        throw std::runtime_error(error.c_str());
     }
+    cout << "Num numChannels: " << numChannels << endl;
+    cout << "Width: " << imageWidth << endl << "Height: " << imageHeight << endl;
+
+    OUTPUT_WIDTH = imageWidth;
+    OUTPUT_HEIGHT = imageHeight;
+
+    storageBufferSize = sizeof(Pixel) * OUTPUT_WIDTH * OUTPUT_HEIGHT;
+
 }
+
 void ComputeApplication::saveRenderedImage() {
     void* mappedMemory = NULL;
     
@@ -90,18 +108,24 @@ void ComputeApplication::saveRenderedImage() {
     // Get the color data from the buffer, and cast it to bytes.
     // We save the data to a vector.
     std::vector<unsigned char> image;
-    image.reserve(WIDTH * HEIGHT * 4);
-    for (int i = 0; i < WIDTH*HEIGHT; i += 1) {
-        image.push_back((unsigned char)(255.0f * (pmappedMemory[i].r)));
-        image.push_back((unsigned char)(255.0f * (pmappedMemory[i].g)));
-        image.push_back((unsigned char)(255.0f * (pmappedMemory[i].b)));
-        image.push_back((unsigned char)(255.0f * (pmappedMemory[i].a)));
+    image.reserve(OUTPUT_WIDTH * OUTPUT_HEIGHT * 4);
+    for (int i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
+        //image.push_back((unsigned char)(255.0f * (pmappedMemory[i].r)));
+        //image.push_back((unsigned char)(255.0f * (pmappedMemory[i].g)));
+        ///image.push_back((unsigned char)(255.0f * (pmappedMemory[i].b)));
+        //image.push_back((unsigned char)(255.0f * (pmappedMemory[i].a)));
+
+    	//use this when you don't have to put back in range of 0-255
+        image.push_back((unsigned char)pmappedMemory[i].r);
+        image.push_back((unsigned char)pmappedMemory[i].g);
+        image.push_back((unsigned char)pmappedMemory[i].b);
+        image.push_back((unsigned char)pmappedMemory[i].a);
     }
     // Done reading, so unmap.
     vkUnmapMemory(device, storageBufferMemory);
 
     // Now we save the acquired color data to a .png.
-    stbi_write_png("Simple Image.png", WIDTH, HEIGHT, 4, image.data(), WIDTH * 4);
+    stbi_write_png("Simple Image.png", OUTPUT_WIDTH, OUTPUT_HEIGHT, 4, image.data(), OUTPUT_WIDTH * 4);
 }
 
 
@@ -406,11 +430,11 @@ void ComputeApplication::writeToStorageBuffer(){
     vkMapMemory(device, storageBufferMemory, 0, storageBufferSize, 0, &mappedMemory);
     Pixel* pixelPointer = (Pixel*)mappedMemory;
 
-    for (int i = 0; i < WIDTH*HEIGHT; i += 1) {
-        pixelPointer[i].r = 0;
-        pixelPointer[i].g = 1;
-        pixelPointer[i].b = 1;
-        pixelPointer[i].a = 1;
+    for (int i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
+        pixelPointer[i].r = inputImageData[i * 4 + 0];
+        pixelPointer[i].g = inputImageData[i * 4 + 1];
+        pixelPointer[i].b = inputImageData[i * 4 + 2];
+        pixelPointer[i].a = inputImageData[i * 4 + 3];
     }
 
     // Done reading, so unmap.
@@ -446,10 +470,14 @@ void ComputeApplication::createUniformBuffer(){
 void ComputeApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
+
     ubo.brightness = 1.0f;
     ubo.colorR = 0.0f;
     ubo.colorG = 1.0f;
     ubo.colorB = 0.0f;
+
+    ubo.width = OUTPUT_WIDTH;
+    ubo.height = OUTPUT_HEIGHT;
 
     void* data;
 
@@ -690,7 +718,7 @@ void ComputeApplication::createCommandBuffer() {
     The number of workgroups is specified in the arguments.
     If you are already familiar with compute shaders from OpenGL, this should be nothing new to you.
     */
-    vkCmdDispatch(commandBuffer, (uint32_t)ceil(WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(HEIGHT / float(WORKGROUP_SIZE)), 1);
+    vkCmdDispatch(commandBuffer, (uint32_t)ceil(OUTPUT_WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(OUTPUT_HEIGHT / float(WORKGROUP_SIZE)), 1);
 
     VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer)); // end recording commands.
 }
@@ -737,6 +765,8 @@ void ComputeApplication::cleanup() {
         func(instance, debugReportCallback, NULL);
     }
 
+    //free input image
+   	stbi_image_free(inputImageData);
     //free export image
     vkFreeMemory(device, storageBufferMemory, NULL);
     vkDestroyBuffer(device, storageBuffer, NULL);  
