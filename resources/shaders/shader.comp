@@ -14,12 +14,14 @@ layout(std140, binding = 0) buffer buf
    Pixel imageData[];
 };
 
-layout(binding = 1) uniform UniformBufferObject
+layout(std140, binding = 1) uniform UniformBufferObject
 {
-  float brightness;
-  float colorR;
-  float colorG;
-  float colorB;
+  
+  uint colorR;
+  uint colorG;
+  uint colorB;
+  uint alpha;
+
 
   uint width;
   uint height;
@@ -43,7 +45,7 @@ void main() {
 
   
 
-  vec3 color = vec3(ubo.colorR, ubo.colorG, ubo.colorB);
+  vec4 color = vec4(ubo.colorR, ubo.colorG, ubo.colorB, ubo.alpha);
 
   float aspectRatio = float(ubo.width) / ubo.height;
 
@@ -51,15 +53,15 @@ void main() {
   fromCenter.x = fromCenter.x * aspectRatio;
   
   if( pow(fromCenter.x,2) / pow(0.45f,2) + pow(fromCenter.y,2) / pow(0.3f,2) > 1  ){
-    color = vec3(0,0,0);
+    color.a = 0;
   }
 
   int imageIndex = int(ubo.width * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
-  //imageData[imageIndex].value = vec4(ubo.brightness * color,1);
+  imageData[imageIndex].value = color;
   
-  vec4 temps = imageData[imageIndex].value;
+  //vec4 temps = imageData[imageIndex].value;
 
-  imageData[imageIndex].value = temps;
-  imageData[imageIndex].value.r = temps.g;
-  imageData[imageIndex].value.g = temps.r;
+  //imageData[imageIndex].value = temps;
+  //imageData[imageIndex].value.g = temps.r;
+  //imageData[imageIndex].value.r = temps.g;
 }

@@ -48,3 +48,19 @@ foreach(RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
             "${CMAKE_CURRENT_BINARY_DIR}/${RESOURCE_DIRECTORY}"
     )
 endforeach()
+
+#[[
+function(createFileGroup files)
+    foreach(file ${files})
+        get_filename_component(PARENT_DIRECTORY "${file}" DIRECTORY)
+        string(REPLACE "${CMAKE_SOURCE_DIR}" "" GROUP_NAME "${PARENT_DIRECTORY}")
+        if(MSVC)
+            string(REPLACE "/" "\\" GROUP_NAME "${GROUP_NAME}")
+        endif()
+        source_group("${GROUP_NAME}" FILES "${file}")
+    endforeach()
+endfunction()
+
+createFileGroup("${INCLUDE_FILES}")
+createFileGroup("${SRC_FILES}")
+]]

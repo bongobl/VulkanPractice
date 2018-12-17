@@ -7,7 +7,8 @@
 #include <assert.h>
 #include <stdexcept>
 #include <cmath>
-
+#include <string>
+using namespace std;
 
 const int WORKGROUP_SIZE = 32; //Workgroup size in compute shader.
 

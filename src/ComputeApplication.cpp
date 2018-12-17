@@ -27,10 +27,11 @@ uint32_t ComputeApplication::OUTPUT_HEIGHT = -1;
 }
 
 struct UniformBufferObject{
-    float brightness;
-    float colorR;
-    float colorG;
-    float colorB;
+    
+	uint32_t colorR;
+	uint32_t colorG;
+	uint32_t colorB;
+	uint32_t alpha;
 
     uint32_t width;
     uint32_t height;
@@ -89,6 +90,7 @@ void ComputeApplication::loadImage(){
         std::string error =  "Compute Application::loadImage: failed to load image " + imageName + "\n";
         throw std::runtime_error(error.c_str());
     }
+    cout << "loaded " << imageName << endl;
     cout << "Num numChannels: " << numChannels << endl;
     cout << "Width: " << imageWidth << endl << "Height: " << imageHeight << endl;
 
@@ -110,10 +112,10 @@ void ComputeApplication::saveRenderedImage() {
     // We save the data to a vector.
     std::vector<unsigned char> image;
     image.reserve(OUTPUT_WIDTH * OUTPUT_HEIGHT * 4);
-    for (int i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
+    for (uint32_t i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
         //image.push_back((unsigned char)(255.0f * (pmappedMemory[i].r)));
         //image.push_back((unsigned char)(255.0f * (pmappedMemory[i].g)));
-        ///image.push_back((unsigned char)(255.0f * (pmappedMemory[i].b)));
+        //image.push_back((unsigned char)(255.0f * (pmappedMemory[i].b)));
         //image.push_back((unsigned char)(255.0f * (pmappedMemory[i].a)));
 
     	//use this when you don't have to put back in range of 0-255
@@ -219,9 +221,9 @@ void ComputeApplication::createInstance() {
     createInfo.pApplicationInfo = &applicationInfo;
     
     // Give our desired layers and extensions to vulkan.
-    createInfo.enabledLayerCount = enabledLayers.size();
+    createInfo.enabledLayerCount = (uint32_t)enabledLayers.size();
     createInfo.ppEnabledLayerNames = enabledLayers.data();
-    createInfo.enabledExtensionCount = enabledExtensions.size();
+    createInfo.enabledExtensionCount = (uint32_t)enabledExtensions.size();
     createInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
     /*
@@ -342,7 +344,7 @@ void ComputeApplication::createDevice() {
     VkPhysicalDeviceFeatures deviceFeatures = {};
 
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.enabledLayerCount = enabledLayers.size();  // need to specify validation layers here as well.
+    deviceCreateInfo.enabledLayerCount = (uint32_t)enabledLayers.size();  // need to specify validation layers here as well.
     deviceCreateInfo.ppEnabledLayerNames = enabledLayers.data();
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo; // when creating the logical device, we also specify what queues it has.
     deviceCreateInfo.queueCreateInfoCount = 1;
@@ -430,12 +432,12 @@ void ComputeApplication::writeToStorageBuffer(){
 
     vkMapMemory(device, storageBufferMemory, 0, storageBufferSize, 0, &mappedMemory);
     Pixel* pixelPointer = (Pixel*)mappedMemory;
-
-    for (int i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
-        pixelPointer[i].r = inputImageData[i * 4 + 0];
-        pixelPointer[i].g = inputImageData[i * 4 + 1];
-        pixelPointer[i].b = inputImageData[i * 4 + 2];
-        pixelPointer[i].a = inputImageData[i * 4 + 3];
+    Pixel* cpuSide = (Pixel*)inputImageData;
+    for (uint32_t i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
+        pixelPointer[i].r = (float)inputImageData[i * 4 + 0];
+        pixelPointer[i].g = (float)inputImageData[i * 4 + 1];
+        pixelPointer[i].b = (float)inputImageData[i * 4 + 2];
+        pixelPointer[i].a = (float)inputImageData[i * 4 + 3];
     }
 
     // Done reading, so unmap.
@@ -472,10 +474,10 @@ void ComputeApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 
-    ubo.brightness = 1.0f;
-    ubo.colorR = 0.0f;
-    ubo.colorG = 1.0f;
-    ubo.colorB = 0.0f;
+	ubo.colorR = 255;
+	ubo.colorG = 0;
+	ubo.colorB = 0;
+	ubo.alpha = 255;
 
     ubo.width = OUTPUT_WIDTH;
     ubo.height = OUTPUT_HEIGHT;
