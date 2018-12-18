@@ -2,6 +2,7 @@
 #include "../include/ComputeApplication.h"
 using namespace std;
 
+//On master branch
 int main() {
     ComputeApplication app;
 
