@@ -9,6 +9,7 @@ OpenGL-tutorial_v*
 Thumbs.db
 bin-*/*
 build/*
+GNU_Build/*
 distrib/build_*/*
 makefile
 screenshot.bmp
