@@ -1,1 +1,0 @@
-glslangValidator -V shader.comp
