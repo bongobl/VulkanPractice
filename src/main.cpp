@@ -2,6 +2,7 @@
 #include "../include/ComputeApplication.h"
 using namespace std;
 
+//On Branch UseVkImage
 int main() {
     ComputeApplication app;
 
