@@ -11,7 +11,7 @@ struct Pixel{
 
 layout(std140, binding = 0) buffer buf
 {
-   Pixel imageData[];
+   Pixel inputImageData[];
 };
 
 layout(std140, binding = 1) uniform UniformBufferObject
@@ -25,43 +25,57 @@ layout(std140, binding = 1) uniform UniformBufferObject
 
   uint width;
   uint height;
-  uint padding1;
-  uint padding2;
+  float saturation;
+  float padding2;
 
 }ubo;
 
+layout(std140, binding = 2) buffer buf2
+{
+   Pixel outputImageData[];
+};
+
+vec4 lerp(vec4 first, vec4 second, float param){
+	return (1.0 - param) * first + param * second;
+}
+
+vec4 clamp_0_255(vec4 raw){
+	vec4 retVal = raw;
+
+	if(retVal.r > 255)	retVal.r = 255;
+	if(retVal.r < 0) retVal.r = 0;
+	if(retVal.g > 255)	retVal.g = 255;
+	if(retVal.g < 0) retVal.g = 0;
+	if(retVal.b > 255)	retVal.b = 255;
+	if(retVal.b < 0) retVal.b = 0;
+	if(retVal.a > 255)	retVal.a = 255;
+	if(retVal.a < 0) retVal.a = 0;
+
+	return retVal;
+}
 
 void main() {
 
 
-  //In order to fit the work into workgroups, some unnecessary threads are launched.
-  //We terminate those threads here. 
-  if(gl_GlobalInvocationID.x >= ubo.width || gl_GlobalInvocationID.y >= ubo.height){
-    return;
-  }
+	//In order to fit the work into workgroups, some unnecessary threads are launched.
+	//We terminate those threads here. 
+	if(gl_GlobalInvocationID.x >= ubo.width || gl_GlobalInvocationID.y >= ubo.height){
+	return;
+	}
 
-  float x = float(gl_GlobalInvocationID.x) / float(ubo.width);
-  float y = float(gl_GlobalInvocationID.y) / float(ubo.height);
+	//get image coordinates in range 0-1
+	float x = float(gl_GlobalInvocationID.x) / float(ubo.width);
+	float y = float(gl_GlobalInvocationID.y) / float(ubo.height);
 
-  
 
-  vec4 color = vec4(ubo.colorR, ubo.colorG, ubo.colorB, ubo.alpha);
+	int imageIndex = int(ubo.width * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
 
-  float aspectRatio = float(ubo.width) / ubo.height;
+	
+	
+	float averageLum = (inputImageData[imageIndex].value.r + inputImageData[imageIndex].value.g + inputImageData[imageIndex].value.b) / 3;
+	vec4 grayScale = vec4(averageLum, averageLum, averageLum, inputImageData[imageIndex].value.a);
+	outputImageData[imageIndex].value = clamp_0_255( lerp(grayScale, inputImageData[imageIndex].value, ubo.saturation) );
 
-  vec2 fromCenter = vec2(x,y) - vec2(0.5f,0.5f);
-  fromCenter.x = fromCenter.x * aspectRatio;
-  
-  if( pow(fromCenter.x,2) / pow(0.45f,2) + pow(fromCenter.y,2) / pow(0.3f,2) > 1  ){
-    color.a = 0;
-  }
 
-  int imageIndex = int(ubo.width * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
-  //imageData[imageIndex].value = color;
-  
-  vec4 temps = imageData[imageIndex].value;
-
-  imageData[imageIndex].value = temps;
-  imageData[imageIndex].value.g = temps.r;
-  imageData[imageIndex].value.r = temps.g;
 }
+

@@ -1,0 +1,3 @@
+"C:\Program Files\CMake\bin\cmake.exe" -E remove -f CMakeFiles\vulkan_minimal_compute.dir/objects.a
+C:\PROGRA~1\MINGW6~1\bin\ar.exe cr CMakeFiles\vulkan_minimal_compute.dir/objects.a @CMakeFiles\vulkan_minimal_compute.dir\objects1.rsp
+C:\PROGRA~1\MINGW6~1\bin\G__~1.EXE -O3 -DNDEBUG   -Wl,--whole-archive CMakeFiles\vulkan_minimal_compute.dir/objects.a -Wl,--no-whole-archive  -o vulkan_minimal_compute.exe -Wl,--out-implib,libvulkan_minimal_compute.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\vulkan_minimal_compute.dir\linklibs.rsp

@@ -29,7 +29,7 @@ class ComputeApplication{
     };
 
     // size of our storage buffer in bytes.
-    uint32_t storageBufferSize; 
+    uint32_t imageSize; 
 
     //input image data
     unsigned char* inputImageData;
@@ -48,14 +48,15 @@ class ComputeApplication{
     //us to interact with the physical device. 
     VkDevice device;
 
-    //for storage buffer, which will be mapped into CPU memory and exported
-    VkBuffer storageBuffer;
-    VkDeviceMemory storageBufferMemory;
+    //Stores image loaded from disk
+    VkBuffer inputBuffer;
+    VkDeviceMemory inputBufferMemory;
     
     //Uniform buffer used to pass simple parameters to compute shader
     VkBuffer uniformBuffer;
     VkDeviceMemory uniformBufferMemory;
 
+	//Image buffer to be exported
 	VkBuffer outputBuffer;
 	VkDeviceMemory outputBufferMemory;
 
@@ -122,8 +123,8 @@ private:
 
 
     //GPU buffers
-    void createStorageBuffer();
-    void writeToStorageBuffer();
+    void createInputBuffer();
+    void writeToInputBuffer();
 
     void createUniformBuffer();
     void writeToUniformBuffer();
