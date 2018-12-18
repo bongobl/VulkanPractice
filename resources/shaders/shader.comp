@@ -57,11 +57,11 @@ void main() {
   }
 
   int imageIndex = int(ubo.width * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x);
-  imageData[imageIndex].value = color;
+  //imageData[imageIndex].value = color;
   
-  //vec4 temps = imageData[imageIndex].value;
+  vec4 temps = imageData[imageIndex].value;
 
-  //imageData[imageIndex].value = temps;
-  //imageData[imageIndex].value.g = temps.r;
-  //imageData[imageIndex].value.r = temps.g;
+  imageData[imageIndex].value = temps;
+  imageData[imageIndex].value.g = temps.r;
+  imageData[imageIndex].value.r = temps.g;
 }

@@ -55,6 +55,8 @@ void ComputeApplication::run() {
     writeToStorageBuffer();
     createUniformBuffer();
     writeToUniformBuffer();
+	createOutputBuffer();
+	
 
     //create descriptor resources
     createDescriptorSetLayout();
@@ -453,7 +455,7 @@ void ComputeApplication::createUniformBuffer(){
     uniformBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     VK_CHECK_RESULT(vkCreateBuffer(device, &uniformBufferCreateInfo, NULL, &uniformBuffer)); // create buffer.
 
-    //bufer memory
+    //buffer memory
     VkMemoryRequirements memoryRequirements;
     vkGetBufferMemoryRequirements(device, uniformBuffer, &memoryRequirements);
 
@@ -470,6 +472,8 @@ void ComputeApplication::createUniformBuffer(){
     VK_CHECK_RESULT(vkBindBufferMemory(device, uniformBuffer, uniformBufferMemory,0));
 
 }
+
+
 void ComputeApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
@@ -491,21 +495,38 @@ void ComputeApplication::writeToUniformBuffer(){
     vkUnmapMemory(device, uniformBufferMemory);
 
 }
+
+
+void ComputeApplication::createOutputBuffer() {
+
+	//create output buffer
+	VkBufferCreateInfo outputBufferCreateInfo = {};
+	outputBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	outputBufferCreateInfo.size = storageBufferSize;
+	outputBufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	outputBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	VK_CHECK_RESULT(vkCreateBuffer(device, &outputBufferCreateInfo, NULL, &outputBuffer));
+
+	//create output buffer memory
+	VkMemoryRequirements memoryRequirements;
+	vkGetBufferMemoryRequirements(device, outputBuffer, &memoryRequirements);
+
+	VkMemoryAllocateInfo allocateInfo = {};
+	allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocateInfo.allocationSize = memoryRequirements.size;
+	allocateInfo.memoryTypeIndex = findMemoryType(
+		memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+	);
+
+	VK_CHECK_RESULT(vkAllocateMemory(device, &allocateInfo, NULL, &outputBufferMemory));
+
+	VK_CHECK_RESULT(vkBindBufferMemory(device, outputBuffer, outputBufferMemory, 0));
+
+}
 void ComputeApplication::createDescriptorSetLayout() {
-    /*
-    Here we specify a descriptor set layout. This allows us to bind our descriptors to 
-    resources in the shader. 
 
-    */
 
-    /*
-    Here we specify a binding of type VK_DESCRIPTOR_TYPE_STORAGE_BUFFER to the binding point
-    0. This binds to 
-
-      layout(std140, binding = 0) buffer buf
-
-    in the compute shader.
-    */
     //define a single binding for the buffer
     VkDescriptorSetLayoutBinding storageBufferBinding = {};
     storageBufferBinding.binding = 0; // binding = 0
@@ -515,7 +536,7 @@ void ComputeApplication::createDescriptorSetLayout() {
 
     //define a binding for the UBO
     VkDescriptorSetLayoutBinding uniformBufferBinding = {};
-    uniformBufferBinding.binding = 1;
+    uniformBufferBinding.binding = 1;	//binding = 1
     uniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uniformBufferBinding.descriptorCount = 1;
     uniformBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -534,14 +555,12 @@ void ComputeApplication::createDescriptorSetLayout() {
 }
 
 void ComputeApplication::createDescriptorSet() {
-    /*
-    So we will allocate a descriptor set here.
-    But we need to first create a descriptor pool to do that. 
-    */
-
-    /*
-    Our descriptor pool can only allocate a single storage buffer.
-    */
+    
+    //So we will allocate a descriptor set here.
+    //But we need to first create a descriptor pool to do that. 
+   
+    //Our descriptor pool can only allocate a single storage buffer.
+   
     std::array<VkDescriptorPoolSize, 2> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[0].descriptorCount = 1;
@@ -770,6 +789,7 @@ void ComputeApplication::cleanup() {
 
     //free input image
    	stbi_image_free(inputImageData);
+
     //free export image
     vkFreeMemory(device, storageBufferMemory, NULL);
     vkDestroyBuffer(device, storageBuffer, NULL);  
@@ -777,6 +797,10 @@ void ComputeApplication::cleanup() {
     //free uniform buffer
     vkFreeMemory(device, uniformBufferMemory, NULL);
     vkDestroyBuffer(device, uniformBuffer, NULL);
+
+	//free export image
+	vkFreeMemory(device, outputBufferMemory, NULL);
+	vkDestroyBuffer(device, outputBuffer, NULL);
 
 
     

@@ -56,6 +56,9 @@ class ComputeApplication{
     VkBuffer uniformBuffer;
     VkDeviceMemory uniformBufferMemory;
 
+	VkBuffer outputBuffer;
+	VkDeviceMemory outputBufferMemory;
+
     //Descriptors provide a way of accessing resources in shaders. They allow us to use 
     //things like uniform buffers, storage buffers and images in GLSL. 
     //A single descriptor represents a single resource, and several descriptors are organized
@@ -124,6 +127,8 @@ private:
 
     void createUniformBuffer();
     void writeToUniformBuffer();
+
+	void createOutputBuffer();
 
     // find memory type with desired properties.
     uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
