@@ -26,17 +26,18 @@ uint32_t ComputeApplication::OUTPUT_HEIGHT = -1;
     }                                                                                                   \
 }
 
+struct Color {
+	float r, g, b, a;
+};
+
 struct UniformBufferObject{
     
-	uint32_t colorR;
-	uint32_t colorG;
-	uint32_t colorB;
-	uint32_t alpha;
+	Color color;
 
     uint32_t width;
     uint32_t height;
     float saturation;
-    float padding2;
+    int32_t blur;
 };
 
 void ComputeApplication::run() {
@@ -99,7 +100,7 @@ void ComputeApplication::loadImage(){
     OUTPUT_WIDTH = imageWidth;
     OUTPUT_HEIGHT = imageHeight;
 
-    imageSize = sizeof(Pixel) * OUTPUT_WIDTH * OUTPUT_HEIGHT;
+    imageSize = sizeof(Color) * OUTPUT_WIDTH * OUTPUT_HEIGHT;
 
 }
 
@@ -108,7 +109,7 @@ void ComputeApplication::saveRenderedImage() {
     
     // Map the buffer memory, so that we can read from it on the CPU.
     vkMapMemory(device, outputBufferMemory, 0, imageSize, 0, &mappedMemory);
-    Pixel* pmappedMemory = (Pixel *)mappedMemory;
+    Color* pmappedMemory = (Color *)mappedMemory;
 
     // Get the color data from the buffer, and cast it to bytes.
     // We save the data to a vector.
@@ -428,8 +429,9 @@ void ComputeApplication::writeToInputBuffer(){
     void* mappedMemory;
 
     vkMapMemory(device, inputBufferMemory, 0, imageSize, 0, &mappedMemory);
-    Pixel* pixelPointer = (Pixel*)mappedMemory;
-    Pixel* cpuSide = (Pixel*)inputImageData;
+
+    Color* pixelPointer = (Color*)mappedMemory;
+
     for (uint32_t i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
         pixelPointer[i].r = (float)inputImageData[i * 4 + 0];
         pixelPointer[i].g = (float)inputImageData[i * 4 + 1];
@@ -472,21 +474,19 @@ void ComputeApplication::createUniformBuffer(){
 void ComputeApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
-
-	ubo.colorR = 255;
-	ubo.colorG = 0;
-	ubo.colorB = 0;
-	ubo.alpha = 255;
 	
-	ubo.saturation = 1.7f;
+	ubo.color = { 1.0f, 1.0f, 0.0f, 1.0f };
+	
     ubo.width = OUTPUT_WIDTH;
     ubo.height = OUTPUT_HEIGHT;
+    ubo.saturation = 1.3f;
+    ubo.blur = 91;
 
-    void* data;
+    void* mappedMemory;
 
-    vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &data);
+    vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &mappedMemory);
 
-    memcpy(data, &ubo, sizeof(ubo));
+    memcpy(mappedMemory, &ubo, sizeof(ubo));
 
     vkUnmapMemory(device, uniformBufferMemory);
 

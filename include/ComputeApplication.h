@@ -23,10 +23,6 @@ class ComputeApplication{
 
 	static uint32_t OUTPUT_WIDTH;
 	static uint32_t OUTPUT_HEIGHT;
-	
-	struct Pixel {
-        float r, g, b, a;
-    };
 
     // size of our storage buffer in bytes.
     uint32_t imageSize; 
