@@ -53,9 +53,9 @@ void ComputeApplication::run() {
 
     //create descriptor resources
     createDescriptorSetLayout();
-
-    //create pool from which to create commands from
+    createDescriptorPool();
     createCommandPool();
+
 
     //create and init buffer resources on GPU
     createTextureImage();
@@ -316,7 +316,7 @@ uint32_t ComputeApplication::getComputeQueueFamilyIndex() {
     for (currFamilyIndex = 0; currFamilyIndex < queueFamilies.size(); ++currFamilyIndex) {
         VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
 
-        if (currFamily.queueCount > 0 && (currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+        if (currFamily.queueCount > 0 && (currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT)) {
             // found a queue family with compute. We're done!
             break;
         }
@@ -516,8 +516,8 @@ void ComputeApplication::createDescriptorSetLayout() {
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
 }
 
-void ComputeApplication::createDescriptorSet() {
-    
+void ComputeApplication::createDescriptorPool(){
+
     //So we will allocate a descriptor set here.
     //But we need to first create a descriptor pool to do that. 
    
@@ -528,8 +528,8 @@ void ComputeApplication::createDescriptorSet() {
     poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[1].descriptorCount = 1;
-	poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[2].descriptorCount = 1;
+    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[2].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -539,7 +539,9 @@ void ComputeApplication::createDescriptorSet() {
 
     //Create descriptor pool.
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
-
+}
+void ComputeApplication::createDescriptorSet() {
+    
 
     //With the pool allocated, we can now allocate the descriptor set. 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
@@ -681,6 +683,41 @@ void ComputeApplication::createCommandPool(){
     // must be submitted to queues of this family ONLY. 
     commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
     VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool));
+}
+
+VkCommandBuffer ComputeApplication::beginSingleTimeCommandBuffer(){
+    
+    VkCommandBuffer newCommandBuffer;
+
+    //allocate command buffer
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+    VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &allocInfo, &newCommandBuffer));
+
+    //begin command buffer
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    VK_CHECK_RESULT(vkBeginCommandBuffer(newCommandBuffer, &beginInfo));
+    return newCommandBuffer;
+
+}
+void ComputeApplication::endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer){
+    VK_CHECK_RESULT(vkEndCommandBuffer(singleTimeCmdBuffer));
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &singleTimeCmdBuffer;
+
+    //NEED A GRAPHICS QUEUE
+    vkQueueSubmit(computeQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(computeQueue); 
+    vkFreeCommandBuffers(device, commandPool, 1, &singleTimeCmdBuffer);
+
 }
 void ComputeApplication::createCommandBuffer() {
     

@@ -126,8 +126,8 @@ private:
 
     //layouts and pools
     void createDescriptorSetLayout();
+    void createDescriptorPool();
     void createCommandPool();
-
 
     //GPU buffers
     void createTextureImage();
@@ -152,6 +152,8 @@ private:
     std::vector<char> readFile(const std::string& filename);
 
    
+    VkCommandBuffer beginSingleTimeCommandBuffer();
+    void endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer);
     void createCommandBuffer();
 
 
