@@ -51,7 +51,14 @@ void ComputeApplication::run() {
     //also sets the width and height
     loadImage();
 
+    //create descriptor resources
+    createDescriptorSetLayout();
+
+    //create pool from which to create commands from
+    createCommandPool();
+
     //create and init buffer resources on GPU
+    createTextureImage();
     createInputBuffer();
     writeToInputBuffer();
     createUniformBuffer();
@@ -59,8 +66,6 @@ void ComputeApplication::run() {
 	createOutputBuffer();
 	
 
-    //create descriptor resources
-    createDescriptorSetLayout();
     createDescriptorSet();
 
     //create pipeline
@@ -375,53 +380,26 @@ uint32_t ComputeApplication::findMemoryType(uint32_t memoryTypeBits, VkMemoryPro
     return -1;
 }
 
+void ComputeApplication::createTextureImage(){
+    
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    VkDeviceSize textureImageSize = OUTPUT_WIDTH * OUTPUT_HEIGHT * 4;
+    createBuffer(textureImageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
+
+    void* mappedMemory;
+    vkMapMemory(device, stagingBufferMemory, 0, textureImageSize, 0, &mappedMemory);
+
+    memcpy(mappedMemory, inputImageData, textureImageSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+
+}
 void ComputeApplication::createInputBuffer() {
-    /*
-    We will now create a buffer. We will render the mandelbrot set into this buffer
-    in a computer shade later. 
-    */
-    
-    VkBufferCreateInfo inputBufferCreateInfo = {};
-    inputBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    inputBufferCreateInfo.size = imageSize; // buffer size in bytes. 
-    inputBufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; // buffer is used as a storage buffer.
-    inputBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // buffer is exclusive to a single queue family at a time. 
 
-    VK_CHECK_RESULT(vkCreateBuffer(device, &inputBufferCreateInfo, NULL, &inputBuffer)); // create buffer.
 
-    /*
-    But the buffer doesn't allocate memory for itself, so we must do that manually.
-    */
-
-    /*
-    First, we find the memory requirements for the buffer.
-    */
-    VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(device, inputBuffer, &memoryRequirements);
-    
-    /*
-    Now use obtained memory requirements info to allocate the memory for the buffer.
-    */
-    VkMemoryAllocateInfo allocateInfo = {};
-    allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocateInfo.allocationSize = memoryRequirements.size; // specify required memory.
-    /*
-    There are several types of memory that can be allocated, and we must choose a memory type that:
-
-    1) Satisfies the memory requirements(memoryRequirements.memoryTypeBits). 
-    2) Satifies our own usage requirements. We want to be able to read the buffer memory from the GPU to the CPU
-       with vkMapMemory, so we set VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT. 
-    Also, by setting VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, memory written by the device(GPU) will be easily 
-    visible to the host(CPU), without having to call any extra flushing commands. So mainly for convenience, we set
-    this flag.
-    */
-    allocateInfo.memoryTypeIndex = findMemoryType(
-        memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-
-    VK_CHECK_RESULT(vkAllocateMemory(device, &allocateInfo, NULL, &inputBufferMemory)); // allocate memory on device.
-    
-    // Now associate that allocated memory with the buffer. With that, the buffer is backed by actual memory. 
-    VK_CHECK_RESULT(vkBindBufferMemory(device, inputBuffer, inputBufferMemory, 0));
+    createBuffer(imageSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, inputBuffer, inputBufferMemory);
 }
 
 void ComputeApplication::writeToInputBuffer(){
@@ -444,29 +422,7 @@ void ComputeApplication::writeToInputBuffer(){
 }
 void ComputeApplication::createUniformBuffer(){
 
-    //buffer
-    VkBufferCreateInfo uniformBufferCreateInfo = {};
-    uniformBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    uniformBufferCreateInfo.size = sizeof(UniformBufferObject);
-    uniformBufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    uniformBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VK_CHECK_RESULT(vkCreateBuffer(device, &uniformBufferCreateInfo, NULL, &uniformBuffer)); // create buffer.
-
-    //buffer memory
-    VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(device, uniformBuffer, &memoryRequirements);
-
-    VkMemoryAllocateInfo allocateInfo = {};
-    allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocateInfo.allocationSize = memoryRequirements.size;
-    allocateInfo.memoryTypeIndex = findMemoryType(
-        memoryRequirements.memoryTypeBits,  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-
-    //allocate memory on device
-    VK_CHECK_RESULT(vkAllocateMemory(device, &allocateInfo, NULL, &uniformBufferMemory));
-
-    //bind buffer memory to buffer
-    VK_CHECK_RESULT(vkBindBufferMemory(device, uniformBuffer, uniformBufferMemory,0));
+    createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, uniformBuffer, uniformBufferMemory);
 
 }
 
@@ -475,12 +431,12 @@ void ComputeApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
-	ubo.color = { 1.0f, 1.0f, 0.0f, 1.0f };
+	ubo.color = { 0.6f, 0.6f, 1.0f, 1.0f };
 	
     ubo.width = OUTPUT_WIDTH;
     ubo.height = OUTPUT_HEIGHT;
-    ubo.saturation = 1.3f;
-    ubo.blur = 91;
+    ubo.saturation = 1.4f;
+    ubo.blur = 3;
 
     void* mappedMemory;
 
@@ -495,30 +451,33 @@ void ComputeApplication::writeToUniformBuffer(){
 
 void ComputeApplication::createOutputBuffer() {
 
-	//create output buffer
-	VkBufferCreateInfo outputBufferCreateInfo = {};
-	outputBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	outputBufferCreateInfo.size = imageSize;
-	outputBufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-	outputBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    createBuffer(imageSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, outputBuffer, outputBufferMemory);
 
-	VK_CHECK_RESULT(vkCreateBuffer(device, &outputBufferCreateInfo, NULL, &outputBuffer));
+}
 
-	//create output buffer memory
-	VkMemoryRequirements memoryRequirements;
-	vkGetBufferMemoryRequirements(device, outputBuffer, &memoryRequirements);
+void ComputeApplication::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory){
 
-	VkMemoryAllocateInfo allocateInfo = {};
-	allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocateInfo.allocationSize = memoryRequirements.size;
-	allocateInfo.memoryTypeIndex = findMemoryType(
-		memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-	);
+    //create buffer
+    VkBufferCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    createInfo.size = size;
+    createInfo.usage = usage;
+    createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	VK_CHECK_RESULT(vkAllocateMemory(device, &allocateInfo, NULL, &outputBufferMemory));
+    VK_CHECK_RESULT(vkCreateBuffer(device, &createInfo, NULL, &buffer));
 
-	VK_CHECK_RESULT(vkBindBufferMemory(device, outputBuffer, outputBufferMemory, 0));
+    //create buffer memory
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
 
+    VkMemoryAllocateInfo allocateInfo = {};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocateInfo.allocationSize = memoryRequirements.size;
+    allocateInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties);
+
+    VK_CHECK_RESULT(vkAllocateMemory(device, &allocateInfo, NULL, &bufferMemory));
+
+    VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
 }
 void ComputeApplication::createDescriptorSetLayout() {
 
@@ -709,8 +668,8 @@ void ComputeApplication::createComputePipeline() {
     vkDestroyShaderModule(device, computeShaderModule, NULL);
 }
 
-void ComputeApplication::createCommandBuffer() {
-    
+void ComputeApplication::createCommandPool(){
+
     //We are getting closer to the end. In order to send commands to the device(GPU),
     //we must first record commands into a command buffer.
     //To allocate a command buffer, we must first create a command pool. So let us do that.
@@ -722,7 +681,9 @@ void ComputeApplication::createCommandBuffer() {
     // must be submitted to queues of this family ONLY. 
     commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
     VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool));
-
+}
+void ComputeApplication::createCommandBuffer() {
+    
     
     //Now allocate a command buffer from the command pool. 
     VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};

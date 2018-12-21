@@ -25,7 +25,7 @@ class ComputeApplication{
 	static uint32_t OUTPUT_HEIGHT;
 
     // size of our storage buffer in bytes.
-    uint32_t imageSize; 
+    VkDeviceSize imageSize; 
 
     //input image data
     unsigned char* inputImageData;
@@ -44,6 +44,12 @@ class ComputeApplication{
     //us to interact with the physical device. 
     VkDevice device;
 
+
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
+    VkImageView textureImageView;
+    VkSampler textureSampler;
+
     //Stores image loaded from disk
     VkBuffer inputBuffer;
     VkDeviceMemory inputBufferMemory;
@@ -55,6 +61,7 @@ class ComputeApplication{
 	//Image buffer to be exported
 	VkBuffer outputBuffer;
 	VkDeviceMemory outputBufferMemory;
+
 
     //Descriptors provide a way of accessing resources in shaders. They allow us to use 
     //things like uniform buffers, storage buffers and images in GLSL. 
@@ -117,8 +124,13 @@ private:
     // Returns the index of a queue family that supports compute operations. 
     uint32_t getComputeQueueFamilyIndex();
 
+    //layouts and pools
+    void createDescriptorSetLayout();
+    void createCommandPool();
+
 
     //GPU buffers
+    void createTextureImage();
     void createInputBuffer();
     void writeToInputBuffer();
 
@@ -127,18 +139,19 @@ private:
 
 	void createOutputBuffer();
 
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
     // find memory type with desired properties.
     uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 
 
-    void createDescriptorSetLayout();
+    
 
     void createDescriptorSet();
-
-    
     void createComputePipeline();
 
     std::vector<char> readFile(const std::string& filename);
+
+   
     void createCommandBuffer();
 
 
