@@ -42,7 +42,7 @@ struct UniformBufferObject{
 
 void ComputeApplication::run() {
 
-    
+
     // Initialize vulkan
     createInstance();
     findPhysicalDevice();
@@ -50,6 +50,7 @@ void ComputeApplication::run() {
     
     //also sets the width and height
     loadImage();
+
 
     //create and init buffer resources on GPU
     createInputBuffer();
@@ -63,15 +64,19 @@ void ComputeApplication::run() {
     createDescriptorSetLayout();
     createDescriptorSet();
 
+    
     //create pipeline
     createComputePipeline();
+    
 
     //record command buffer
     createCommandBuffer();
 
+    
     // Finally, run the recorded command buffer.
     runCommandBuffer();
-
+    
+    
     // Save that buffer as a png on disk.
     saveRenderedImage();
 
@@ -475,12 +480,12 @@ void ComputeApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
-	ubo.color = { 1.0f, 1.0f, 0.0f, 1.0f };
+	ubo.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	
     ubo.width = OUTPUT_WIDTH;
     ubo.height = OUTPUT_HEIGHT;
-    ubo.saturation = 1.3f;
-    ubo.blur = 91;
+    ubo.saturation = 1.7f;
+    ubo.blur = 51;
 
     void* mappedMemory;
 
