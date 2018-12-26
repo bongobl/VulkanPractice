@@ -131,6 +131,9 @@ private:
 
     //GPU buffers
     void createTextureImage();
+	void createTextureImageView();
+	void createTextureSampler();
+
     void createInputBuffer();
     void writeToInputBuffer();
 
@@ -139,7 +142,12 @@ private:
 
 	void createOutputBuffer();
 
+
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+
+
     // find memory type with desired properties.
     uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 
