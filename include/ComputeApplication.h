@@ -25,67 +25,68 @@ class ComputeApplication{
 	static uint32_t OUTPUT_HEIGHT;
 
     // size of our storage buffer in bytes.
-    VkDeviceSize imageSize; 
+    static VkDeviceSize outputBufferSize; 
+	static VkDeviceSize inputImageSize;
 
     //input image data
-    unsigned char* inputImageData;
+	static unsigned char* inputImageData;
 
     //In order to use Vulkan, you must create an instance. 
-    VkInstance instance;
+	static VkInstance instance;
 
     //debug callback
-    VkDebugReportCallbackEXT debugReportCallback;
+	static VkDebugReportCallbackEXT debugReportCallback;
     
     //The physical device is some device on the system that supports usage of Vulkan.
     //Often, it is simply a graphics card that supports Vulkan. 
-    VkPhysicalDevice physicalDevice;
+	static VkPhysicalDevice physicalDevice;
 
     //Then we have the logical device VkDevice, which basically allows 
     //us to interact with the physical device. 
-    VkDevice device;
+	static VkDevice device;
 
 
-    VkImage textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView textureImageView;
-    VkSampler textureSampler;
+	static VkImage inputImage;
+	static VkDeviceMemory inputImageMemory;
+	static VkImageView inputImageView;
+	static VkSampler inputImageSampler;
 
     
     //Uniform buffer used to pass simple parameters to compute shader
-    VkBuffer uniformBuffer;
-    VkDeviceMemory uniformBufferMemory;
+	static VkBuffer uniformBuffer;
+	static VkDeviceMemory uniformBufferMemory;
 
 	//Image buffer to be exported
-	VkBuffer outputBuffer;
-	VkDeviceMemory outputBufferMemory;
+	static VkBuffer outputBuffer;
+	static VkDeviceMemory outputBufferMemory;
 
-
+	 
     //Descriptors provide a way of accessing resources in shaders. They allow us to use 
     //things like uniform buffers, storage buffers and images in GLSL. 
     //A single descriptor represents a single resource, and several descriptors are organized
     //into descriptor sets, which are basically just collections of descriptors.
-    VkDescriptorPool descriptorPool;
-    VkDescriptorSet descriptorSet;
-    VkDescriptorSetLayout descriptorSetLayout;
+	static VkDescriptorPool descriptorPool;
+	static VkDescriptorSet descriptorSet;
+	static VkDescriptorSetLayout descriptorSetLayout;
     
 
     //Compute shader used to generate final image, encapsulates shader code
-    VkShaderModule computeShaderModule;
+	static VkShaderModule computeShaderModule;
 
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
     //We will be creating a simple compute pipeline in this application. 
-    VkPipeline computePipeline;
-    VkPipelineLayout pipelineLayout;
+	static VkPipeline computePipeline;
+	static VkPipelineLayout pipelineLayout;
     
 
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
-    VkCommandPool commandPool;
-    VkCommandBuffer mainCommandBuffer;
+	static VkCommandPool commandPool;
+	static VkCommandBuffer mainCommandBuffer;
 
     
     //used to enable a basic validation layer
-    std::vector<const char *> enabledLayers;
+	static std::vector<const char *> enabledLayers;
 
     
     /*In order to execute commands on a device(GPU), the commands must be submitted
@@ -93,87 +94,63 @@ class ComputeApplication{
     is given to the queue. 
 
     There will be different kinds of queues on the device. For this application, 
-    we want a queue that atleast supports compute operations.*/
-    VkQueue computeQueue;
+    we want a queue that supports compute and graphics operations.*/
+	static VkQueue queue;
 
 
     //When submitting a command buffer, you must specify to which queue in the family you are submitting to. 
     //This variable keeps track of the index of that queue in its family. 
-    uint32_t queueFamilyIndex;
+	static uint32_t queueFamilyIndex;
 
     
 
 public:
 
-	void run();
+	static void run();
 
 private:
 
     //Load and saving image
-    void loadImage();
-    void saveRenderedImage();
+	static void loadImage();
+	static void saveRenderedImage();
 
     //app info
-    void createInstance();
-    void findPhysicalDevice();
-    void createDevice();
+	static void createInstance();
+	static void findPhysicalDevice();
+	static void createDevice();
+
 
     // Returns the index of a queue family that supports compute operations. 
-    uint32_t getComputeQueueFamilyIndex();
+	static uint32_t getQueueFamilyIndex();
 
     //layouts and pools
-    void createDescriptorSetLayout();
-    void createDescriptorPool();
-    void createCommandPool();
+	static void createDescriptorSetLayout();
+	static void createDescriptorPool();
+	static void createCommandPool();
 
     //GPU buffers
-    void createTextureImage();
-	void createTextureImageView();
-	void createTextureSampler();
+	static void createInputImage();
+	static void writeToInputImage();
 
-    void createUniformBuffer();
-    void writeToUniformBuffer();
+	static void createInputImageView();
+	static void createInputImageSampler();
 
-	void createOutputBuffer();
+	static void createUniformBuffer();
+	static void writeToUniformBuffer();
 
-	//helpers
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-	void createImage(uint32_t width, uint32_t height, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
+	static void createOutputBuffer();
 
+	
+	static void createDescriptorSet();
+	static void createComputePipeline();
 
-    // find memory type with desired properties.
-    uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
+	static void createMainCommandBuffer();
 
 
-    
+	static void runCommandBuffer();
 
-    void createDescriptorSet();
-    void createComputePipeline();
+	static void cleanup();
 
-    std::vector<char> readFile(const std::string& filename);
-
-   
-    VkCommandBuffer beginSingleTimeCommandBuffer();
-    void endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer);
-    void createCommandBuffer();
-
-
-    void runCommandBuffer();
-
-    void cleanup();
+	friend class Utils;
 };
 
-//debug callback
-VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
-        VkDebugReportFlagsEXT                       flags,
-        VkDebugReportObjectTypeEXT                  objectType,
-        uint64_t                                    object,
-        size_t                                      location,
-        int32_t                                     messageCode,
-        const char*                                 pLayerPrefix,
-        const char*                                 pMessage,
-        void*                                       pUserData 
-
-);

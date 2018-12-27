@@ -1,14 +1,13 @@
 #include <iostream>
-#include "../include/ComputeApplication.h"
+#include <ComputeApplication.h>
 using namespace std;
 
 //On UseVkImage branch
 int main() {
-    ComputeApplication app;
 
     cout << "Running Compute Application" << endl;
     try {
-        app.run();
+		ComputeApplication::run();
     }
     catch (const std::runtime_error& e) {
         printf("%s\n", e.what());

@@ -22,6 +22,7 @@ set (SRC_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set (SRC_FILES
 	"${SRC_DIRECTORY}/main.cpp"
     "${SRC_DIRECTORY}/ComputeApplication.cpp"
+    "${SRC_DIRECTORY}/Utils.cpp"
 )
 
 set(ALL_LIBS ${Vulkan_LIBRARY} )
