@@ -680,13 +680,22 @@ void ComputeApplication::createDescriptorSetLayout() {
 	outputBufferBinding.descriptorCount = 1;
 	outputBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+	//define a binding for an image sampler
+	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	samplerLayoutBinding.binding = 3;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding.pImmutableSamplers = NULL;
+	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 3> allBindings = {storageBufferBinding, uniformBufferBinding, outputBufferBinding };
+    std::array<VkDescriptorSetLayoutBinding, 4> allBindings = {storageBufferBinding, uniformBufferBinding, outputBufferBinding, samplerLayoutBinding };
 
     //create descriptor set layout for binding to a storage buffer, UBO and another storage buffer
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
     descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorSetLayoutCreateInfo.bindingCount = 3; //number of bindings
+    descriptorSetLayoutCreateInfo.bindingCount = (uint32_t)allBindings.size(); //number of bindings
     descriptorSetLayoutCreateInfo.pBindings = allBindings.data();
 
     // Create the descriptor set layout. 
@@ -700,18 +709,20 @@ void ComputeApplication::createDescriptorPool(){
    
     //Our descriptor pool can only allocate a single storage buffer.
    
-    std::array<VkDescriptorPoolSize, 3> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 4> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[1].descriptorCount = 1;
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[2].descriptorCount = 1;
+	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[3].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolCreateInfo.maxSets = 1; // we only need to allocate one descriptor set from the pool.
-    descriptorPoolCreateInfo.poolSizeCount = 3; //3 descriptors total
+	descriptorPoolCreateInfo.poolSizeCount = (uint32_t)poolSizes.size();
     descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
     //Create descriptor pool.
@@ -753,8 +764,14 @@ void ComputeApplication::createDescriptorSet() {
 	outputBufferInfo.offset = 0;
 	outputBufferInfo.range = imageSize;
 
+	// Specify the image sampler info
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageView = textureImageView;
+	imageInfo.sampler = textureSampler;
 
-    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
+
+    std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
 
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = descriptorSet; // write to this descriptor set.
@@ -777,6 +794,14 @@ void ComputeApplication::createDescriptorSet() {
 	descriptorWrites[2].descriptorCount = 1; // update a single descriptor.
 	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // storage buffer.
 	descriptorWrites[2].pBufferInfo = &outputBufferInfo;
+
+	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[3].dstSet = descriptorSet;
+	descriptorWrites[3].dstBinding = 3;
+	descriptorWrites[3].dstArrayElement = 0;
+	descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[3].descriptorCount = 1;
+	descriptorWrites[3].pImageInfo = &imageInfo;
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);

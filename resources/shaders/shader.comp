@@ -12,11 +12,13 @@ struct Color{
   vec4 value;
 };
 
+//BINDING 0
 layout(std140, binding = 0) buffer buf
 {
    Color inputImageData[];
 };
 
+//BINDING 1
 layout(std140, binding = 1) uniform UniformBufferObject
 {
   
@@ -29,10 +31,15 @@ layout(std140, binding = 1) uniform UniformBufferObject
 
 }ubo;
 
+//BINDING 2
 layout(std140, binding = 2) buffer buf2
 {
    Color outputImageData[];
 };
+
+//BINDING 3
+layout(binding = 3) uniform sampler2D texSampler;
+
 
 vec4 lerp(vec4 first, vec4 second, float param){
 	return (1.0 - param) * first + param * second;
@@ -133,6 +140,8 @@ void main() {
 
 	//check 0 - 255 bounds of final color value
 	outputImageData[b * ubo.width + a].value = clamp_0_255(outputImageData[b * ubo.width + a].value);
+
+	outputImageData[b * ubo.width + a].value = texture(texSampler,vec2(x,y)) * vec4(255,255,255,255);
 
 }
 
