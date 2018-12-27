@@ -50,9 +50,6 @@ class ComputeApplication{
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    //Stores image loaded from disk
-    VkBuffer inputBuffer;
-    VkDeviceMemory inputBufferMemory;
     
     //Uniform buffer used to pass simple parameters to compute shader
     VkBuffer uniformBuffer;
@@ -84,7 +81,7 @@ class ComputeApplication{
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
     VkCommandPool commandPool;
-    VkCommandBuffer commandBuffer;
+    VkCommandBuffer mainCommandBuffer;
 
     
     //used to enable a basic validation layer
@@ -134,18 +131,16 @@ private:
 	void createTextureImageView();
 	void createTextureSampler();
 
-    void createInputBuffer();
-    void writeToInputBuffer();
-
     void createUniformBuffer();
     void writeToUniformBuffer();
 
 	void createOutputBuffer();
 
-
+	//helpers
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	void createImage(uint32_t width, uint32_t height, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
 
 
     // find memory type with desired properties.

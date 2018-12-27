@@ -13,10 +13,7 @@ struct Color{
 };
 
 //BINDING 0
-layout(std140, binding = 0) buffer buf
-{
-   Color inputImageData[];
-};
+layout(binding = 0) uniform sampler2D texSampler;
 
 //BINDING 1
 layout(std140, binding = 1) uniform UniformBufferObject
@@ -37,8 +34,6 @@ layout(std140, binding = 2) buffer buf2
    Color outputImageData[];
 };
 
-//BINDING 3
-layout(binding = 3) uniform sampler2D texSampler;
 
 
 vec4 lerp(vec4 first, vec4 second, float param){
@@ -68,18 +63,6 @@ float gaussKernel(int x, int n) {
 	return base * pow(E, exp);
 }
 
-vec4 GetPixelWrapped(int x, int y) {
-
-	//if(x > int(ubo.width) || y > int(ubo.height) || x < 0 || y < 0)
-	//	return vec4(0,0,0,0);
-	//return inputImageData[ubo.width * y + x].value;
-
-	if (x > ubo.width) { x -= int(ubo.width); }
-	if (y > ubo.height) { y -= int(ubo.height); }
-	if (x < 0) { x += int(ubo.width); }
-	if (y < 0) { y += int(ubo.height); }
-	return inputImageData[ubo.width * y + x].value;
-}
 
 vec4 saturate(vec4 raw, float saturation){
 
@@ -100,48 +83,18 @@ void main() {
 	float x = float(gl_GlobalInvocationID.x) / float(ubo.width);
 	float y = float(gl_GlobalInvocationID.y) / float(ubo.height);
 
-	
 
-	int n = ubo.blur;
-
-	//error check
-	if (n < 3) {
-		n = 3;
-	}
-	if (n % 2 == 0) {
-		n += 1;
-	}
-
-	int radius = int(floor(n / 2));
 	int a = int(gl_GlobalInvocationID.x);
 	int b = int(gl_GlobalInvocationID.y);
-	float runningSumR = 0, runningSumG = 0, runningSumB = 0, runningSumAlpha = 0;
-	float runningGauss = 0;
-
-
-	//iterate over window
-	for (int y = b - radius; y <= b + radius; ++y) {
-		for (int x = a - radius; x <= a + radius; ++x) {
-
-			float gaussCoeff = gaussKernel(x - a, n) * gaussKernel(y - b, n);
-			runningGauss += gaussCoeff;
-
-			runningSumR += gaussCoeff * GetPixelWrapped(x, y).r;
-			runningSumG += gaussCoeff * GetPixelWrapped(x, y).g;
-			runningSumB += gaussCoeff * GetPixelWrapped(x, y).b;
-			runningSumAlpha += gaussCoeff * GetPixelWrapped(x, y).a;
-		}
-	}
-	outputImageData[b * ubo.width + a].value = 
-		vec4(runningSumR/runningGauss, runningSumG/runningGauss, runningSumB/runningGauss, runningSumAlpha/runningGauss);
+	
+	//sample input image
+	outputImageData[b * ubo.width + a].value = texture(texSampler,vec2(x,y)) * vec4(255,255,255,255);
 
 	//saturation
 	outputImageData[b * ubo.width + a].value = saturate(ubo.color * outputImageData[b * ubo.width + a].value, ubo.saturation);
 
 	//check 0 - 255 bounds of final color value
 	outputImageData[b * ubo.width + a].value = clamp_0_255(outputImageData[b * ubo.width + a].value);
-
-	outputImageData[b * ubo.width + a].value = texture(texSampler,vec2(x,y)) * vec4(255,255,255,255);
 
 }
 

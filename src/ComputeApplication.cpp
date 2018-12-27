@@ -62,8 +62,6 @@ void ComputeApplication::run() {
 	createTextureImageView();
 	createTextureSampler();
 
-    createInputBuffer();
-    writeToInputBuffer();
     createUniformBuffer();
     writeToUniformBuffer();
 	createOutputBuffer();
@@ -405,37 +403,7 @@ void ComputeApplication::createTextureImage(){
     vkUnmapMemory(device, stagingBufferMemory);
 
 
-    //Texture Image
-    VkImageCreateInfo imageInfo = {};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = OUTPUT_WIDTH;
-    imageInfo.extent.height = OUTPUT_HEIGHT;
-    imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = 1;
-    imageInfo.arrayLayers = 1;
-    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.flags = 0;
-
-    VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, NULL, &textureImage));
-
-    //Texture Image Memory
-    VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(device, textureImage, &memoryRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memoryRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, NULL,&textureImageMemory));
-
-    VK_CHECK_RESULT(vkBindImageMemory(device, textureImage, textureImageMemory, 0));
+	createImage(OUTPUT_WIDTH, OUTPUT_HEIGHT, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
 
 	transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	copyBufferToImage(stagingBuffer, textureImage, OUTPUT_WIDTH, OUTPUT_HEIGHT);
@@ -447,6 +415,40 @@ void ComputeApplication::createTextureImage(){
 	vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
+void ComputeApplication::createImage(uint32_t width, uint32_t height, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory) {
+	
+	//Texture Image
+	VkImageCreateInfo imageInfo = {};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width = width;
+	imageInfo.extent.height = height;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage = usage;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.flags = 0;
+
+	VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, NULL, &image));
+
+	//Texture Image Memory
+	VkMemoryRequirements memoryRequirements;
+	vkGetImageMemoryRequirements(device, image, &memoryRequirements);
+
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memoryRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties);
+
+	VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, NULL, &imageMemory));
+
+	VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
+}
 void ComputeApplication::createTextureImageView() {
 
 	VkImageViewCreateInfo imageViewCreateInfo = {};
@@ -486,30 +488,8 @@ void ComputeApplication::createTextureSampler() {
 	VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, NULL, &textureSampler));
 
 }
-void ComputeApplication::createInputBuffer() {
 
 
-    createBuffer(imageSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, inputBuffer, inputBufferMemory);
-}
-
-void ComputeApplication::writeToInputBuffer(){
-
-    void* mappedMemory;
-
-    vkMapMemory(device, inputBufferMemory, 0, imageSize, 0, &mappedMemory);
-
-    Color* pixelPointer = (Color*)mappedMemory;
-
-    for (uint32_t i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
-        pixelPointer[i].r = (float)inputImageData[i * 4 + 0];
-        pixelPointer[i].g = (float)inputImageData[i * 4 + 1];
-        pixelPointer[i].b = (float)inputImageData[i * 4 + 2];
-        pixelPointer[i].a = (float)inputImageData[i * 4 + 3];
-    }
-
-    // Done reading, so unmap.
-    vkUnmapMemory(device, inputBufferMemory);
-}
 void ComputeApplication::createUniformBuffer(){
 
     createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, uniformBuffer, uniformBufferMemory);
@@ -521,12 +501,12 @@ void ComputeApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
-	ubo.color = { 0.6f, 1.0f, 0.6f, 1.0f };
+	ubo.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	
     ubo.width = OUTPUT_WIDTH;
     ubo.height = OUTPUT_HEIGHT;
-    ubo.saturation = 1.4f;
-    ubo.blur = 27;
+    ubo.saturation = 1.6f;
+    ubo.blur = 27;	//doesn't work yet
 
     void* mappedMemory;
 
@@ -659,12 +639,13 @@ void ComputeApplication::copyBufferToImage(VkBuffer buffer, VkImage image, uint3
 void ComputeApplication::createDescriptorSetLayout() {
 
 
-    //define a single binding for a storage buffer
-    VkDescriptorSetLayoutBinding storageBufferBinding = {};
-    storageBufferBinding.binding = 0; // binding = 0
-    storageBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    storageBufferBinding.descriptorCount = 1;
-    storageBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	//define a binding for an image sampler
+	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	samplerLayoutBinding.binding = 0;	//binding = 0
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding.pImmutableSamplers = NULL;
+	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
     //define a binding for a UBO
     VkDescriptorSetLayoutBinding uniformBufferBinding = {};
@@ -680,17 +661,11 @@ void ComputeApplication::createDescriptorSetLayout() {
 	outputBufferBinding.descriptorCount = 1;
 	outputBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-	//define a binding for an image sampler
-	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-	samplerLayoutBinding.binding = 3;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = NULL;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	
 
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 4> allBindings = {storageBufferBinding, uniformBufferBinding, outputBufferBinding, samplerLayoutBinding };
+    std::array<VkDescriptorSetLayoutBinding, 3> allBindings = { samplerLayoutBinding, uniformBufferBinding, outputBufferBinding};
 
     //create descriptor set layout for binding to a storage buffer, UBO and another storage buffer
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
@@ -709,15 +684,14 @@ void ComputeApplication::createDescriptorPool(){
    
     //Our descriptor pool can only allocate a single storage buffer.
    
-    std::array<VkDescriptorPoolSize, 4> poolSizes = {};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[0].descriptorCount = 1;
+    std::array<VkDescriptorPoolSize, 3> poolSizes = {};
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[1].descriptorCount = 1;
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[2].descriptorCount = 1;
-	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = 1;
+	
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -746,11 +720,11 @@ void ComputeApplication::createDescriptorSet() {
     We use vkUpdateDescriptorSets() to update the descriptor set.
     */
 
-    // Specify the input buffer to bind to the descriptor.
-    VkDescriptorBufferInfo storageBufferInfo = {};
-    storageBufferInfo.buffer = inputBuffer;
-    storageBufferInfo.offset = 0;
-    storageBufferInfo.range = imageSize;
+	// Specify the image sampler info
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageView = textureImageView;
+	imageInfo.sampler = textureSampler;
 
     // Specify the uniform buffer info
     VkDescriptorBufferInfo descriptorUniformBufferInfo = {};
@@ -764,21 +738,18 @@ void ComputeApplication::createDescriptorSet() {
 	outputBufferInfo.offset = 0;
 	outputBufferInfo.range = imageSize;
 
-	// Specify the image sampler info
-	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = textureImageView;
-	imageInfo.sampler = textureSampler;
+	
 
 
-    std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
+    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
 
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = descriptorSet; // write to this descriptor set.
-    descriptorWrites[0].dstBinding = 0; // write to the first, and only binding.
-    descriptorWrites[0].descriptorCount = 1; // update a single descriptor.
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // storage buffer.
-    descriptorWrites[0].pBufferInfo = &storageBufferInfo;
+	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = descriptorSet;
+	descriptorWrites[0].dstBinding = 0;
+	descriptorWrites[0].dstArrayElement = 0;
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pImageInfo = &imageInfo;
 
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[1].dstSet = descriptorSet;
@@ -795,13 +766,7 @@ void ComputeApplication::createDescriptorSet() {
 	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // storage buffer.
 	descriptorWrites[2].pBufferInfo = &outputBufferInfo;
 
-	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[3].dstSet = descriptorSet;
-	descriptorWrites[3].dstBinding = 3;
-	descriptorWrites[3].dstArrayElement = 0;
-	descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrites[3].descriptorCount = 1;
-	descriptorWrites[3].pImageInfo = &imageInfo;
+	
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
@@ -935,7 +900,7 @@ void ComputeApplication::createCommandBuffer() {
     // submitted to a queue. To keep things simple, we use a primary command buffer. 
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     commandBufferAllocateInfo.commandBufferCount = 1; // allocate a single command buffer. 
-    VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer)); // allocate command buffer.
+    VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &mainCommandBuffer)); // allocate command buffer.
 
     /*
     Now we shall start recording commands into the newly allocated command buffer. 
@@ -943,24 +908,24 @@ void ComputeApplication::createCommandBuffer() {
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // the buffer is only submitted and used once in this application.
-    VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffer, &beginInfo)); // start recording commands.
+    VK_CHECK_RESULT(vkBeginCommandBuffer(mainCommandBuffer, &beginInfo)); // start recording commands.
 
     /*
     We need to bind a pipeline, AND a descriptor set before we dispatch.
 
     The validation layer will NOT give warnings if you forget these, so be very careful not to forget them.
     */
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+    vkCmdBindPipeline(mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+    vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
     /*
     Calling vkCmdDispatch basically starts the compute pipeline, and executes the compute shader.
     The number of workgroups is specified in the arguments.
     If you are already familiar with compute shaders from OpenGL, this should be nothing new to you.
     */
-    vkCmdDispatch(commandBuffer, (uint32_t)ceil(OUTPUT_WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(OUTPUT_HEIGHT / float(WORKGROUP_SIZE)), 1);
+    vkCmdDispatch(mainCommandBuffer, (uint32_t)ceil(OUTPUT_WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(OUTPUT_HEIGHT / float(WORKGROUP_SIZE)), 1);
 
-    VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer)); // end recording commands.
+    VK_CHECK_RESULT(vkEndCommandBuffer(mainCommandBuffer)); // end recording commands.
 }
 
 void ComputeApplication::runCommandBuffer() {
@@ -969,7 +934,7 @@ void ComputeApplication::runCommandBuffer() {
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1; // submit a single command buffer
-    submitInfo.pCommandBuffers = &commandBuffer; // the command buffer to submit.
+    submitInfo.pCommandBuffers = &mainCommandBuffer; // the command buffer to submit.
 
     //Create a fence to make the CPU wait for the GPU to finish before proceeding 
     VkFence fence;
@@ -1007,10 +972,6 @@ void ComputeApplication::cleanup() {
 
     //free input image
    	stbi_image_free(inputImageData);
-
-    //free export image
-    vkFreeMemory(device, inputBufferMemory, NULL);
-    vkDestroyBuffer(device, inputBuffer, NULL);  
 
     //free uniform buffer
     vkFreeMemory(device, uniformBufferMemory, NULL);
