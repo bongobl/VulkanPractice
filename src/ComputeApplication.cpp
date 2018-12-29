@@ -388,7 +388,16 @@ void ComputeApplication::createDevice() {
 
 void ComputeApplication::createInputImage(){
     
-	Utils::createImage(OUTPUT_WIDTH, OUTPUT_HEIGHT, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, inputImage, inputImageMemory);
+	Utils::createImage(
+		OUTPUT_WIDTH,		//Width
+		OUTPUT_HEIGHT,		//Height
+		VK_FORMAT_R8G8B8A8_UNORM,	//Format
+		VK_IMAGE_TILING_OPTIMAL,	//Tiling
+		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,	//Usage
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//Memory properties
+		inputImage,			//image
+		inputImageMemory);	//image memory
+
 }
 
 void ComputeApplication::writeToInputImage() {
@@ -401,14 +410,14 @@ void ComputeApplication::writeToInputImage() {
 	Utils::createBuffer(inputImageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
 
 	void* mappedMemory;
+    
 	vkMapMemory(device, stagingBufferMemory, 0, inputImageSize, 0, &mappedMemory);
-
 	memcpy(mappedMemory, inputImageData, inputImageSize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
-	Utils::transitionImageLayout(inputImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	Utils::copyBufferToImage(stagingBuffer, inputImage, OUTPUT_WIDTH, OUTPUT_HEIGHT);
-	Utils::transitionImageLayout(inputImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 
 	//Clean Up Staging Buffer
@@ -453,7 +462,7 @@ void ComputeApplication::writeToUniformBuffer(){
 	
     ubo.width = OUTPUT_WIDTH;
     ubo.height = OUTPUT_HEIGHT;
-    ubo.saturation = 1.6f;
+    ubo.saturation = -1.0f;
     ubo.blur = 27;	//doesn't work yet
 
     void* mappedMemory;

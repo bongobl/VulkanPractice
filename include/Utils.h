@@ -7,11 +7,14 @@ using namespace std;
 class Utils{
 
 	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
-	static void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	static void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
 	static void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-	static void createImage(uint32_t width, uint32_t height, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
+	static void copyImageToBuffer(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	static void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
+	
 	static VkCommandBuffer beginSingleTimeCommandBuffer();
 	static void endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer);
+	
 	static void createImageSampler(VkSampler &sampler);
 	static std::vector<char> readFile(const std::string& filename);
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);

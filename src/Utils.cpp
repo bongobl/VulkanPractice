@@ -2,7 +2,7 @@
 #include <ComputeApplication.h>
 
 
-void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
+void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
 	
 	//create buffer
 	VkBufferCreateInfo createInfo = {};
@@ -20,14 +20,118 @@ void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPr
 	VkMemoryAllocateInfo allocateInfo = {};
 	allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocateInfo.allocationSize = memoryRequirements.size;
-	allocateInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties);
+	allocateInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, propertyFlags);
 
 	VK_CHECK_RESULT(vkAllocateMemory(ComputeApplication::device, &allocateInfo, NULL, &bufferMemory));
 
 	VK_CHECK_RESULT(vkBindBufferMemory(ComputeApplication::device, buffer, bufferMemory, 0));
 }
 
-void Utils::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+void Utils::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkImage &image, VkDeviceMemory& imageMemory) {
+	
+	//Texture Image
+	VkImageCreateInfo imageInfo = {};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width = width;
+	imageInfo.extent.height = height;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.format = format;
+	imageInfo.tiling = tiling;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage = usage;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.flags = 0;
+
+	VK_CHECK_RESULT(vkCreateImage(ComputeApplication::device, &imageInfo, NULL, &image));
+
+	//Texture Image Memory
+	VkMemoryRequirements memoryRequirements;
+	vkGetImageMemoryRequirements(ComputeApplication::device, image, &memoryRequirements);
+
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memoryRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, propertyFlags);
+
+	VK_CHECK_RESULT(vkAllocateMemory(ComputeApplication::device, &allocInfo, NULL, &imageMemory));
+
+	VK_CHECK_RESULT(vkBindImageMemory(ComputeApplication::device, image, imageMemory, 0));
+}
+
+
+
+void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+
+	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
+
+	VkBufferImageCopy region = {};
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+
+	region.imageOffset = { 0,0,0 };
+	region.imageExtent = {
+		width,
+		height,
+		1
+	};
+
+	vkCmdCopyBufferToImage(
+		singleTimeCommandBuffer,
+		buffer,
+		image,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1,
+		&region
+	);
+	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
+}
+
+void Utils::copyImageToBuffer(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height){
+
+	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
+
+	VkBufferImageCopy region = {};
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+
+	region.imageOffset = { 0,0,0 };
+	region.imageExtent = {
+		width,
+		height,
+		1
+	};
+
+	vkCmdCopyImageToBuffer(
+		singleTimeCommandBuffer,
+		image,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		buffer,
+		1,
+		&region
+	);
+
+	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
+
+}
+
+
+void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
 
 	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
 
@@ -82,72 +186,6 @@ void Utils::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout 
 	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
 }
 
-void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-
-	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
-
-	VkBufferImageCopy region = {};
-	region.bufferOffset = 0;
-	region.bufferRowLength = 0;
-	region.bufferImageHeight = 0;
-
-	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	region.imageSubresource.mipLevel = 0;
-	region.imageSubresource.baseArrayLayer = 0;
-	region.imageSubresource.layerCount = 1;
-
-	region.imageOffset = { 0,0,0 };
-	region.imageExtent = {
-		width,
-		height,
-		1
-	};
-
-	vkCmdCopyBufferToImage(
-		singleTimeCommandBuffer,
-		buffer,
-		image,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		1,
-		&region
-	);
-	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
-}
-
-void Utils::createImage(uint32_t width, uint32_t height, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory) {
-	
-	//Texture Image
-	VkImageCreateInfo imageInfo = {};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = width;
-	imageInfo.extent.height = height;
-	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.usage = usage;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.flags = 0;
-
-	VK_CHECK_RESULT(vkCreateImage(ComputeApplication::device, &imageInfo, NULL, &image));
-
-	//Texture Image Memory
-	VkMemoryRequirements memoryRequirements;
-	vkGetImageMemoryRequirements(ComputeApplication::device, image, &memoryRequirements);
-
-	VkMemoryAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memoryRequirements.size;
-	allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties);
-
-	VK_CHECK_RESULT(vkAllocateMemory(ComputeApplication::device, &allocInfo, NULL, &imageMemory));
-
-	VK_CHECK_RESULT(vkBindImageMemory(ComputeApplication::device, image, imageMemory, 0));
-}
 
 VkCommandBuffer Utils::beginSingleTimeCommandBuffer() {
 
@@ -166,6 +204,7 @@ VkCommandBuffer Utils::beginSingleTimeCommandBuffer() {
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	VK_CHECK_RESULT(vkBeginCommandBuffer(newCommandBuffer, &beginInfo));
+	
 	return newCommandBuffer;
 }
 
@@ -239,7 +278,7 @@ uint32_t Utils::findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags pr
 			((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties))
 			return i;
 	}
-	return -1;
+	throw std::runtime_error("Memory type not found");
 }
 
 //debug callback

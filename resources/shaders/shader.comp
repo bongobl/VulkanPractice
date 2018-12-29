@@ -35,7 +35,6 @@ layout(std140, binding = 2) buffer buf2
 };
 
 
-
 vec4 lerp(vec4 first, vec4 second, float param){
 	return (1.0 - param) * first + param * second;
 }
@@ -89,6 +88,7 @@ void main() {
 	
 	//sample input image
 	outputImageData[b * ubo.width + a].value = texture(texSampler,vec2(x,y)) * vec4(255,255,255,255);
+
 
 	//saturation
 	outputImageData[b * ubo.width + a].value = saturate(ubo.color * outputImageData[b * ubo.width + a].value, ubo.saturation);
