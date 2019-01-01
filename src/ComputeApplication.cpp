@@ -24,11 +24,13 @@ VkDevice ComputeApplication::device;
 VkImage ComputeApplication::inputImage;
 VkDeviceMemory ComputeApplication::inputImageMemory;
 VkImageView ComputeApplication::inputImageView;
-VkSampler ComputeApplication::inputImageSampler;
 VkBuffer ComputeApplication::uniformBuffer;
 VkDeviceMemory ComputeApplication::uniformBufferMemory;
 VkBuffer ComputeApplication::outputBuffer;
 VkDeviceMemory ComputeApplication::outputBufferMemory;
+VkImage ComputeApplication::outputImage;
+VkDeviceMemory ComputeApplication::outputImageMemory;
+VkImageView ComputeApplication::outputImageView;
 VkDescriptorPool ComputeApplication::descriptorPool;
 VkDescriptorSet ComputeApplication::descriptorSet;
 VkDescriptorSetLayout ComputeApplication::descriptorSetLayout;
@@ -78,12 +80,15 @@ void ComputeApplication::run() {
 	writeToInputImage();
 
 	createInputImageView();
-	createInputImageSampler();
 
     createUniformBuffer();
     writeToUniformBuffer();
 
+	//will remove
 	createOutputBuffer();
+
+	createOutputImage();
+	createOutputImageView();
 
     createDescriptorSet();
 
@@ -396,7 +401,8 @@ void ComputeApplication::createInputImage(){
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,	//Usage
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//Memory properties
 		inputImage,			//image
-		inputImageMemory);	//image memory
+		inputImageMemory	//image memory
+	);	
 
 }
 
@@ -426,25 +432,10 @@ void ComputeApplication::writeToInputImage() {
 }
 void ComputeApplication::createInputImageView() {
 
-	VkImageViewCreateInfo imageViewCreateInfo = {};
-	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	imageViewCreateInfo.image = inputImage;
-	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	imageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-	imageViewCreateInfo.subresourceRange.levelCount = 1;
-	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-	imageViewCreateInfo.subresourceRange.layerCount = 1;
-
-	VK_CHECK_RESULT( vkCreateImageView(device, &imageViewCreateInfo, NULL, &inputImageView));
+	Utils::createImageView(inputImage, inputImageView);
 }
 
-void ComputeApplication::createInputImageSampler() {
 
-	Utils::createImageSampler(inputImageSampler);
-
-}
 
 
 void ComputeApplication::createUniformBuffer(){
@@ -482,6 +473,27 @@ void ComputeApplication::createOutputBuffer() {
 
 }
 
+void ComputeApplication::createOutputImage() {
+	
+	Utils::createImage(
+		OUTPUT_WIDTH,		//Width
+		OUTPUT_HEIGHT,		//Height
+		VK_FORMAT_R8G8B8A8_UNORM,	//Format
+		VK_IMAGE_TILING_OPTIMAL,	//Tiling
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,	//Usage
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//Memory properties
+		outputImage,			//image
+		outputImageMemory	//image memory
+	);
+
+	Utils::transitionImageLayout(outputImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+}
+
+void ComputeApplication::createOutputImageView() {
+
+	Utils::createImageView(outputImage, outputImageView);
+}
 
 void ComputeApplication::createDescriptorSetLayout() {
 
@@ -571,7 +583,6 @@ void ComputeApplication::createDescriptorSet() {
 	VkDescriptorImageInfo imageInfo = {};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	imageInfo.imageView = inputImageView;
-	imageInfo.sampler = inputImageSampler;
 	
     // Specify the uniform buffer info
     VkDescriptorBufferInfo descriptorUniformBufferInfo = {};
@@ -764,22 +775,27 @@ void ComputeApplication::cleanup() {
         func(instance, debugReportCallback, NULL);
     }
 
-    //free input image
+    //free CPU image buffer
    	stbi_image_free(inputImageData);
 
     //free uniform buffer
     vkFreeMemory(device, uniformBufferMemory, NULL);
     vkDestroyBuffer(device, uniformBuffer, NULL);
 
-	//free export image
+	//free output image
 	vkFreeMemory(device, outputBufferMemory, NULL);
 	vkDestroyBuffer(device, outputBuffer, NULL);
 
-	//free textureImage
+
+	//free input Image
 	vkFreeMemory(device, inputImageMemory, NULL);
 	vkDestroyImage(device, inputImage, NULL);
-	vkDestroySampler(device, inputImageSampler, NULL);
 	vkDestroyImageView(device, inputImageView, NULL);
+
+	//free output Image
+	vkFreeMemory(device, outputImageMemory, NULL);
+	vkDestroyImage(device, outputImage, NULL);
+	vkDestroyImageView(device, outputImageView, NULL);
 
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);

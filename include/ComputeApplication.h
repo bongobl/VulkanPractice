@@ -46,10 +46,10 @@ class ComputeApplication{
 	static VkDevice device;
 
 
+	//Input image
 	static VkImage inputImage;
 	static VkDeviceMemory inputImageMemory;
 	static VkImageView inputImageView;
-	static VkSampler inputImageSampler;
 
     
     //Uniform buffer used to pass simple parameters to compute shader
@@ -60,6 +60,10 @@ class ComputeApplication{
 	static VkBuffer outputBuffer;
 	static VkDeviceMemory outputBufferMemory;
 
+	//Output Image
+	static VkImage outputImage;
+	static VkDeviceMemory outputImageMemory;
+	static VkImageView outputImageView;
 	 
     //Descriptors provide a way of accessing resources in shaders. They allow us to use 
     //things like uniform buffers, storage buffers and images in GLSL. 
@@ -128,18 +132,17 @@ private:
 	static void createDescriptorPool();
 	static void createCommandPool();
 
-    //GPU buffers
+    //GPU resources
 	static void createInputImage();
 	static void writeToInputImage();
-
 	static void createInputImageView();
-	static void createInputImageSampler();
 
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
 
 	static void createOutputBuffer();
-
+	static void createOutputImage();
+	static void createOutputImageView();
 	
 	static void createDescriptorSet();
 	static void createComputePipeline();
