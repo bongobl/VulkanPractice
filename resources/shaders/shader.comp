@@ -13,7 +13,10 @@ struct Color{
 };
 
 //BINDING 0
-layout(binding = 0) uniform sampler2D texSampler;
+//layout(binding = 0) uniform sampler2D texSampler;
+layout (binding = 0, rgba8 ) uniform image2D inputImage;
+
+
 
 //BINDING 1
 layout(std140, binding = 1) uniform UniformBufferObject
@@ -87,8 +90,8 @@ void main() {
 	int b = int(gl_GlobalInvocationID.y);
 	
 	//sample input image
-	outputImageData[b * ubo.width + a].value = texture(texSampler,vec2(x,y)) * vec4(255,255,255,255);
-
+	//outputImageData[b * ubo.width + a].value = texture(texSampler,vec2(x,y)) * vec4(255,255,255,255);
+	outputImageData[b * ubo.width + a].value = imageLoad(inputImage, ivec2(a, b)) * vec4(255,255,255,255);
 
 	//saturation
 	outputImageData[b * ubo.width + a].value = saturate(ubo.color * outputImageData[b * ubo.width + a].value, ubo.saturation);

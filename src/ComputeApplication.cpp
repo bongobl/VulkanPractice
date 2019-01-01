@@ -393,7 +393,7 @@ void ComputeApplication::createInputImage(){
 		OUTPUT_HEIGHT,		//Height
 		VK_FORMAT_R8G8B8A8_UNORM,	//Format
 		VK_IMAGE_TILING_OPTIMAL,	//Tiling
-		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,	//Usage
+		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,	//Usage
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//Memory properties
 		inputImage,			//image
 		inputImageMemory);	//image memory
@@ -417,7 +417,7 @@ void ComputeApplication::writeToInputImage() {
 
 	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	Utils::copyBufferToImage(stagingBuffer, inputImage, OUTPUT_WIDTH, OUTPUT_HEIGHT);
-	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 
 
 	//Clean Up Staging Buffer
@@ -462,7 +462,7 @@ void ComputeApplication::writeToUniformBuffer(){
 	
     ubo.width = OUTPUT_WIDTH;
     ubo.height = OUTPUT_HEIGHT;
-    ubo.saturation = -1.0f;
+    ubo.saturation = 1.5f;
     ubo.blur = 27;	//doesn't work yet
 
     void* mappedMemory;
@@ -490,7 +490,7 @@ void ComputeApplication::createDescriptorSetLayout() {
 	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
 	samplerLayoutBinding.binding = 0;	//binding = 0
 	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	samplerLayoutBinding.pImmutableSamplers = NULL;
 	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
@@ -532,7 +532,7 @@ void ComputeApplication::createDescriptorPool(){
     //Our descriptor pool can only allocate a single storage buffer.
    
     std::array<VkDescriptorPoolSize, 3> poolSizes = {};
-	poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[1].descriptorCount = 1;
@@ -569,10 +569,10 @@ void ComputeApplication::createDescriptorSet() {
 
 	// Specify the image sampler info
 	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	imageInfo.imageView = inputImageView;
 	imageInfo.sampler = inputImageSampler;
-
+	
     // Specify the uniform buffer info
     VkDescriptorBufferInfo descriptorUniformBufferInfo = {};
     descriptorUniformBufferInfo.buffer = uniformBuffer;
@@ -593,7 +593,7 @@ void ComputeApplication::createDescriptorSet() {
 	descriptorWrites[0].dstSet = descriptorSet;
 	descriptorWrites[0].dstBinding = 0;
 	descriptorWrites[0].dstArrayElement = 0;
-	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	descriptorWrites[0].descriptorCount = 1;
 	descriptorWrites[0].pImageInfo = &imageInfo;
 

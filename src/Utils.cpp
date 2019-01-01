@@ -160,7 +160,7 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 		destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 	}
 	//to get ready for shader sampling
-	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL) {
 		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
