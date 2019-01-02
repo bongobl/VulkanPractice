@@ -26,7 +26,7 @@ class ComputeApplication{
 
     // size of our storage buffer in bytes.
     static VkDeviceSize outputBufferSize; 
-	static VkDeviceSize inputImageSize;
+	static VkDeviceSize imageSize;
 
     //input image data
 	static unsigned char* inputImageData;
@@ -116,7 +116,6 @@ private:
 
     //Load and saving image
 	static void loadImage();
-	static void saveRenderedImage();
 
     //app info
 	static void createInstance();
@@ -141,9 +140,11 @@ private:
 	static void writeToUniformBuffer();
 
 	static void createOutputBuffer();
+
 	static void createOutputImage();
 	static void createOutputImageView();
-	
+	static void exportOutputImage();
+
 	static void createDescriptorSet();
 	static void createComputePipeline();
 

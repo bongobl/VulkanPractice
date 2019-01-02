@@ -15,7 +15,7 @@
 uint32_t ComputeApplication::OUTPUT_WIDTH = -1;
 uint32_t ComputeApplication::OUTPUT_HEIGHT = -1;
 VkDeviceSize ComputeApplication::outputBufferSize;
-VkDeviceSize ComputeApplication::inputImageSize;
+VkDeviceSize ComputeApplication::imageSize;
 unsigned char* ComputeApplication::inputImageData;
 VkInstance ComputeApplication::instance;
 VkDebugReportCallbackEXT ComputeApplication::debugReportCallback;
@@ -102,7 +102,7 @@ void ComputeApplication::run() {
     runCommandBuffer();
 
     // Save that buffer as a png on disk.
-    saveRenderedImage();
+	exportOutputImage();
 
     // Clean up all Vulkan resources.
     cleanup();
@@ -122,6 +122,7 @@ void ComputeApplication::loadImage(){
         std::string error =  "Compute Application::loadImage: failed to load image " + imageName + "\n";
         throw std::runtime_error(error.c_str());
     }
+
     cout << "loaded " << imageName << endl;
     cout << "Num numChannels: " << numChannels << endl;
     cout << "Width: " << imageWidth << endl << "Height: " << imageHeight << endl;
@@ -130,34 +131,33 @@ void ComputeApplication::loadImage(){
     OUTPUT_HEIGHT = imageHeight;
 
     outputBufferSize = sizeof(Color) * OUTPUT_WIDTH * OUTPUT_HEIGHT;
-	inputImageSize = OUTPUT_WIDTH * OUTPUT_HEIGHT * 4;
+	imageSize = OUTPUT_WIDTH * OUTPUT_HEIGHT * 4;
 }
 
-void ComputeApplication::saveRenderedImage() {
-    void* mappedMemory = NULL;
-    
-    // Map the buffer memory, so that we can read from it on the CPU.
-    vkMapMemory(device, outputBufferMemory, 0, outputBufferSize, 0, &mappedMemory);
-    Color* pmappedMemory = (Color *)mappedMemory;
+void ComputeApplication::exportOutputImage() {
 
-    // Get the color data from the buffer, and cast it to bytes.
-    // We save the data to a vector.
-    std::vector<unsigned char> image;
-    image.reserve(OUTPUT_WIDTH * OUTPUT_HEIGHT * 4);
-    for (uint32_t i = 0; i < OUTPUT_WIDTH * OUTPUT_HEIGHT; i += 1) {
+	//Buffer
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
 
-        image.push_back((unsigned char)pmappedMemory[i].r);
-        image.push_back((unsigned char)pmappedMemory[i].g);
-        image.push_back((unsigned char)pmappedMemory[i].b);
-        image.push_back((unsigned char)pmappedMemory[i].a);
-    }
-    // Done reading, so unmap.
-    vkUnmapMemory(device, outputBufferMemory);
+	Utils::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
 
-    // Now we save the acquired color data to a .png.
-    stbi_write_png("Simple Image.png", OUTPUT_WIDTH, OUTPUT_HEIGHT, 4, image.data(), OUTPUT_WIDTH * 4);
+	Utils::transitionImageLayout(outputImage, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	Utils::copyImageToBuffer(stagingBuffer, outputImage, OUTPUT_WIDTH, OUTPUT_HEIGHT);
+
+	void* mappedMemory;
+	vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &mappedMemory);
+
+	stbi_write_png("Simple Image.png", OUTPUT_WIDTH, OUTPUT_HEIGHT, 4, mappedMemory, OUTPUT_WIDTH * 4);
+
+	//write pixels to another array
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	//Clean Up Staging Buffer
+	vkDestroyBuffer(device, stagingBuffer, nullptr);
+	vkFreeMemory(device, stagingBufferMemory, nullptr);
+
 }
-
 void ComputeApplication::createInstance() {
     std::vector<const char *> enabledExtensions;
 
@@ -413,12 +413,12 @@ void ComputeApplication::writeToInputImage() {
 	VkDeviceMemory stagingBufferMemory;
 
 
-	Utils::createBuffer(inputImageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
+	Utils::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
 
 	void* mappedMemory;
     
-	vkMapMemory(device, stagingBufferMemory, 0, inputImageSize, 0, &mappedMemory);
-	memcpy(mappedMemory, inputImageData, inputImageSize);
+	vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &mappedMemory);
+	memcpy(mappedMemory, inputImageData, imageSize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
 	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -520,11 +520,16 @@ void ComputeApplication::createDescriptorSetLayout() {
 	outputBufferBinding.descriptorCount = 1;
 	outputBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+	VkDescriptorSetLayoutBinding outputImageBinding = {};
+	outputImageBinding.binding = 3;	//binding = 3
+	outputImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	outputImageBinding.descriptorCount = 1;
+	outputImageBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	
 
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 3> allBindings = { samplerLayoutBinding, uniformBufferBinding, outputBufferBinding};
+    std::array<VkDescriptorSetLayoutBinding, 4> allBindings = { samplerLayoutBinding, uniformBufferBinding, outputBufferBinding, outputImageBinding};
 
     //create descriptor set layout for binding to a storage buffer, UBO and another storage buffer
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
@@ -543,13 +548,15 @@ void ComputeApplication::createDescriptorPool(){
    
     //Our descriptor pool can only allocate a single storage buffer.
    
-    std::array<VkDescriptorPoolSize, 3> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 4> poolSizes = {};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[1].descriptorCount = 1;
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[2].descriptorCount = 1;
+	poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	poolSizes[3].descriptorCount = 1;
 	
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -579,10 +586,10 @@ void ComputeApplication::createDescriptorSet() {
     We use vkUpdateDescriptorSets() to update the descriptor set.
     */
 
-	// Specify the image sampler info
-	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	imageInfo.imageView = inputImageView;
+	// Specify the input image info
+	VkDescriptorImageInfo inputImageInfo = {};
+	inputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	inputImageInfo.imageView = inputImageView;
 	
     // Specify the uniform buffer info
     VkDescriptorBufferInfo descriptorUniformBufferInfo = {};
@@ -596,9 +603,13 @@ void ComputeApplication::createDescriptorSet() {
 	outputBufferInfo.offset = 0;
 	outputBufferInfo.range = outputBufferSize;
 
-	
+	// Specify the output image info
+	VkDescriptorImageInfo outputImageInfo = {};
+	outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	outputImageInfo.imageView = outputImageView;
 
-    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
+
+    std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
 
 	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrites[0].dstSet = descriptorSet;
@@ -606,7 +617,7 @@ void ComputeApplication::createDescriptorSet() {
 	descriptorWrites[0].dstArrayElement = 0;
 	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	descriptorWrites[0].descriptorCount = 1;
-	descriptorWrites[0].pImageInfo = &imageInfo;
+	descriptorWrites[0].pImageInfo = &inputImageInfo;
 
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[1].dstSet = descriptorSet;
@@ -622,6 +633,14 @@ void ComputeApplication::createDescriptorSet() {
 	descriptorWrites[2].descriptorCount = 1; // update a single descriptor.
 	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // storage buffer.
 	descriptorWrites[2].pBufferInfo = &outputBufferInfo;
+
+	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[3].dstSet = descriptorSet;
+	descriptorWrites[3].dstBinding = 3;
+	descriptorWrites[3].dstArrayElement = 0;
+	descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	descriptorWrites[3].descriptorCount = 1;
+	descriptorWrites[3].pImageInfo = &outputImageInfo;
 
 	
 
