@@ -13,8 +13,7 @@ struct Color{
 };
 
 //BINDING 0
-//layout(binding = 0) uniform sampler2D texSampler;
-layout (binding = 0, rgba8 ) uniform image2D inputImage;
+layout (binding = 0, rgba8) uniform image2D inputImage;
 
 
 
@@ -45,16 +44,16 @@ vec4 lerp(vec4 first, vec4 second, float param){
 	return (1.0 - param) * first + param * second;
 }
 
-vec4 clamp_0_255(vec4 raw){
+vec4 clamp_0_1(vec4 raw){
 	vec4 retVal = raw;
 
-	if(retVal.r > 255)	retVal.r = 255;
+	if(retVal.r > 1)	retVal.r = 1;
 	if(retVal.r < 0) retVal.r = 0;
-	if(retVal.g > 255)	retVal.g = 255;
+	if(retVal.g > 1)	retVal.g = 1;
 	if(retVal.g < 0) retVal.g = 0;
-	if(retVal.b > 255)	retVal.b = 255;
+	if(retVal.b > 1)	retVal.b = 1;
 	if(retVal.b < 0) retVal.b = 0;
-	if(retVal.a > 255)	retVal.a = 255;
+	if(retVal.a > 1)	retVal.a = 1;
 	if(retVal.a < 0) retVal.a = 0;
 
 	return retVal;
@@ -68,6 +67,16 @@ float gaussKernel(int x, int n) {
 	return base * pow(E, exp);
 }
 
+vec4 GetPixelWrapped(int x, int y) {
+
+
+	if (x >= ubo.width) { x -= int(ubo.width); }
+	if (y >= ubo.height) { y -= int(ubo.height); }
+	if (x < 0) { x += int(ubo.width); }
+	if (y < 0) { y += int(ubo.height); }
+
+	return imageLoad(inputImage, ivec2(x, y));
+}
 
 vec4 saturate(vec4 raw, float saturation){
 
@@ -92,18 +101,50 @@ void main() {
 	int a = int(gl_GlobalInvocationID.x);
 	int b = int(gl_GlobalInvocationID.y);
 	
+
+	int n = ubo.blur;
+
+	//error check
+	if (n < 3) {
+		n = 3;
+	}
+	if (n % 2 == 0) {
+		n += 1;
+	}
+
+	int radius = int(floor(n / 2));
+	float runningSumR = 0, runningSumG = 0, runningSumB = 0, runningSumAlpha = 0;
+	float runningGauss = 0;
+
+
+	//iterate over window
+	for (int y = b - radius; y <= b + radius; ++y) {
+		for (int x = a - radius; x <= a + radius; ++x) {
+
+			float gaussCoeff = gaussKernel(x - a, n) * gaussKernel(y - b, n);
+			runningGauss += gaussCoeff;
+
+			runningSumR += gaussCoeff * GetPixelWrapped(x, y).r;
+			runningSumG += gaussCoeff * GetPixelWrapped(x, y).g;
+			runningSumB += gaussCoeff * GetPixelWrapped(x, y).b;
+			runningSumAlpha += gaussCoeff * GetPixelWrapped(x, y).a;
+		}
+	}
+	vec4 colorValue  = 
+		vec4(runningSumR/runningGauss, runningSumG/runningGauss, runningSumB/runningGauss, runningSumAlpha/runningGauss);
+
+
 	//sample input image
-	//outputImageData[b * ubo.width + a].value = texture(texSampler,vec2(x,y)) * vec4(255,255,255,255);
-	outputImageData[b * ubo.width + a].value = imageLoad(inputImage, ivec2(a, b)) * vec4(255,255,255,255);
+	//vec4 colorValue = imageLoad(inputImage, ivec2(a, b));
 
 	//saturation
-	outputImageData[b * ubo.width + a].value = saturate(ubo.color * outputImageData[b * ubo.width + a].value, ubo.saturation);
+	colorValue = saturate(ubo.color * colorValue, ubo.saturation);
 
-	//check 0 - 255 bounds of final color value
-	outputImageData[b * ubo.width + a].value = clamp_0_255(outputImageData[b * ubo.width + a].value);
+	//check 0 - 1 bounds of final color value
+	colorValue = clamp_0_1(colorValue);
 
 	//test output Image
-	imageStore(outputImage, ivec2(a,b), imageLoad(inputImage, ivec2(ubo.width - a, b)));
+	imageStore(outputImage, ivec2(a,b), colorValue);
 
 }
 

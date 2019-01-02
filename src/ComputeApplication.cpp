@@ -110,7 +110,7 @@ void ComputeApplication::run() {
 
 void ComputeApplication::loadImage(){
 
-	string imageName = "resources/images/beach.png";
+	string imageName = "resources/images/oahu.jpg";
 
     //read in the file here
     int numChannels = -1;
@@ -453,8 +453,8 @@ void ComputeApplication::writeToUniformBuffer(){
 	
     ubo.width = OUTPUT_WIDTH;
     ubo.height = OUTPUT_HEIGHT;
-    ubo.saturation = 1.5f;
-    ubo.blur = 27;	//doesn't work yet
+    ubo.saturation = 1.4f;
+    ubo.blur = 75;
 
     void* mappedMemory;
 
