@@ -12,9 +12,8 @@
 
 #include <fstream>
 
-uint32_t ComputeApplication::OUTPUT_WIDTH = -1;
-uint32_t ComputeApplication::OUTPUT_HEIGHT = -1;
-VkDeviceSize ComputeApplication::outputBufferSize;
+uint32_t ComputeApplication::IMAGE_WIDTH = -1;
+uint32_t ComputeApplication::IMAGE_HEIGHT = -1;
 VkDeviceSize ComputeApplication::imageSize;
 unsigned char* ComputeApplication::inputImageData;
 VkInstance ComputeApplication::instance;
@@ -26,8 +25,6 @@ VkDeviceMemory ComputeApplication::inputImageMemory;
 VkImageView ComputeApplication::inputImageView;
 VkBuffer ComputeApplication::uniformBuffer;
 VkDeviceMemory ComputeApplication::uniformBufferMemory;
-VkBuffer ComputeApplication::outputBuffer;
-VkDeviceMemory ComputeApplication::outputBufferMemory;
 VkImage ComputeApplication::outputImage;
 VkDeviceMemory ComputeApplication::outputImageMemory;
 VkImageView ComputeApplication::outputImageView;
@@ -39,9 +36,18 @@ VkPipeline ComputeApplication::computePipeline;
 VkPipelineLayout ComputeApplication::pipelineLayout;
 VkCommandPool ComputeApplication::commandPool;
 VkCommandBuffer ComputeApplication::mainCommandBuffer;
-std::vector<const char *> ComputeApplication::enabledLayers;
-VkQueue ComputeApplication::queue;
 uint32_t ComputeApplication::queueFamilyIndex;
+VkQueue ComputeApplication::queue;
+
+
+const std::vector<const char *> ComputeApplication::requiredInstanceLayers = {
+	"VK_LAYER_LUNARG_standard_validation"
+};
+const std::vector<const char *> ComputeApplication::requiredInstanceExtensions = {
+	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
+};
+
+
 
 
 struct Color {
@@ -84,9 +90,6 @@ void ComputeApplication::run() {
     createUniformBuffer();
     writeToUniformBuffer();
 
-	//will remove
-	createOutputBuffer();
-
 	createOutputImage();
 	createOutputImageView();
 
@@ -127,11 +130,10 @@ void ComputeApplication::loadImage(){
     cout << "Num numChannels: " << numChannels << endl;
     cout << "Width: " << imageWidth << endl << "Height: " << imageHeight << endl;
 
-    OUTPUT_WIDTH = imageWidth;
-    OUTPUT_HEIGHT = imageHeight;
+    IMAGE_WIDTH = imageWidth;
+    IMAGE_HEIGHT = imageHeight;
 
-    outputBufferSize = sizeof(Color) * OUTPUT_WIDTH * OUTPUT_HEIGHT;
-	imageSize = OUTPUT_WIDTH * OUTPUT_HEIGHT * 4;
+	imageSize = IMAGE_WIDTH * IMAGE_HEIGHT * 4;
 }
 
 void ComputeApplication::exportOutputImage() {
@@ -143,12 +145,13 @@ void ComputeApplication::exportOutputImage() {
 	Utils::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
 
 	Utils::transitionImageLayout(outputImage, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	Utils::copyImageToBuffer(stagingBuffer, outputImage, OUTPUT_WIDTH, OUTPUT_HEIGHT);
+	Utils::copyImageToBuffer(stagingBuffer, outputImage, IMAGE_WIDTH, IMAGE_HEIGHT);
 
 	void* mappedMemory;
 	vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &mappedMemory);
 
-	stbi_write_png("Simple Image.png", OUTPUT_WIDTH, OUTPUT_HEIGHT, 4, mappedMemory, OUTPUT_WIDTH * 4);
+	//write output image to disk as a png
+	stbi_write_png("Simple Image.png", IMAGE_WIDTH, IMAGE_HEIGHT, 4, mappedMemory, IMAGE_WIDTH * 4);
 
 	//write pixels to another array
 	vkUnmapMemory(device, stagingBufferMemory);
@@ -159,84 +162,71 @@ void ComputeApplication::exportOutputImage() {
 
 }
 void ComputeApplication::createInstance() {
-    std::vector<const char *> enabledExtensions;
+    
 
-    /*
-    By enabling validation layers, Vulkan will emit warnings if the API
-    is used incorrectly. We shall enable the layer VK_LAYER_LUNARG_standard_validation,
-    which is basically a collection of several useful validation layers.
-    */
-    if (enableValidationLayers) {
-        /*
-        We get all supported layers with vkEnumerateInstanceLayerProperties.
-        */
-        uint32_t layerCount;
-        vkEnumerateInstanceLayerProperties(&layerCount, NULL);
+	//Make sure all required instance layers/extensions are supported and throw a runtime error if not
+	if (enableValidationLayers) {
 
-        std::vector<VkLayerProperties> layerProperties(layerCount);
-        vkEnumerateInstanceLayerProperties(&layerCount, layerProperties.data());
+		//Check for presence of required layers
+		uint32_t numAvailableLayers;
 
-        /*
-        And then we simply check if VK_LAYER_LUNARG_standard_validation is among the supported layers.
-        */
-        bool foundLayer = false;
-        for (VkLayerProperties prop : layerProperties) {
-            
-            if (strcmp("VK_LAYER_LUNARG_standard_validation", prop.layerName) == 0) {
-                foundLayer = true;
-                break;
-            }
+		vkEnumerateInstanceLayerProperties(&numAvailableLayers, NULL);
+		std::vector<VkLayerProperties> allAvailableLayerProps(numAvailableLayers);
+		vkEnumerateInstanceLayerProperties(&numAvailableLayers, allAvailableLayerProps.data());
 
-        }
+		for (const char* currRequiredLayer : requiredInstanceLayers) {
+
+			bool foundRequiredLayer = false;
+			for (VkLayerProperties currAvailableLayerProp : allAvailableLayerProps) {
+				if (strcmp(currRequiredLayer, currAvailableLayerProp.layerName) == 0) {
+					foundRequiredLayer = true;
+					break;
+				}
+			}
+			if (!foundRequiredLayer) {
+				string errorMessage = "Layer " + string(currRequiredLayer) + " not supported\n";
+				throw std::runtime_error(errorMessage);
+			}
+		}
         
-        if (!foundLayer) {
-            throw std::runtime_error("Layer VK_LAYER_LUNARG_standard_validation not supported\n");
-        }
-        enabledLayers.push_back("VK_LAYER_LUNARG_standard_validation"); // Alright, we can use this layer.
-
-        /*
-        We need to enable an extension named VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-        in order to be able to print the warnings emitted by the validation layer.
-
-        So again, we just check if the extension is among the supported extensions.
-        */
         
-        uint32_t extensionCount;
+		//check for presence of required extensions
+        uint32_t numAvailableExtensions;
         
-        vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
-        std::vector<VkExtensionProperties> extensionProperties(extensionCount);
-        vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, extensionProperties.data());
+        vkEnumerateInstanceExtensionProperties(NULL, &numAvailableExtensions, NULL);
+        std::vector<VkExtensionProperties> allAvailableExtensionProps(numAvailableExtensions);
+        vkEnumerateInstanceExtensionProperties(NULL, &numAvailableExtensions, allAvailableExtensionProps.data());
 
-        bool foundExtension = false;
-        for (VkExtensionProperties prop : extensionProperties) {
-            if (strcmp(VK_EXT_DEBUG_REPORT_EXTENSION_NAME, prop.extensionName) == 0) {
-                foundExtension = true;
-                break;
-            }
 
-        }
+		for (const char* currRequiredExtension : requiredInstanceExtensions) {
 
-        if (!foundExtension) {
-            throw std::runtime_error("Extension VK_EXT_DEBUG_REPORT_EXTENSION_NAME not supported\n");
-        }
-        enabledExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+			bool foundRequiredExtension = false;
+			for (VkExtensionProperties currAvailableExtProp : allAvailableExtensionProps) {
+				if (strcmp(currRequiredExtension, currAvailableExtProp.extensionName) == 0) {
+					foundRequiredExtension = true;
+					break;
+				}			
+			}
+			if (!foundRequiredExtension) {
+				string errorMessage = "Extension " + string(currRequiredExtension) + " not supported\n";
+				throw std::runtime_error(errorMessage);
+			}
+		}
+
     }//End if(enableValidationLayers)
 
 
-    /*
-    Next, we actually create the instance.
+    //Next, we actually create the instance.
     
-    */
     
-    /*
-    Contains application info. This is actually not that important.
-    The only real important field is apiVersion.
-    */
+
+    //Contains application info. This is actually not that important.
+    //The only real important field is apiVersion.
     VkApplicationInfo applicationInfo = {};
     applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    applicationInfo.pApplicationName = "Hello world app";
+    applicationInfo.pApplicationName = "Vulkan Compute Application";
     applicationInfo.applicationVersion = 0;
-    applicationInfo.pEngineName = "awesomeengine";
+    applicationInfo.pEngineName = "ComputeEngine";
     applicationInfo.engineVersion = 0;
     applicationInfo.apiVersion = VK_API_VERSION_1_1;;
     
@@ -246,10 +236,10 @@ void ComputeApplication::createInstance() {
     createInfo.pApplicationInfo = &applicationInfo;
     
     // Give our desired layers and extensions to vulkan.
-    createInfo.enabledLayerCount = (uint32_t)enabledLayers.size();
-    createInfo.ppEnabledLayerNames = enabledLayers.data();
-    createInfo.enabledExtensionCount = (uint32_t)enabledExtensions.size();
-    createInfo.ppEnabledExtensionNames = enabledExtensions.data();
+    createInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();
+    createInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
+    createInfo.enabledExtensionCount = (uint32_t)requiredInstanceExtensions.size();
+    createInfo.ppEnabledExtensionNames = requiredInstanceExtensions.data();
 
     /*
     Actually create the instance.
@@ -267,7 +257,7 @@ void ComputeApplication::createInstance() {
         createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
         createInfo.pfnCallback = &debugReportCallbackFn;
 
-        // We have to explicitly load this function.
+        // We have to explicitly load this function and have our local function pointer point to it
         auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
         if (vkCreateDebugReportCallbackEXT == nullptr) {
             throw std::runtime_error("Could not load vkCreateDebugReportCallbackEXT");
@@ -284,14 +274,14 @@ void ComputeApplication::findPhysicalDevice() {
     //In this function, we find a physical device that can be used with Vulkan.
     //So, first we will list all physical devices on the system with vkEnumeratePhysicalDevices .
 
-    uint32_t deviceCount;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
-    if (deviceCount == 0) {
+    uint32_t physicalDeviceCount;
+    vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, NULL);
+    if (physicalDeviceCount == 0) {
         throw std::runtime_error("could not find a device with vulkan support");
     }
 
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+    std::vector<VkPhysicalDevice> allPhysicalDevices(physicalDeviceCount);
+    vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, allPhysicalDevices.data());
 
     /*
     Next, we choose a device that can be used for our purposes. 
@@ -315,13 +305,16 @@ void ComputeApplication::findPhysicalDevice() {
     device in the list. But in a real and serious application, those limitations should certainly be taken into account.
 
     */
-    for (VkPhysicalDevice currPhysicalDevice : devices) {
+
+    for (VkPhysicalDevice currPhysicalDevice : allPhysicalDevices) {
 		VkPhysicalDeviceFeatures supportedFeatures;
 		vkGetPhysicalDeviceFeatures(currPhysicalDevice, &supportedFeatures);
-        if (supportedFeatures.samplerAnisotropy) { // As above stated, we do no feature checks, so just accept.
-            physicalDevice = currPhysicalDevice;
-            break;
-        }
+
+		//We would normally check the supportedFeatures structure to see that all our features are supported
+		//by this physical device. Since we have none, we just choose the first device and get the queue family index we need
+        physicalDevice = currPhysicalDevice;
+		queueFamilyIndex = getQueueFamilyIndex(); // find queue family with compute capability.
+		return;
     }
 }
 
@@ -362,7 +355,6 @@ void ComputeApplication::createDevice() {
     //When creating the device, we also specify what queues it has.
     VkDeviceQueueCreateInfo queueCreateInfo = {};
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueFamilyIndex = getQueueFamilyIndex(); // find queue family with compute capability.
     queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
     queueCreateInfo.queueCount = 1; // get one queue from this family. We don't need more.
     float queuePriorities = 1.0;  // we only have one queue, so this is not that imporant. 
@@ -373,18 +365,18 @@ void ComputeApplication::createDevice() {
 
     // Specify any desired device features here. We do not need any for this application, though.
     VkPhysicalDeviceFeatures deviceFeatures = {};
-	deviceFeatures.samplerAnisotropy = VK_TRUE;
 
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.enabledLayerCount = (uint32_t)enabledLayers.size();  // need to specify validation layers here as well.
-    deviceCreateInfo.ppEnabledLayerNames = enabledLayers.data();
+    deviceCreateInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();  // need to specify validation layers here as well.
+    deviceCreateInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo; // when creating the logical device, we also specify what queues it has.
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
     VK_CHECK_RESULT(vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); // create logical device.
 
-    uint32_t particularQueueIndex = 0;	//the index within this queue family of the queue to retrieve.
+	//the index within this queue family of the queue to retrieve, we just take the first one
+    uint32_t particularQueueIndex = 0;	
 
     // Get a handle to the only member of the queue family.
     vkGetDeviceQueue(device, queueFamilyIndex, particularQueueIndex, &queue);
@@ -394,8 +386,8 @@ void ComputeApplication::createDevice() {
 void ComputeApplication::createInputImage(){
     
 	Utils::createImage(
-		OUTPUT_WIDTH,		//Width
-		OUTPUT_HEIGHT,		//Height
+		IMAGE_WIDTH,		//Width
+		IMAGE_HEIGHT,		//Height
 		VK_FORMAT_R8G8B8A8_UNORM,	//Format
 		VK_IMAGE_TILING_OPTIMAL,	//Tiling
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,	//Usage
@@ -422,7 +414,7 @@ void ComputeApplication::writeToInputImage() {
 	vkUnmapMemory(device, stagingBufferMemory);
 
 	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	Utils::copyBufferToImage(stagingBuffer, inputImage, OUTPUT_WIDTH, OUTPUT_HEIGHT);
+	Utils::copyBufferToImage(stagingBuffer, inputImage, IMAGE_WIDTH, IMAGE_HEIGHT);
 	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 
 
@@ -451,10 +443,10 @@ void ComputeApplication::writeToUniformBuffer(){
 	
 	ubo.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	
-    ubo.width = OUTPUT_WIDTH;
-    ubo.height = OUTPUT_HEIGHT;
-    ubo.saturation = 1.4f;
-    ubo.blur = 75;
+    ubo.width = IMAGE_WIDTH;
+    ubo.height = IMAGE_HEIGHT;
+    ubo.saturation = 1.5;
+    ubo.blur = 121;
 
     void* mappedMemory;
 
@@ -467,17 +459,11 @@ void ComputeApplication::writeToUniformBuffer(){
 }
 
 
-void ComputeApplication::createOutputBuffer() {
-
-    Utils::createBuffer(outputBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, outputBuffer, outputBufferMemory);
-
-}
-
 void ComputeApplication::createOutputImage() {
 	
 	Utils::createImage(
-		OUTPUT_WIDTH,		//Width
-		OUTPUT_HEIGHT,		//Height
+		IMAGE_WIDTH,		//Width
+		IMAGE_HEIGHT,		//Height
 		VK_FORMAT_R8G8B8A8_UNORM,	//Format
 		VK_IMAGE_TILING_OPTIMAL,	//Tiling
 		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,	//Usage
@@ -486,6 +472,7 @@ void ComputeApplication::createOutputImage() {
 		outputImageMemory	//image memory
 	);
 
+	//shader needs image to be in general layout
 	Utils::transitionImageLayout(outputImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 }
@@ -498,7 +485,7 @@ void ComputeApplication::createOutputImageView() {
 void ComputeApplication::createDescriptorSetLayout() {
 
 
-	//define a binding for an image sampler
+	//define a binding for a storage image 
 	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
 	samplerLayoutBinding.binding = 0;	//binding = 0
 	samplerLayoutBinding.descriptorCount = 1;
@@ -513,23 +500,16 @@ void ComputeApplication::createDescriptorSetLayout() {
     uniformBufferBinding.descriptorCount = 1;
     uniformBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-	//define a binding for a storage buffer
-	VkDescriptorSetLayoutBinding outputBufferBinding = {};
-	outputBufferBinding.binding = 2;	//binding = 2
-	outputBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	outputBufferBinding.descriptorCount = 1;
-	outputBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
+	//define a binding for a storage image
 	VkDescriptorSetLayoutBinding outputImageBinding = {};
-	outputImageBinding.binding = 3;	//binding = 3
+	outputImageBinding.binding = 2;		//binding = 2
 	outputImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	outputImageBinding.descriptorCount = 1;
 	outputImageBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	
 
-
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 4> allBindings = { samplerLayoutBinding, uniformBufferBinding, outputBufferBinding, outputImageBinding};
+    std::array<VkDescriptorSetLayoutBinding, 3> allBindings = { samplerLayoutBinding, uniformBufferBinding, outputImageBinding};
 
     //create descriptor set layout for binding to a storage buffer, UBO and another storage buffer
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
@@ -548,15 +528,13 @@ void ComputeApplication::createDescriptorPool(){
    
     //Our descriptor pool can only allocate a single storage buffer.
    
-    std::array<VkDescriptorPoolSize, 4> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 3> poolSizes = {};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[1].descriptorCount = 1;
-    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[2].descriptorCount = 1;
-	poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	poolSizes[3].descriptorCount = 1;
+	poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	poolSizes[2].descriptorCount = 1;
 	
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -581,11 +559,6 @@ void ComputeApplication::createDescriptorSet() {
     // allocate descriptor set.
     VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet));
 
-    /*
-    Next, we need to connect our actual storage buffer with the descrptor. 
-    We use vkUpdateDescriptorSets() to update the descriptor set.
-    */
-
 	// Specify the input image info
 	VkDescriptorImageInfo inputImageInfo = {};
 	inputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -597,19 +570,13 @@ void ComputeApplication::createDescriptorSet() {
     descriptorUniformBufferInfo.offset = 0;
     descriptorUniformBufferInfo.range = sizeof(UniformBufferObject);
 
-	// Specify the output buffer to bind to the descriptor
-	VkDescriptorBufferInfo outputBufferInfo = {};
-	outputBufferInfo.buffer = outputBuffer;
-	outputBufferInfo.offset = 0;
-	outputBufferInfo.range = outputBufferSize;
-
 	// Specify the output image info
 	VkDescriptorImageInfo outputImageInfo = {};
 	outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	outputImageInfo.imageView = outputImageView;
 
 
-    std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
+    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
 
 	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrites[0].dstSet = descriptorSet;
@@ -628,21 +595,13 @@ void ComputeApplication::createDescriptorSet() {
     descriptorWrites[1].pBufferInfo = &descriptorUniformBufferInfo;
 
 	descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[2].dstSet = descriptorSet; // write to this descriptor set.
-	descriptorWrites[2].dstBinding = 2; // write to the first, and only binding.
-	descriptorWrites[2].descriptorCount = 1; // update a single descriptor.
-	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // storage buffer.
-	descriptorWrites[2].pBufferInfo = &outputBufferInfo;
+	descriptorWrites[2].dstSet = descriptorSet;
+	descriptorWrites[2].dstBinding = 2;
+	descriptorWrites[2].dstArrayElement = 0;
+	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	descriptorWrites[2].descriptorCount = 1;
+	descriptorWrites[2].pImageInfo = &outputImageInfo;
 
-	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[3].dstSet = descriptorSet;
-	descriptorWrites[3].dstBinding = 3;
-	descriptorWrites[3].dstArrayElement = 0;
-	descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	descriptorWrites[3].descriptorCount = 1;
-	descriptorWrites[3].pImageInfo = &outputImageInfo;
-
-	
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
@@ -733,20 +692,18 @@ void ComputeApplication::createMainCommandBuffer() {
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // the buffer is only submitted and used once in this application.
     VK_CHECK_RESULT(vkBeginCommandBuffer(mainCommandBuffer, &beginInfo)); // start recording commands.
 
-    /*
-    We need to bind a pipeline, AND a descriptor set before we dispatch.
+    
+    //We need to bind a pipeline, AND a descriptor set before we dispatch.
 
-    The validation layer will NOT give warnings if you forget these, so be very careful not to forget them.
-    */
+    //The validation layer will NOT give warnings if you forget these, so be very careful not to forget them.
     vkCmdBindPipeline(mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
     vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
-    /*
-    Calling vkCmdDispatch basically starts the compute pipeline, and executes the compute shader.
-    The number of workgroups is specified in the arguments.
-    If you are already familiar with compute shaders from OpenGL, this should be nothing new to you.
-    */
-    vkCmdDispatch(mainCommandBuffer, (uint32_t)ceil(OUTPUT_WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(OUTPUT_HEIGHT / float(WORKGROUP_SIZE)), 1);
+    
+    //Calling vkCmdDispatch starts the compute pipeline, and executes the compute shader.
+    //The number of workgroups is specified in the arguments.
+    //If you are already familiar with compute shaders from OpenGL, this should be nothing new to you.
+    vkCmdDispatch(mainCommandBuffer, (uint32_t)ceil(IMAGE_WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(IMAGE_HEIGHT / float(WORKGROUP_SIZE)), 1);
 
     VK_CHECK_RESULT(vkEndCommandBuffer(mainCommandBuffer)); // end recording commands.
 }
@@ -801,11 +758,6 @@ void ComputeApplication::cleanup() {
     vkFreeMemory(device, uniformBufferMemory, NULL);
     vkDestroyBuffer(device, uniformBuffer, NULL);
 
-	//free output image
-	vkFreeMemory(device, outputBufferMemory, NULL);
-	vkDestroyBuffer(device, outputBuffer, NULL);
-
-
 	//free input Image
 	vkFreeMemory(device, inputImageMemory, NULL);
 	vkDestroyImage(device, inputImage, NULL);
@@ -825,4 +777,3 @@ void ComputeApplication::cleanup() {
     vkDestroyInstance(instance, NULL);      
 	
 }
-

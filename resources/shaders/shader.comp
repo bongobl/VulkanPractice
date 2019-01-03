@@ -30,14 +30,10 @@ layout(std140, binding = 1) uniform UniformBufferObject
 
 }ubo;
 
-//BINDING 2
-layout(std140, binding = 2) buffer buf2
-{
-   Color outputImageData[];
-};
 
 //BINDING 3
-layout (binding = 3, rgba8) uniform image2D outputImage;
+layout (binding = 2, rgba8) uniform image2D outputImage;
+
 
 
 vec4 lerp(vec4 first, vec4 second, float param){
@@ -77,6 +73,17 @@ vec4 GetPixelWrapped(int x, int y) {
 
 	return imageLoad(inputImage, ivec2(x, y));
 }
+vec4 GetPixelClamped(int x, int y) {
+
+
+	if (x >= ubo.width) { x = int(ubo.width); }
+	if (y >= ubo.height) { y = int(ubo.height); }
+	if (x < 0) { x = 0; }
+	if (y < 0) { y = 0; }
+
+	return imageLoad(inputImage, ivec2(x, y));
+}
+
 
 vec4 saturate(vec4 raw, float saturation){
 
@@ -84,12 +91,13 @@ vec4 saturate(vec4 raw, float saturation){
 	vec4 grayScale = vec4(averageLum, averageLum, averageLum, raw.a);
 	return lerp(grayScale, raw, saturation);
 }
+
 void main() {
 
 
 	//In order to fit the work into workgroups, some unnecessary threads are launched.
 	//We terminate those threads here. 
-	if(gl_GlobalInvocationID.x >= ubo.width || gl_GlobalInvocationID.y >= ubo.height){
+	if (gl_GlobalInvocationID.x >= ubo.width || gl_GlobalInvocationID.y >= ubo.height) {
 		return;
 	}
 
@@ -124,10 +132,10 @@ void main() {
 			float gaussCoeff = gaussKernel(x - a, n) * gaussKernel(y - b, n);
 			runningGauss += gaussCoeff;
 
-			runningSumR += gaussCoeff * GetPixelWrapped(x, y).r;
-			runningSumG += gaussCoeff * GetPixelWrapped(x, y).g;
-			runningSumB += gaussCoeff * GetPixelWrapped(x, y).b;
-			runningSumAlpha += gaussCoeff * GetPixelWrapped(x, y).a;
+			runningSumR += gaussCoeff * GetPixelClamped(x, y).r;
+			runningSumG += gaussCoeff * GetPixelClamped(x, y).g;
+			runningSumB += gaussCoeff * GetPixelClamped(x, y).b;
+			runningSumAlpha += gaussCoeff * GetPixelClamped(x, y).a;
 		}
 	}
 	vec4 colorValue  = 

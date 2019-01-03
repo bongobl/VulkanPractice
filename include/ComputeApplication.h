@@ -21,11 +21,10 @@ const bool enableValidationLayers = true;
 using namespace std;
 class ComputeApplication{
 
-	static uint32_t OUTPUT_WIDTH;
-	static uint32_t OUTPUT_HEIGHT;
+	static uint32_t IMAGE_WIDTH;
+	static uint32_t IMAGE_HEIGHT;
 
-    // size of our storage buffer in bytes.
-    static VkDeviceSize outputBufferSize; 
+    // size of our storage image in bytes.
 	static VkDeviceSize imageSize;
 
     //input image data
@@ -51,14 +50,9 @@ class ComputeApplication{
 	static VkDeviceMemory inputImageMemory;
 	static VkImageView inputImageView;
 
-    
     //Uniform buffer used to pass simple parameters to compute shader
 	static VkBuffer uniformBuffer;
 	static VkDeviceMemory uniformBufferMemory;
-
-	//Image buffer to be exported
-	static VkBuffer outputBuffer;
-	static VkDeviceMemory outputBufferMemory;
 
 	//Output Image
 	static VkImage outputImage;
@@ -88,25 +82,18 @@ class ComputeApplication{
 	static VkCommandPool commandPool;
 	static VkCommandBuffer mainCommandBuffer;
 
-    
-    //used to enable a basic validation layer
-	static std::vector<const char *> enabledLayers;
 
-    
-    /*In order to execute commands on a device(GPU), the commands must be submitted
-    to a queue. The commands are stored in a command buffer, and this command buffer
-    is given to the queue. 
-
-    There will be different kinds of queues on the device. For this application, 
-    we want a queue that supports compute and graphics operations.*/
-	static VkQueue queue;
-
-
-    //When submitting a command buffer, you must specify to which queue in the family you are submitting to. 
-    //This variable keeps track of the index of that queue in its family. 
+	//Index of queue family which supports our desired features, in our case, graphics and compute
 	static uint32_t queueFamilyIndex;
 
-    
+	//Queue for graphics and compute operation
+	static VkQueue queue;
+
+	//The instance layers and extensions required for our application
+	const static std::vector<const char *> requiredInstanceLayers;
+	const static std::vector<const char *> requiredInstanceExtensions;
+
+
 
 public:
 
@@ -138,8 +125,6 @@ private:
 
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
-
-	static void createOutputBuffer();
 
 	static void createOutputImage();
 	static void createOutputImageView();
