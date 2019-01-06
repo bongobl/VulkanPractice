@@ -33,7 +33,7 @@ class ComputeApplication{
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;
 
-    //debug callback
+    //object to store debug callback
 	static VkDebugReportCallbackEXT debugReportCallback;
     
     //The physical device is some device on the system that supports usage of Vulkan.
@@ -89,8 +89,8 @@ class ComputeApplication{
 	//Queue for graphics and compute operation
 	static VkQueue queue;
 
-	//The instance layers and extensions required for our application
-	const static std::vector<const char *> requiredInstanceLayers;
+	//The layers and instance extensions required for our application
+	const static std::vector<const char *> requiredLayers;
 	const static std::vector<const char *> requiredInstanceExtensions;
 
 
@@ -109,9 +109,15 @@ private:
 	static void findPhysicalDevice();
 	static void createDevice();
 
+	
+	//helper to find physical device
+	static bool isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice, uint32_t &familyIndex);
 
     // Returns the index of a queue family that supports compute operations. 
-	static uint32_t getQueueFamilyIndex();
+	static uint32_t getQueueFamilyIndex(VkPhysicalDevice currPhysicalDevice);
+
+	
+
 
     //layouts and pools
 	static void createDescriptorSetLayout();

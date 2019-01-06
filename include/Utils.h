@@ -36,7 +36,7 @@ class Utils{
 }
 
 //debug callback
-VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
+VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
 	VkDebugReportFlagsEXT                       flags,
 	VkDebugReportObjectTypeEXT                  objectType,
 	uint64_t                                    object,

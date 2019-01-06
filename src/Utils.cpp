@@ -315,7 +315,7 @@ uint32_t Utils::findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags pr
 }
 
 //debug callback
-VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
+VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
 	VkDebugReportFlagsEXT                       flags,
 	VkDebugReportObjectTypeEXT                  objectType,
 	uint64_t                                    object,

@@ -40,7 +40,7 @@ uint32_t ComputeApplication::queueFamilyIndex;
 VkQueue ComputeApplication::queue;
 
 
-const std::vector<const char *> ComputeApplication::requiredInstanceLayers = {
+const std::vector<const char *> ComputeApplication::requiredLayers = {
 	"VK_LAYER_LUNARG_standard_validation"
 };
 const std::vector<const char *> ComputeApplication::requiredInstanceExtensions = {
@@ -75,16 +75,15 @@ void ComputeApplication::run() {
     //also sets the width and height
     loadImage();
 
-    //create descriptor resources
+    //create descriptor and command resources
     createDescriptorSetLayout();
     createDescriptorPool();
     createCommandPool();
 
 
-    //create and init buffer resources on GPU
+    //create and init GPU resources
     createInputImage();
 	writeToInputImage();
-
 	createInputImageView();
 
     createUniformBuffer();
@@ -93,6 +92,7 @@ void ComputeApplication::run() {
 	createOutputImage();
 	createOutputImageView();
 
+	//create descriptors 
     createDescriptorSet();
 
     //create pipeline
@@ -174,7 +174,7 @@ void ComputeApplication::createInstance() {
 		std::vector<VkLayerProperties> allAvailableLayerProps(numAvailableLayers);
 		vkEnumerateInstanceLayerProperties(&numAvailableLayers, allAvailableLayerProps.data());
 
-		for (const char* currRequiredLayer : requiredInstanceLayers) {
+		for (const char* currRequiredLayer : requiredLayers) {
 
 			bool foundRequiredLayer = false;
 			for (VkLayerProperties currAvailableLayerProp : allAvailableLayerProps) {
@@ -190,7 +190,7 @@ void ComputeApplication::createInstance() {
 		}
         
         
-		//check for presence of required extensions
+		//check for presence of required instance extensions
         uint32_t numAvailableExtensions;
         
         vkEnumerateInstanceExtensionProperties(NULL, &numAvailableExtensions, NULL);
@@ -235,27 +235,30 @@ void ComputeApplication::createInstance() {
     createInfo.flags = 0;
     createInfo.pApplicationInfo = &applicationInfo;
     
-    // Give our desired layers and extensions to vulkan.
-    createInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();
-    createInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
+
+    // Give our desired instance layers and extensions to vulkan.
+	if (enableValidationLayers) {
+		createInfo.enabledLayerCount = (uint32_t)requiredLayers.size();
+		createInfo.ppEnabledLayerNames = requiredLayers.data();
+	} else {
+		createInfo.enabledLayerCount = 0;
+	}
+
     createInfo.enabledExtensionCount = (uint32_t)requiredInstanceExtensions.size();
     createInfo.ppEnabledExtensionNames = requiredInstanceExtensions.data();
 
-    /*
-    Actually create the instance.
-    Having created the instance, we can actually start using vulkan.
-    */
+    
+    //Actually create the instance. Having created the instance, we can actually start using vulkan.
     VK_CHECK_RESULT( vkCreateInstance( &createInfo, NULL, &instance));
 
-    /*
-    Register a callback function for the extension VK_EXT_DEBUG_REPORT_EXTENSION_NAME, so that warnings emitted from the validation
-    layer are actually printed.
-    */
+    
+    //Register a callback function for the extension VK_EXT_DEBUG_REPORT_EXTENSION_NAME, so that warnings emitted from the validation
+    //layer are actually printed.
     if (enableValidationLayers) {
         VkDebugReportCallbackCreateInfoEXT createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
         createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-        createInfo.pfnCallback = &debugReportCallbackFn;
+        createInfo.pfnCallback = &debugReportCallbackFunction;
 
         // We have to explicitly load this function and have our local function pointer point to it
         auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
@@ -275,59 +278,49 @@ void ComputeApplication::findPhysicalDevice() {
     //So, first we will list all physical devices on the system with vkEnumeratePhysicalDevices .
 
     uint32_t physicalDeviceCount;
+
     vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, NULL);
     if (physicalDeviceCount == 0) {
         throw std::runtime_error("could not find a device with vulkan support");
     }
-
     std::vector<VkPhysicalDevice> allPhysicalDevices(physicalDeviceCount);
     vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, allPhysicalDevices.data());
 
-    /*
-    Next, we choose a device that can be used for our purposes. 
-
-    With VkPhysicalDeviceFeatures(), we can retrieve a fine-grained list of physical features supported by the device.
-    However, in this demo, we are simply launching a simple compute shader, and there are no 
-    special physical features demanded for this task.
-
-    With VkPhysicalDeviceProperties(), we can obtain a list of physical device properties. Most importantly,
-    we obtain a list of physical device limitations. For this application, we launch a compute shader,
-    and the maximum size of the workgroups and total number of compute shader invocations is limited by the physical device,
-    and we should ensure that the limitations named maxComputeWorkGroupCount, maxComputeWorkGroupInvocations and 
-    maxComputeWorkGroupSize are not exceeded by our application.  Moreover, we are using a storage buffer in the compute shader,
-    and we should ensure that it is not larger than the device can handle, by checking the limitation maxStorageBufferRange. 
-
-    However, in our application, the workgroup size and total number of shader invocations is relatively small, and the storage buffer is
-    not that large, and thus a vast majority of devices will be able to handle it. This can be verified by looking at some devices at_
-    http://vulkan.gpuinfo.org/
-
-    Therefore, to keep things simple and clean, we will not perform any such checks here, and just pick the first physical
-    device in the list. But in a real and serious application, those limitations should certainly be taken into account.
-
-    */
 
     for (VkPhysicalDevice currPhysicalDevice : allPhysicalDevices) {
-		VkPhysicalDeviceFeatures supportedFeatures;
-		vkGetPhysicalDeviceFeatures(currPhysicalDevice, &supportedFeatures);
 
-		//We would normally check the supportedFeatures structure to see that all our features are supported
-		//by this physical device. Since we have none, we just choose the first device and get the queue family index we need
-        physicalDevice = currPhysicalDevice;
-		queueFamilyIndex = getQueueFamilyIndex(); // find queue family with compute capability.
-		return;
+		if (isValidPhysicalDevice(currPhysicalDevice, queueFamilyIndex)) {
+			physicalDevice = currPhysicalDevice;
+			return;
+		}	
     }
+
+	throw std::runtime_error("Could not load find a valid physical device for our operations");
 }
 
+bool ComputeApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice, uint32_t &familyIndex) {
+
+	VkPhysicalDeviceFeatures supportedFeatures;
+	vkGetPhysicalDeviceFeatures(potentialPhysicalDevice, &supportedFeatures);
+
+	//We would normally check the supportedFeatures structure to see that all our features are supported
+	//by this potential physical device. Since we have none, we just choose this device and get the queue family we need
+
+	familyIndex = getQueueFamilyIndex(potentialPhysicalDevice);
+	return familyIndex != -1;
+
+
+}
 // Returns the index of a queue family that supports compute and graphics operations. 
-uint32_t ComputeApplication::getQueueFamilyIndex() {
+uint32_t ComputeApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDevice) {
 
     uint32_t queueFamilyCount;
 
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, NULL);
+    vkGetPhysicalDeviceQueueFamilyProperties(currPhysicalDevice, &queueFamilyCount, NULL);
 
     // Retrieve all queue families.
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(currPhysicalDevice, &queueFamilyCount, queueFamilies.data());
 
     // Now find a family that supports compute.
     uint32_t currFamilyIndex;
@@ -338,13 +331,13 @@ uint32_t ComputeApplication::getQueueFamilyIndex() {
 			(currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) && 
 			(currFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
 
-            // found a queue family with compute. We're done!
+            // found a queue family with compute and graphics. We're done!
             break;
         }
     }
 
     if (currFamilyIndex == queueFamilies.size()) {
-        throw std::runtime_error("could not find a queue family that supports operations");
+		return -1;
     }
     return currFamilyIndex;
 }
@@ -360,18 +353,25 @@ void ComputeApplication::createDevice() {
     float queuePriorities = 1.0;  // we only have one queue, so this is not that imporant. 
     queueCreateInfo.pQueuePriorities = &queuePriorities;
 
-    //Now we create the logical device. The logical device allows us to interact with the physical device.
-    VkDeviceCreateInfo deviceCreateInfo = {};
-
     // Specify any desired device features here. We do not need any for this application, though.
     VkPhysicalDeviceFeatures deviceFeatures = {};
 
+    //Now we create the logical device. The logical device allows us to interact with the physical device.
+    VkDeviceCreateInfo deviceCreateInfo = {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();  // need to specify validation layers here as well.
-    deviceCreateInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo; // when creating the logical device, we also specify what queues it has.
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+
+	if (enableValidationLayers) {
+		deviceCreateInfo.enabledLayerCount = (uint32_t)requiredLayers.size();  // need to specify validation layers here as well.
+		deviceCreateInfo.ppEnabledLayerNames = requiredLayers.data();
+	} else {
+		deviceCreateInfo.enabledLayerCount = 0;
+	}
+
+	// no device extensions for this app since we aren't using a swapchain
+	deviceCreateInfo.enabledExtensionCount = 0;
 
     VK_CHECK_RESULT(vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); // create logical device.
 
@@ -446,7 +446,7 @@ void ComputeApplication::writeToUniformBuffer(){
     ubo.width = IMAGE_WIDTH;
     ubo.height = IMAGE_HEIGHT;
     ubo.saturation = 1.5;
-    ubo.blur = 121;
+    ubo.blur = 51;
 
     void* mappedMemory;
 
@@ -485,7 +485,7 @@ void ComputeApplication::createOutputImageView() {
 void ComputeApplication::createDescriptorSetLayout() {
 
 
-	//define a binding for a storage image 
+	//define a storage image binding for our input image
 	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
 	samplerLayoutBinding.binding = 0;	//binding = 0
 	samplerLayoutBinding.descriptorCount = 1;
@@ -500,7 +500,7 @@ void ComputeApplication::createDescriptorSetLayout() {
     uniformBufferBinding.descriptorCount = 1;
     uniformBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-	//define a binding for a storage image
+	//define a storage image binding for our output image
 	VkDescriptorSetLayoutBinding outputImageBinding = {};
 	outputImageBinding.binding = 2;		//binding = 2
 	outputImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -729,7 +729,7 @@ void ComputeApplication::runCommandBuffer() {
 
     /*The command will not have finished executing until the fence is signalled.
     So we wait here.
-    We will directly after this read our buffer from the GPU,
+    Directly after this, we will copy our output image to a staging buffer and export it
     and we will not be sure that the command has finished executing unless we wait for the fence.
     Hence, we use a fence here.*/
     VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
