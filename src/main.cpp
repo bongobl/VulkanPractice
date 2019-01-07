@@ -2,7 +2,7 @@
 #include <ComputeApplication.h>
 using namespace std;
 
-//On UseVkImage branch
+//On BasicRender branch
 int main() {
 
     cout << "Running Compute Application" << endl;
