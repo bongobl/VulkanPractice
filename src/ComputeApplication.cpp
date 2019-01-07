@@ -133,6 +133,7 @@ void ComputeApplication::loadImage(){
     IMAGE_WIDTH = imageWidth;
     IMAGE_HEIGHT = imageHeight;
 
+	//define image byte size
 	imageSize = IMAGE_WIDTH * IMAGE_HEIGHT * 4;
 }
 
@@ -589,7 +590,7 @@ void ComputeApplication::createDescriptorSet() {
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[1].dstSet = descriptorSet;
     descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;	//??????
+    descriptorWrites[1].dstArrayElement = 0;	
     descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorWrites[1].descriptorCount = 1;
     descriptorWrites[1].pBufferInfo = &descriptorUniformBufferInfo;
