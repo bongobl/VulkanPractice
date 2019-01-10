@@ -15,6 +15,6 @@ int main() {
     }
     
     //open image
-    system("\"Simple Image.png\"");
+    cout << "Successful Execution" << endl;
     return EXIT_SUCCESS;
 }

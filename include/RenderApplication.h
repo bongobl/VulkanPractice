@@ -10,8 +10,6 @@
 #include <string>
 using namespace std;
 
-const int WORKGROUP_SIZE = 32; //Workgroup size in compute shader.
-
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
@@ -21,14 +19,6 @@ const bool enableValidationLayers = true;
 using namespace std;
 class RenderApplication{
 
-	static uint32_t IMAGE_WIDTH;
-	static uint32_t IMAGE_HEIGHT;
-
-    // size of our storage image in bytes.
-	static VkDeviceSize imageSize;
-
-    //input image data
-	static unsigned char* inputImageData;
 
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;
@@ -44,20 +34,10 @@ class RenderApplication{
     //us to interact with the physical device. 
 	static VkDevice device;
 
-
-	//Input image
-	static VkImage inputImage;
-	static VkDeviceMemory inputImageMemory;
-	static VkImageView inputImageView;
-
     //Uniform buffer used to pass simple parameters to compute shader
 	static VkBuffer uniformBuffer;
 	static VkDeviceMemory uniformBufferMemory;
 
-	//Output Image
-	static VkImage outputImage;
-	static VkDeviceMemory outputImageMemory;
-	static VkImageView outputImageView;
 	 
     //Descriptors provide a way of accessing resources in shaders. They allow us to use 
     //things like uniform buffers, storage buffers and images in GLSL. 
@@ -67,16 +47,14 @@ class RenderApplication{
 	static VkDescriptorSet descriptorSet;
 	static VkDescriptorSetLayout descriptorSetLayout;
     
+	//our render pass with one color attachment
+	static VkRenderPass renderPass;
 
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
-    //We will be creating a simple compute pipeline in this application. 
-	static VkPipeline computePipeline;
+	static VkPipeline graphicsPipeline;
 	static VkPipelineLayout pipelineLayout;
     
-	//For graphics
-	static VkRenderPass renderPass;
-	static VkPipeline graphicsPipeline;
-
+	
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
 	static VkCommandPool commandPool;
@@ -93,16 +71,12 @@ class RenderApplication{
 	const static std::vector<const char *> requiredLayers;
 	const static std::vector<const char *> requiredInstanceExtensions;
 
-
-
 public:
 
 	static void run();
 
 private:
 
-    //Load and saving image
-	static void loadImage();
 
     //app info
 	static void createInstance();
@@ -124,20 +98,12 @@ private:
 	static void createDescriptorPool();
 	static void createCommandPool();
 
-    //GPU resources
-	static void createInputImage();
-	static void writeToInputImage();
-	static void createInputImageView();
 
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
 
-	static void createOutputImage();
-	static void createOutputImageView();
-	static void exportOutputImage();
 
 	static void createDescriptorSet();
-	static void createComputePipeline();
 
 	//to start rendering
 	static void createRenderPass();

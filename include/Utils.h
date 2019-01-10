@@ -17,8 +17,10 @@ class Utils{
 	static void endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer);
 	
 	static void createImageSampler(VkSampler &sampler);
+	static VkShaderModule createShaderModule(const std::vector<char> &shaderCode);
 	static std::vector<char> readFile(const std::string& filename);
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
+	
 	
 
 	friend class RenderApplication;

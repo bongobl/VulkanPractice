@@ -12,26 +12,16 @@
 
 #include <fstream>
 
-uint32_t RenderApplication::IMAGE_WIDTH = -1;
-uint32_t RenderApplication::IMAGE_HEIGHT = -1;
-VkDeviceSize RenderApplication::imageSize;
-unsigned char* RenderApplication::inputImageData;
+
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
 VkDevice RenderApplication::device;
-VkImage RenderApplication::inputImage;
-VkDeviceMemory RenderApplication::inputImageMemory;
-VkImageView RenderApplication::inputImageView;
 VkBuffer RenderApplication::uniformBuffer;
 VkDeviceMemory RenderApplication::uniformBufferMemory;
-VkImage RenderApplication::outputImage;
-VkDeviceMemory RenderApplication::outputImageMemory;
-VkImageView RenderApplication::outputImageView;
 VkDescriptorPool RenderApplication::descriptorPool;
 VkDescriptorSet RenderApplication::descriptorSet;
 VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
-VkPipeline RenderApplication::computePipeline;
 VkPipelineLayout RenderApplication::pipelineLayout;
 VkRenderPass RenderApplication::renderPass;
 VkCommandPool RenderApplication::commandPool;
@@ -72,8 +62,6 @@ void RenderApplication::run() {
     findPhysicalDevice();
     createDevice();
     
-    //also sets the width and height
-    loadImage();
 
     //create descriptor and command resources
     createDescriptorSetLayout();
@@ -81,22 +69,12 @@ void RenderApplication::run() {
     createCommandPool();
 
 
-    //create and init GPU resources
-    createInputImage();
-	writeToInputImage();
-	createInputImageView();
-
     createUniformBuffer();
     writeToUniformBuffer();
 
-	createOutputImage();
-	createOutputImageView();
 
 	//create descriptors 
     createDescriptorSet();
-
-    //create pipeline
-    createComputePipeline();
 
     //for graphics
 	createRenderPass();
@@ -108,64 +86,11 @@ void RenderApplication::run() {
     // Finally, run the recorded command buffer.
     runCommandBuffer();
 
-    // Save that buffer as a png on disk.
-	exportOutputImage();
-
     // Clean up all Vulkan resources.
     cleanup();
 }
 
-void RenderApplication::loadImage(){
 
-	string imageName = "resources/images/oahu.jpg";
-
-    //read in the file here
-    int numChannels = -1;
-    int imageWidth, imageHeight;
-
-    //load image
-    inputImageData = stbi_load(imageName.c_str(), &imageWidth, &imageHeight, &numChannels, STBI_rgb_alpha);
-    if (numChannels == -1) {
-        std::string error =  "Compute Application::loadImage: failed to load image " + imageName + "\n";
-        throw std::runtime_error(error.c_str());
-    }
-
-    cout << "loaded " << imageName << endl;
-    cout << "Num numChannels: " << numChannels << endl;
-    cout << "Width: " << imageWidth << endl << "Height: " << imageHeight << endl;
-
-    IMAGE_WIDTH = imageWidth;
-    IMAGE_HEIGHT = imageHeight;
-
-	//define image byte size
-	imageSize = IMAGE_WIDTH * IMAGE_HEIGHT * 4;
-}
-
-void RenderApplication::exportOutputImage() {
-
-	//Buffer
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-
-	Utils::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
-
-	Utils::transitionImageLayout(outputImage, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	Utils::copyImageToBuffer(stagingBuffer, outputImage, IMAGE_WIDTH, IMAGE_HEIGHT);
-
-	void* mappedMemory;
-	vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &mappedMemory);
-
-	//write output image to disk as a png
-	stbi_write_png("Simple Image.png", IMAGE_WIDTH, IMAGE_HEIGHT, 4, mappedMemory, IMAGE_WIDTH * 4);
-
-	//write pixels to another array
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	//Clean Up Staging Buffer
-	vkDestroyBuffer(device, stagingBuffer, nullptr);
-	vkFreeMemory(device, stagingBufferMemory, nullptr);
-
-}
 void RenderApplication::createInstance() {
     
 
@@ -387,54 +312,6 @@ void RenderApplication::createDevice() {
     vkGetDeviceQueue(device, queueFamilyIndex, particularQueueIndex, &queue);
 }
 
-
-void RenderApplication::createInputImage(){
-    
-	Utils::createImage(
-		IMAGE_WIDTH,		//Width
-		IMAGE_HEIGHT,		//Height
-		VK_FORMAT_R8G8B8A8_UNORM,	//Format
-		VK_IMAGE_TILING_OPTIMAL,	//Tiling
-		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,	//Usage
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//Memory properties
-		inputImage,			//image
-		inputImageMemory	//image memory
-	);	
-
-}
-
-void RenderApplication::writeToInputImage() {
-
-	//Buffer
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-
-
-	Utils::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
-
-	void* mappedMemory;
-    
-	vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &mappedMemory);
-	memcpy(mappedMemory, inputImageData, imageSize);
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	Utils::copyBufferToImage(stagingBuffer, inputImage, IMAGE_WIDTH, IMAGE_HEIGHT);
-	Utils::transitionImageLayout(inputImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-
-
-	//Clean Up Staging Buffer
-	vkDestroyBuffer(device, stagingBuffer, nullptr);
-	vkFreeMemory(device, stagingBufferMemory, nullptr);
-}
-void RenderApplication::createInputImageView() {
-
-	Utils::createImageView(inputImage, inputImageView);
-}
-
-
-
-
 void RenderApplication::createUniformBuffer(){
 
 	Utils::createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, uniformBuffer, uniformBufferMemory);
@@ -448,8 +325,8 @@ void RenderApplication::writeToUniformBuffer(){
 	
 	ubo.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	
-    ubo.width = IMAGE_WIDTH;
-    ubo.height = IMAGE_HEIGHT;
+    ubo.width = 4;	//dubby val
+    ubo.height = 4;	//dummy val
     ubo.saturation = 1.5;
     ubo.blur = 51;
 
@@ -463,33 +340,9 @@ void RenderApplication::writeToUniformBuffer(){
 
 }
 
-
-void RenderApplication::createOutputImage() {
-	
-	Utils::createImage(
-		IMAGE_WIDTH,		//Width
-		IMAGE_HEIGHT,		//Height
-		VK_FORMAT_R8G8B8A8_UNORM,	//Format
-		VK_IMAGE_TILING_OPTIMAL,	//Tiling
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,	//Usage
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//Memory properties
-		outputImage,			//image
-		outputImageMemory	//image memory
-	);
-
-	//shader needs image to be in general layout
-	Utils::transitionImageLayout(outputImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
-}
-
-void RenderApplication::createOutputImageView() {
-
-	Utils::createImageView(outputImage, outputImageView);
-}
-
 void RenderApplication::createDescriptorSetLayout() {
 
-
+	/*
 	//define a storage image binding for our input image
 	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
 	samplerLayoutBinding.binding = 0;	//binding = 0
@@ -524,15 +377,13 @@ void RenderApplication::createDescriptorSetLayout() {
 
     // Create the descriptor set layout. 
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
+	*/
 }
 
 void RenderApplication::createDescriptorPool(){
 
-    //So we will allocate a descriptor set here.
-    //But we need to first create a descriptor pool to do that. 
-   
-    //Our descriptor pool can only allocate a single storage buffer.
-   
+
+	/*
     std::array<VkDescriptorPoolSize, 3> poolSizes = {};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	poolSizes[0].descriptorCount = 1;
@@ -550,10 +401,12 @@ void RenderApplication::createDescriptorPool(){
 
     //Create descriptor pool.
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
+
+	*/
 }
 void RenderApplication::createDescriptorSet() {
     
-
+	/*
     //With the pool allocated, we can now allocate the descriptor set. 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO; 
@@ -610,57 +463,9 @@ void RenderApplication::createDescriptorSet() {
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
+	*/
 }
 
-
-void RenderApplication::createComputePipeline() {
-
-    
-    //Create a shader module. A shader module basically just encapsulates some shader code.
-    //Compute shader used to generate final image, encapsulates shader code
-    VkShaderModule computeShaderModule;
-
-    std::vector<char> shaderCode = Utils::readFile("resources/shaders/comp.spv");
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
-    createInfo.codeSize = shaderCode.size();
-    VK_CHECK_RESULT(vkCreateShaderModule(device, &createInfo, NULL, &computeShaderModule));
-
-    /*
-    Now let us actually create the compute pipeline.
-    A compute pipeline is very simple compared to a graphics pipeline.
-    It only consists of a single stage with a compute shader. 
-
-    So first we specify the compute shader stage, and it's entry point(main).
-    */
-    VkPipelineShaderStageCreateInfo shaderStageCreateInfo = {};
-    shaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    shaderStageCreateInfo.module = computeShaderModule;
-    shaderStageCreateInfo.pName = "main";
-
-    
-    //The pipeline layout allows the pipeline to access descriptor sets. 
-    //So we just specify the descriptor set layout we created earlier.
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
-    pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout; 
-    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &pipelineLayout));
-
-    VkComputePipelineCreateInfo pipelineCreateInfo = {};
-    pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    pipelineCreateInfo.stage = shaderStageCreateInfo;
-    pipelineCreateInfo.layout = pipelineLayout;
-
-    
-    //Now, we finally create the compute pipeline. 
-    VK_CHECK_RESULT(vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &computePipeline));
-
-    //don't need shader module anymore for any other pipeline, so destroy
-    vkDestroyShaderModule(device, computeShaderModule, NULL);
-}
 
 void RenderApplication::createCommandPool(){
 
@@ -711,47 +516,46 @@ void RenderApplication::createRenderPass() {
 
 void RenderApplication::createGraphicsPipeline(){
     
+	//create vertex shader module
+	auto vertexShaderCode = Utils::readFile("resources/shaders/vert.spv");
+	VkShaderModule vertexShaderModule = Utils::createShaderModule(vertexShaderCode);
+	
+	//create fragment shader module
+	auto fragmentShaderCode = Utils::readFile("resources/shaders/frag.spv");
+	VkShaderModule fragmentShaderModule = Utils::createShaderModule(fragmentShaderCode);
+
+
+
+	VkPipelineShaderStageCreateInfo vertexShaderStageInfo = {};
+	vertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertexShaderStageInfo.module = vertexShaderModule;
+	vertexShaderStageInfo.pName = "main";
+	
+	VkPipelineShaderStageCreateInfo fragmentShaderStageInfo = {};
+	fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragmentShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragmentShaderStageInfo.module = fragmentShaderModule;
+	fragmentShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, fragmentShaderStageInfo };
+
+	
+
+
+	//destroy shader modules
+	vkDestroyShaderModule(device,vertexShaderModule, NULL);
+	vkDestroyShaderModule(device, fragmentShaderModule, NULL);
 }
 void RenderApplication::createMainCommandBuffer() {
     
     
-    //Now allocate a command buffer from the command pool. 
-    VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
-    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    commandBufferAllocateInfo.commandPool = commandPool; // specify the command pool to allocate from. 
-
-    // if the command buffer is primary, it can be directly submitted to queues. 
-    // A secondary buffer has to be called from some primary command buffer, and cannot be directly 
-    // submitted to a queue. To keep things simple, we use a primary command buffer. 
-    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    commandBufferAllocateInfo.commandBufferCount = 1; // allocate a single command buffer. 
-    VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &mainCommandBuffer)); // allocate command buffer.
-
-    /*
-    Now we shall start recording commands into the newly allocated command buffer. 
-    */
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // the buffer is only submitted and used once in this application.
-    VK_CHECK_RESULT(vkBeginCommandBuffer(mainCommandBuffer, &beginInfo)); // start recording commands.
-
-    
-    //We need to bind a pipeline, AND a descriptor set before we dispatch.
-
-    //The validation layer will NOT give warnings if you forget these, so be very careful not to forget them.
-    vkCmdBindPipeline(mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-    vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-
-    
-    //Calling vkCmdDispatch starts the compute pipeline, and executes the compute shader.
-    //The number of workgroups is specified in the arguments.
-    //If you are already familiar with compute shaders from OpenGL, this should be nothing new to you.
-    vkCmdDispatch(mainCommandBuffer, (uint32_t)ceil(IMAGE_WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(IMAGE_HEIGHT / float(WORKGROUP_SIZE)), 1);
-
-    VK_CHECK_RESULT(vkEndCommandBuffer(mainCommandBuffer)); // end recording commands.
+   
 }
 
 void RenderApplication::runCommandBuffer() {
+
+	/* THIS CODE PROBABLY DOESN'T CHANGE AT ALL, ENABLE WHEN READY
 
     //Now we shall finally submit the recorded command buffer to a the compute queue.
     VkSubmitInfo submitInfo = {};
@@ -769,16 +573,11 @@ void RenderApplication::runCommandBuffer() {
     //We submit the command buffer on the queue, at the same time giving a fence.
     VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
 
-
-    /*The command will not have finished executing until the fence is signalled.
-    So we wait here.
-    Directly after this, we will copy our output image to a staging buffer and export it
-    and we will not be sure that the command has finished executing unless we wait for the fence.
-    Hence, we use a fence here.*/
     VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
 
     //no longer need fence
     vkDestroyFence(device, fence, NULL);
+	*/
 }
 
 void RenderApplication::cleanup() {
@@ -794,30 +593,16 @@ void RenderApplication::cleanup() {
         func(instance, debugReportCallback, NULL);
     }
 
-	
-
-    //free CPU image buffer
-   	stbi_image_free(inputImageData);
 
     //free uniform buffer
     vkFreeMemory(device, uniformBufferMemory, NULL);
     vkDestroyBuffer(device, uniformBuffer, NULL);
 
-	//free input Image
-	vkFreeMemory(device, inputImageMemory, NULL);
-	vkDestroyImage(device, inputImage, NULL);
-	vkDestroyImageView(device, inputImageView, NULL);
-
-	//free output Image
-	vkFreeMemory(device, outputImageMemory, NULL);
-	vkDestroyImage(device, outputImage, NULL);
-	vkDestroyImageView(device, outputImageView, NULL);
 
 	vkDestroyRenderPass(device,renderPass, NULL);
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);
-    vkDestroyPipeline(device, computePipeline, NULL);
     vkDestroyCommandPool(device, commandPool, NULL);        
     vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);      

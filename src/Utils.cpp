@@ -278,6 +278,20 @@ void Utils::createImageSampler(VkSampler &sampler) {
 
 	VK_CHECK_RESULT(vkCreateSampler(RenderApplication::device, &samplerInfo, NULL, &sampler));
 }
+
+VkShaderModule Utils::createShaderModule(const std::vector<char> &shaderCode) {
+
+	VkShaderModule shaderModule;
+
+	VkShaderModuleCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = shaderCode.size();
+	createInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
+	VK_CHECK_RESULT(vkCreateShaderModule(RenderApplication::device, &createInfo, NULL, &shaderModule));
+
+	return shaderModule;
+
+}
 std::vector<char> Utils::readFile(const std::string& filename) {
 
 	std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -286,10 +300,14 @@ std::vector<char> Utils::readFile(const std::string& filename) {
 		throw std::runtime_error("failed to open file!");
 	}
 
+	//get file byte size, create a char array of same size
 	size_t fileSize = (size_t)file.tellg();
 	std::vector<char> buffer(fileSize);
 
+	//go to beginning of file
 	file.seekg(0);
+
+	//copy file into buffer
 	file.read(buffer.data(), fileSize);
 
 	file.close();
