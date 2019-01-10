@@ -21,7 +21,7 @@ class Utils{
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 	
 
-	friend class ComputeApplication;
+	friend class RenderApplication;
 };
 
 // Used for validating return values of Vulkan API calls.

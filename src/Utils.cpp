@@ -1,5 +1,5 @@
 #include <utils.h>
-#include <ComputeApplication.h>
+#include <RenderApplication.h>
 
 
 void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
@@ -11,20 +11,20 @@ void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPr
 	createInfo.usage = usage;
 	createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	VK_CHECK_RESULT(vkCreateBuffer(ComputeApplication::device, &createInfo, NULL, &buffer));
+	VK_CHECK_RESULT(vkCreateBuffer(RenderApplication::device, &createInfo, NULL, &buffer));
 
 	//create buffer memory
 	VkMemoryRequirements memoryRequirements;
-	vkGetBufferMemoryRequirements(ComputeApplication::device, buffer, &memoryRequirements);
+	vkGetBufferMemoryRequirements(RenderApplication::device, buffer, &memoryRequirements);
 
 	VkMemoryAllocateInfo allocateInfo = {};
 	allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocateInfo.allocationSize = memoryRequirements.size;
 	allocateInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, propertyFlags);
 
-	VK_CHECK_RESULT(vkAllocateMemory(ComputeApplication::device, &allocateInfo, NULL, &bufferMemory));
+	VK_CHECK_RESULT(vkAllocateMemory(RenderApplication::device, &allocateInfo, NULL, &bufferMemory));
 
-	VK_CHECK_RESULT(vkBindBufferMemory(ComputeApplication::device, buffer, bufferMemory, 0));
+	VK_CHECK_RESULT(vkBindBufferMemory(RenderApplication::device, buffer, bufferMemory, 0));
 }
 
 void Utils::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkImage &image, VkDeviceMemory& imageMemory) {
@@ -46,20 +46,20 @@ void Utils::createImage(uint32_t width, uint32_t height, VkFormat format, VkImag
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.flags = 0;
 
-	VK_CHECK_RESULT(vkCreateImage(ComputeApplication::device, &imageInfo, NULL, &image));
+	VK_CHECK_RESULT(vkCreateImage(RenderApplication::device, &imageInfo, NULL, &image));
 
 	//Texture Image Memory
 	VkMemoryRequirements memoryRequirements;
-	vkGetImageMemoryRequirements(ComputeApplication::device, image, &memoryRequirements);
+	vkGetImageMemoryRequirements(RenderApplication::device, image, &memoryRequirements);
 
 	VkMemoryAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.allocationSize = memoryRequirements.size;
 	allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, propertyFlags);
 
-	VK_CHECK_RESULT(vkAllocateMemory(ComputeApplication::device, &allocInfo, NULL, &imageMemory));
+	VK_CHECK_RESULT(vkAllocateMemory(RenderApplication::device, &allocInfo, NULL, &imageMemory));
 
-	VK_CHECK_RESULT(vkBindImageMemory(ComputeApplication::device, image, imageMemory, 0));
+	VK_CHECK_RESULT(vkBindImageMemory(RenderApplication::device, image, imageMemory, 0));
 }
 
 void Utils::createImageView(VkImage image, VkImageView &imageView) {
@@ -75,7 +75,7 @@ void Utils::createImageView(VkImage image, VkImageView &imageView) {
 	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
 	imageViewCreateInfo.subresourceRange.layerCount = 1;
 
-	VK_CHECK_RESULT(vkCreateImageView(ComputeApplication::device, &imageViewCreateInfo, NULL, &imageView));
+	VK_CHECK_RESULT(vkCreateImageView(RenderApplication::device, &imageViewCreateInfo, NULL, &imageView));
 }
 
 void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
@@ -227,10 +227,10 @@ VkCommandBuffer Utils::beginSingleTimeCommandBuffer() {
 	//allocate command buffer
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = ComputeApplication::commandPool;
+	allocInfo.commandPool = RenderApplication::commandPool;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = 1;
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(ComputeApplication::device, &allocInfo, &newCommandBuffer));
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(RenderApplication::device, &allocInfo, &newCommandBuffer));
 
 	//begin command buffer
 	VkCommandBufferBeginInfo beginInfo = {};
@@ -251,9 +251,9 @@ void Utils::endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer) {
 	submitInfo.pCommandBuffers = &singleTimeCmdBuffer;
 
 	//NEED A GRAPHICS QUEUE
-	vkQueueSubmit(ComputeApplication::queue, 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(ComputeApplication::queue);
-	vkFreeCommandBuffers(ComputeApplication::device, ComputeApplication::commandPool, 1, &singleTimeCmdBuffer);
+	vkQueueSubmit(RenderApplication::queue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(RenderApplication::queue);
+	vkFreeCommandBuffers(RenderApplication::device, RenderApplication::commandPool, 1, &singleTimeCmdBuffer);
 }
 
 void Utils::createImageSampler(VkSampler &sampler) {
@@ -276,7 +276,7 @@ void Utils::createImageSampler(VkSampler &sampler) {
 	samplerInfo.minLod = 0.0f;
 	samplerInfo.maxLod = 0.0f;
 
-	VK_CHECK_RESULT(vkCreateSampler(ComputeApplication::device, &samplerInfo, NULL, &sampler));
+	VK_CHECK_RESULT(vkCreateSampler(RenderApplication::device, &samplerInfo, NULL, &sampler));
 }
 std::vector<char> Utils::readFile(const std::string& filename) {
 
@@ -302,7 +302,7 @@ uint32_t Utils::findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags pr
 
 	VkPhysicalDeviceMemoryProperties memoryProperties;
 
-	vkGetPhysicalDeviceMemoryProperties(ComputeApplication::physicalDevice, &memoryProperties);
+	vkGetPhysicalDeviceMemoryProperties(RenderApplication::physicalDevice, &memoryProperties);
 
 	for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i) {
 

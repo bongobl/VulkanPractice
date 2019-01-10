@@ -1,4 +1,4 @@
-#include <ComputeApplication.h>
+#include <RenderApplication.h>
 #include <Utils.h>
 #ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -12,38 +12,38 @@
 
 #include <fstream>
 
-uint32_t ComputeApplication::IMAGE_WIDTH = -1;
-uint32_t ComputeApplication::IMAGE_HEIGHT = -1;
-VkDeviceSize ComputeApplication::imageSize;
-unsigned char* ComputeApplication::inputImageData;
-VkInstance ComputeApplication::instance;
-VkDebugReportCallbackEXT ComputeApplication::debugReportCallback;
-VkPhysicalDevice ComputeApplication::physicalDevice;
-VkDevice ComputeApplication::device;
-VkImage ComputeApplication::inputImage;
-VkDeviceMemory ComputeApplication::inputImageMemory;
-VkImageView ComputeApplication::inputImageView;
-VkBuffer ComputeApplication::uniformBuffer;
-VkDeviceMemory ComputeApplication::uniformBufferMemory;
-VkImage ComputeApplication::outputImage;
-VkDeviceMemory ComputeApplication::outputImageMemory;
-VkImageView ComputeApplication::outputImageView;
-VkDescriptorPool ComputeApplication::descriptorPool;
-VkDescriptorSet ComputeApplication::descriptorSet;
-VkDescriptorSetLayout ComputeApplication::descriptorSetLayout;
-VkShaderModule ComputeApplication::computeShaderModule;
-VkPipeline ComputeApplication::computePipeline;
-VkPipelineLayout ComputeApplication::pipelineLayout;
-VkCommandPool ComputeApplication::commandPool;
-VkCommandBuffer ComputeApplication::mainCommandBuffer;
-uint32_t ComputeApplication::queueFamilyIndex;
-VkQueue ComputeApplication::queue;
+uint32_t RenderApplication::IMAGE_WIDTH = -1;
+uint32_t RenderApplication::IMAGE_HEIGHT = -1;
+VkDeviceSize RenderApplication::imageSize;
+unsigned char* RenderApplication::inputImageData;
+VkInstance RenderApplication::instance;
+VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
+VkPhysicalDevice RenderApplication::physicalDevice;
+VkDevice RenderApplication::device;
+VkImage RenderApplication::inputImage;
+VkDeviceMemory RenderApplication::inputImageMemory;
+VkImageView RenderApplication::inputImageView;
+VkBuffer RenderApplication::uniformBuffer;
+VkDeviceMemory RenderApplication::uniformBufferMemory;
+VkImage RenderApplication::outputImage;
+VkDeviceMemory RenderApplication::outputImageMemory;
+VkImageView RenderApplication::outputImageView;
+VkDescriptorPool RenderApplication::descriptorPool;
+VkDescriptorSet RenderApplication::descriptorSet;
+VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
+VkPipeline RenderApplication::computePipeline;
+VkPipelineLayout RenderApplication::pipelineLayout;
+VkRenderPass RenderApplication::renderPass;
+VkCommandPool RenderApplication::commandPool;
+VkCommandBuffer RenderApplication::mainCommandBuffer;
+uint32_t RenderApplication::queueFamilyIndex;
+VkQueue RenderApplication::queue;
 
 
-const std::vector<const char *> ComputeApplication::requiredLayers = {
+const std::vector<const char *> RenderApplication::requiredLayers = {
 	"VK_LAYER_LUNARG_standard_validation"
 };
-const std::vector<const char *> ComputeApplication::requiredInstanceExtensions = {
+const std::vector<const char *> RenderApplication::requiredInstanceExtensions = {
 	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
 };
 
@@ -64,7 +64,7 @@ struct UniformBufferObject{
     int32_t blur;
 };
 
-void ComputeApplication::run() {
+void RenderApplication::run() {
 
     
     // Initialize vulkan
@@ -98,6 +98,10 @@ void ComputeApplication::run() {
     //create pipeline
     createComputePipeline();
 
+    //for graphics
+	createRenderPass();
+    createGraphicsPipeline();
+
     //record command buffer
     createMainCommandBuffer();
 
@@ -111,7 +115,7 @@ void ComputeApplication::run() {
     cleanup();
 }
 
-void ComputeApplication::loadImage(){
+void RenderApplication::loadImage(){
 
 	string imageName = "resources/images/oahu.jpg";
 
@@ -137,7 +141,7 @@ void ComputeApplication::loadImage(){
 	imageSize = IMAGE_WIDTH * IMAGE_HEIGHT * 4;
 }
 
-void ComputeApplication::exportOutputImage() {
+void RenderApplication::exportOutputImage() {
 
 	//Buffer
 	VkBuffer stagingBuffer;
@@ -162,7 +166,7 @@ void ComputeApplication::exportOutputImage() {
 	vkFreeMemory(device, stagingBufferMemory, nullptr);
 
 }
-void ComputeApplication::createInstance() {
+void RenderApplication::createInstance() {
     
 
 	//Make sure all required instance layers/extensions are supported and throw a runtime error if not
@@ -273,7 +277,7 @@ void ComputeApplication::createInstance() {
 
 }
 
-void ComputeApplication::findPhysicalDevice() {
+void RenderApplication::findPhysicalDevice() {
     
     //In this function, we find a physical device that can be used with Vulkan.
     //So, first we will list all physical devices on the system with vkEnumeratePhysicalDevices .
@@ -299,7 +303,7 @@ void ComputeApplication::findPhysicalDevice() {
 	throw std::runtime_error("Could not load find a valid physical device for our operations");
 }
 
-bool ComputeApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice, uint32_t &familyIndex) {
+bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice, uint32_t &familyIndex) {
 
 	VkPhysicalDeviceFeatures supportedFeatures;
 	vkGetPhysicalDeviceFeatures(potentialPhysicalDevice, &supportedFeatures);
@@ -313,7 +317,7 @@ bool ComputeApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysica
 
 }
 // Returns the index of a queue family that supports compute and graphics operations. 
-uint32_t ComputeApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDevice) {
+uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDevice) {
 
     uint32_t queueFamilyCount;
 
@@ -343,7 +347,7 @@ uint32_t ComputeApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDe
     return currFamilyIndex;
 }
 
-void ComputeApplication::createDevice() {
+void RenderApplication::createDevice() {
 
 
     //When creating the device, we also specify what queues it has.
@@ -384,7 +388,7 @@ void ComputeApplication::createDevice() {
 }
 
 
-void ComputeApplication::createInputImage(){
+void RenderApplication::createInputImage(){
     
 	Utils::createImage(
 		IMAGE_WIDTH,		//Width
@@ -399,7 +403,7 @@ void ComputeApplication::createInputImage(){
 
 }
 
-void ComputeApplication::writeToInputImage() {
+void RenderApplication::writeToInputImage() {
 
 	//Buffer
 	VkBuffer stagingBuffer;
@@ -423,7 +427,7 @@ void ComputeApplication::writeToInputImage() {
 	vkDestroyBuffer(device, stagingBuffer, nullptr);
 	vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
-void ComputeApplication::createInputImageView() {
+void RenderApplication::createInputImageView() {
 
 	Utils::createImageView(inputImage, inputImageView);
 }
@@ -431,14 +435,14 @@ void ComputeApplication::createInputImageView() {
 
 
 
-void ComputeApplication::createUniformBuffer(){
+void RenderApplication::createUniformBuffer(){
 
 	Utils::createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, uniformBuffer, uniformBufferMemory);
 
 }
 
 
-void ComputeApplication::writeToUniformBuffer(){
+void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
@@ -460,7 +464,7 @@ void ComputeApplication::writeToUniformBuffer(){
 }
 
 
-void ComputeApplication::createOutputImage() {
+void RenderApplication::createOutputImage() {
 	
 	Utils::createImage(
 		IMAGE_WIDTH,		//Width
@@ -478,12 +482,12 @@ void ComputeApplication::createOutputImage() {
 
 }
 
-void ComputeApplication::createOutputImageView() {
+void RenderApplication::createOutputImageView() {
 
 	Utils::createImageView(outputImage, outputImageView);
 }
 
-void ComputeApplication::createDescriptorSetLayout() {
+void RenderApplication::createDescriptorSetLayout() {
 
 
 	//define a storage image binding for our input image
@@ -522,7 +526,7 @@ void ComputeApplication::createDescriptorSetLayout() {
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
 }
 
-void ComputeApplication::createDescriptorPool(){
+void RenderApplication::createDescriptorPool(){
 
     //So we will allocate a descriptor set here.
     //But we need to first create a descriptor pool to do that. 
@@ -547,7 +551,7 @@ void ComputeApplication::createDescriptorPool(){
     //Create descriptor pool.
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
 }
-void ComputeApplication::createDescriptorSet() {
+void RenderApplication::createDescriptorSet() {
     
 
     //With the pool allocated, we can now allocate the descriptor set. 
@@ -609,10 +613,13 @@ void ComputeApplication::createDescriptorSet() {
 }
 
 
-void ComputeApplication::createComputePipeline() {
+void RenderApplication::createComputePipeline() {
 
     
     //Create a shader module. A shader module basically just encapsulates some shader code.
+    //Compute shader used to generate final image, encapsulates shader code
+    VkShaderModule computeShaderModule;
+
     std::vector<char> shaderCode = Utils::readFile("resources/shaders/comp.spv");
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -655,7 +662,7 @@ void ComputeApplication::createComputePipeline() {
     vkDestroyShaderModule(device, computeShaderModule, NULL);
 }
 
-void ComputeApplication::createCommandPool(){
+void RenderApplication::createCommandPool(){
 
     //We are getting closer to the end. In order to send commands to the device(GPU),
     //we must first record commands into a command buffer.
@@ -670,7 +677,42 @@ void ComputeApplication::createCommandPool(){
     VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool));
 }
 
-void ComputeApplication::createMainCommandBuffer() {
+void RenderApplication::createRenderPass() {
+
+	VkAttachmentDescription colorAttachment = {};
+	colorAttachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;	//we want to copy it to a staging buffer and export it after rendering
+
+	VkAttachmentReference colorAttachmentRef = {};
+	colorAttachmentRef.attachment = 0;
+	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorAttachmentRef;
+
+	VkRenderPassCreateInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.attachmentCount = 1;
+	renderPassInfo.pAttachments = &colorAttachment;
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+
+	VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
+
+}
+
+void RenderApplication::createGraphicsPipeline(){
+    
+}
+void RenderApplication::createMainCommandBuffer() {
     
     
     //Now allocate a command buffer from the command pool. 
@@ -709,7 +751,7 @@ void ComputeApplication::createMainCommandBuffer() {
     VK_CHECK_RESULT(vkEndCommandBuffer(mainCommandBuffer)); // end recording commands.
 }
 
-void ComputeApplication::runCommandBuffer() {
+void RenderApplication::runCommandBuffer() {
 
     //Now we shall finally submit the recorded command buffer to a the compute queue.
     VkSubmitInfo submitInfo = {};
@@ -739,7 +781,7 @@ void ComputeApplication::runCommandBuffer() {
     vkDestroyFence(device, fence, NULL);
 }
 
-void ComputeApplication::cleanup() {
+void RenderApplication::cleanup() {
 
 	//clean up all Vulkan resources
 
@@ -751,6 +793,8 @@ void ComputeApplication::cleanup() {
         }
         func(instance, debugReportCallback, NULL);
     }
+
+	
 
     //free CPU image buffer
    	stbi_image_free(inputImageData);
@@ -769,6 +813,7 @@ void ComputeApplication::cleanup() {
 	vkDestroyImage(device, outputImage, NULL);
 	vkDestroyImageView(device, outputImageView, NULL);
 
+	vkDestroyRenderPass(device,renderPass, NULL);
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);

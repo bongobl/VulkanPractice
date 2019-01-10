@@ -19,7 +19,7 @@ const bool enableValidationLayers = true;
 #endif
 
 using namespace std;
-class ComputeApplication{
+class RenderApplication{
 
 	static uint32_t IMAGE_WIDTH;
 	static uint32_t IMAGE_HEIGHT;
@@ -68,14 +68,14 @@ class ComputeApplication{
 	static VkDescriptorSetLayout descriptorSetLayout;
     
 
-    //Compute shader used to generate final image, encapsulates shader code
-	static VkShaderModule computeShaderModule;
-
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
     //We will be creating a simple compute pipeline in this application. 
 	static VkPipeline computePipeline;
 	static VkPipelineLayout pipelineLayout;
     
+	//For graphics
+	static VkRenderPass renderPass;
+	static VkPipeline graphicsPipeline;
 
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
@@ -138,6 +138,10 @@ private:
 
 	static void createDescriptorSet();
 	static void createComputePipeline();
+
+	//to start rendering
+	static void createRenderPass();
+	static void createGraphicsPipeline();
 
 	static void createMainCommandBuffer();
 
