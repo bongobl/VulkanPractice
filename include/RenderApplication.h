@@ -20,6 +20,9 @@ using namespace std;
 class RenderApplication{
 
 
+	//width and height
+	static VkExtent2D resolution;
+
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;
 

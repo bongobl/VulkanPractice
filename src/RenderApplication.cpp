@@ -12,7 +12,7 @@
 
 #include <fstream>
 
-
+VkExtent2D RenderApplication::resolution = {600,600};
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
@@ -235,6 +235,11 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 
 	//We would normally check the supportedFeatures structure to see that all our features are supported
 	//by this potential physical device. Since we have none, we just choose this device and get the queue family we need
+
+
+    //If we had any required device extensions, we would check if they are supported by the physical device here before
+    //supplying them to the logical device create info.
+
 
 	familyIndex = getQueueFamilyIndex(potentialPhysicalDevice);
 	return familyIndex != -1;
@@ -540,8 +545,43 @@ void RenderApplication::createGraphicsPipeline(){
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, fragmentShaderStageInfo };
 
-	
+    //Vertex Input
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = NULL;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = NULL;
 
+    //Input Assembly
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    //Viewports
+    VkViewport viewport = {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0;
+    viewport.width = (float)resolution.width;
+    viewport.height = (float)resolution.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    //Scissors
+    VkRect2D scissor = {};
+    scissor.offset = {0,0};
+    scissor.extent = resolution;
+
+    //Viewport State
+    VkPipelineViewportStateCreateInfo viewportState = {};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    //Rasterizer
 
 	//destroy shader modules
 	vkDestroyShaderModule(device,vertexShaderModule, NULL);
