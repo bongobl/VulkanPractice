@@ -46,8 +46,7 @@ class RenderApplication{
 	static VkDeviceMemory colorImageMemory;
 	static VkImageView colorImageView;
 
-	//frame buffer to reference our color attachment image
-	static VkFramebuffer frameBuffer;
+	
 
     //Descriptors provide a way of accessing resources in shaders. They allow us to use 
     //things like uniform buffers, storage buffers and images in GLSL. 
@@ -59,6 +58,9 @@ class RenderApplication{
     
 	//our render pass with one color attachment
 	static VkRenderPass renderPass;
+
+	//frame buffer to reference our color attachment image
+	static VkFramebuffer frameBuffer;
 
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
 	static VkPipelineLayout pipelineLayout;
@@ -103,7 +105,6 @@ private:
 
 	
 
-
     //layouts and pools
 	static void createDescriptorSetLayout();
 	static void createDescriptorPool();
@@ -112,15 +113,17 @@ private:
 	//GPU resources
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
+	
 	static void createColorImage();
 	static void createColorImageView();
 
-	static void createFrameBuffer();
+	
 
 	static void createDescriptorSet();
 
 	//to start rendering
 	static void createRenderPass();
+	static void createFrameBuffer();
 	static void createGraphicsPipeline();
 
 	static void createMainCommandBuffer();

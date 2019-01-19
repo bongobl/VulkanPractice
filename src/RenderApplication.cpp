@@ -79,13 +79,15 @@ void RenderApplication::run() {
 
 	createColorImage();
 	createColorImageView();
-	createFrameBuffer();
+	
+	
 
 	//create descriptors 
     createDescriptorSet();
 
     //for graphics
 	createRenderPass();
+	createFrameBuffer();
     createGraphicsPipeline();
 
     //record command buffer
@@ -374,6 +376,16 @@ void RenderApplication::createColorImageView() {
 
 void RenderApplication::createFrameBuffer() {
 
+	VkFramebufferCreateInfo frameBufferInfo = {};
+	frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	frameBufferInfo.renderPass = renderPass;
+	frameBufferInfo.attachmentCount = 1;
+	frameBufferInfo.pAttachments = &colorImageView;
+	frameBufferInfo.width = resolution.width;
+	frameBufferInfo.height = resolution.height;
+	frameBufferInfo.layers = 1;
+
+	VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferInfo, NULL, &frameBuffer));
 }
 void RenderApplication::createDescriptorSetLayout() {
 
@@ -735,6 +747,7 @@ void RenderApplication::cleanup() {
 	vkDestroyImage(device, colorImage, NULL);
 	vkFreeMemory(device, colorImageMemory, NULL);
 
+	vkDestroyFramebuffer(device, frameBuffer, NULL);
 	vkDestroyRenderPass(device,renderPass, NULL);
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
