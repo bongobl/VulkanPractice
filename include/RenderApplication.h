@@ -41,7 +41,11 @@ class RenderApplication{
 	static VkBuffer uniformBuffer;
 	static VkDeviceMemory uniformBufferMemory;
 
-	 
+	//Color attachment image to render to
+	static VkImage colorImage;
+	static VkDeviceMemory colorImageMemory;
+	static VkImageView colorImageView;
+
     //Descriptors provide a way of accessing resources in shaders. They allow us to use 
     //things like uniform buffers, storage buffers and images in GLSL. 
     //A single descriptor represents a single resource, and several descriptors are organized
@@ -54,8 +58,9 @@ class RenderApplication{
 	static VkRenderPass renderPass;
 
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
-	static VkPipeline graphicsPipeline;
 	static VkPipelineLayout pipelineLayout;
+	static VkPipeline graphicsPipeline;
+	
     
 	
     //The command buffer is used to record commands, that will be submitted to a queue.
@@ -101,9 +106,11 @@ private:
 	static void createDescriptorPool();
 	static void createCommandPool();
 
-
+	//GPU resources
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
+	static void createColorImage();
+	static void createColorImageView();
 
 
 	static void createDescriptorSet();

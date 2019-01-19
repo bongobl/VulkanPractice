@@ -19,11 +19,14 @@ VkPhysicalDevice RenderApplication::physicalDevice;
 VkDevice RenderApplication::device;
 VkBuffer RenderApplication::uniformBuffer;
 VkDeviceMemory RenderApplication::uniformBufferMemory;
+VkImage RenderApplication::colorImage;
+VkDeviceMemory RenderApplication::colorImageMemory;
 VkDescriptorPool RenderApplication::descriptorPool;
 VkDescriptorSet RenderApplication::descriptorSet;
 VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
-VkPipelineLayout RenderApplication::pipelineLayout;
 VkRenderPass RenderApplication::renderPass;
+VkPipelineLayout RenderApplication::pipelineLayout;
+VkPipeline RenderApplication::graphicsPipeline;
 VkCommandPool RenderApplication::commandPool;
 VkCommandBuffer RenderApplication::mainCommandBuffer;
 uint32_t RenderApplication::queueFamilyIndex;
@@ -71,7 +74,7 @@ void RenderApplication::run() {
 
     createUniformBuffer();
     writeToUniformBuffer();
-
+	createColorImage();
 
 	//create descriptors 
     createDescriptorSet();
@@ -233,7 +236,7 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 	VkPhysicalDeviceFeatures supportedFeatures;
 	vkGetPhysicalDeviceFeatures(potentialPhysicalDevice, &supportedFeatures);
 
-	//We would normally check the supportedFeatures structure to see that all our features are supported
+	//We would normally check the supportedFeatures structure to see that all our device features are supported
 	//by this potential physical device. Since we have none, we just choose this device and get the queue family we need
 
 
@@ -345,6 +348,22 @@ void RenderApplication::writeToUniformBuffer(){
 
 }
 
+void RenderApplication::createColorImage() {
+
+	Utils::createImage(
+		resolution.width,	//width
+		resolution.height,	//height
+		VK_FORMAT_R8G8B8A8_UNORM,	//format
+		VK_IMAGE_TILING_OPTIMAL,	//tiling
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,	//usage
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//memory properties
+		colorImage,			//image
+		colorImageMemory	//image memory
+	);
+}
+void RenderApplication::createColorImageView() {
+
+}
 void RenderApplication::createDescriptorSetLayout() {
 
 	/*
@@ -530,13 +549,14 @@ void RenderApplication::createGraphicsPipeline(){
 	VkShaderModule fragmentShaderModule = Utils::createShaderModule(fragmentShaderCode);
 
 
-
+	//Vertex Shader Stage
 	VkPipelineShaderStageCreateInfo vertexShaderStageInfo = {};
 	vertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 	vertexShaderStageInfo.module = vertexShaderModule;
 	vertexShaderStageInfo.pName = "main";
 	
+	//Fragment Shader Stage
 	VkPipelineShaderStageCreateInfo fragmentShaderStageInfo = {};
 	fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	fragmentShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -582,8 +602,69 @@ void RenderApplication::createGraphicsPipeline(){
     viewportState.pScissors = &scissor;
 
     //Rasterizer
+	VkPipelineRasterizationStateCreateInfo rasterizer = {};
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.depthClampEnable = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer.depthBiasEnable = VK_FALSE;
 
-	//destroy shader modules
+	//Multisampling
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+
+	//Color Blending (per frame buffer)
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_FALSE;
+
+
+	//Color blending (global settings)
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.logicOpEnable = VK_FALSE;
+	colorBlending.logicOp = VK_LOGIC_OP_COPY;
+	colorBlending.attachmentCount = 1;
+	colorBlending.pAttachments = &colorBlendAttachment;
+
+	//Pipeline Layout
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 0;	//CHANGE LATER
+	pipelineLayoutInfo.pSetLayouts = NULL;	//CHANGE LATER
+
+
+	//Create Pipeline Layout
+	VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, &pipelineLayout));
+
+	VkGraphicsPipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.stageCount = 2;
+	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pMultisampleState = &multisampling;
+	pipelineInfo.pDepthStencilState = NULL;
+	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pDynamicState = NULL;
+	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.renderPass = renderPass;
+	pipelineInfo.subpass = 0;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+	//Create Graphics Pipeline 
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &graphicsPipeline));
+
+
+	//destroy shader modules 
 	vkDestroyShaderModule(device,vertexShaderModule, NULL);
 	vkDestroyShaderModule(device, fragmentShaderModule, NULL);
 }
@@ -642,6 +723,8 @@ void RenderApplication::cleanup() {
 	vkDestroyRenderPass(device,renderPass, NULL);
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
+
+	vkDestroyPipeline(device, graphicsPipeline, NULL);
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);
     vkDestroyCommandPool(device, commandPool, NULL);        
     vkDestroyDevice(device, NULL);
