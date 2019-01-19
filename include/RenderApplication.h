@@ -46,6 +46,9 @@ class RenderApplication{
 	static VkDeviceMemory colorImageMemory;
 	static VkImageView colorImageView;
 
+	//frame buffer to reference our color attachment image
+	static VkFramebuffer frameBuffer;
+
     //Descriptors provide a way of accessing resources in shaders. They allow us to use 
     //things like uniform buffers, storage buffers and images in GLSL. 
     //A single descriptor represents a single resource, and several descriptors are organized
@@ -112,6 +115,7 @@ private:
 	static void createColorImage();
 	static void createColorImageView();
 
+	static void createFrameBuffer();
 
 	static void createDescriptorSet();
 

@@ -8,7 +8,7 @@ class Utils{
 
 	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 	static void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
-	static void createImageView(VkImage image, VkImageView &imageView);
+	static void createImageView(VkImage image, VkImageView &imageView, VkFormat format);
 	static void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	static void copyImageToBuffer(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	static void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);

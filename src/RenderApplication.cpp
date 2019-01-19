@@ -21,6 +21,8 @@ VkBuffer RenderApplication::uniformBuffer;
 VkDeviceMemory RenderApplication::uniformBufferMemory;
 VkImage RenderApplication::colorImage;
 VkDeviceMemory RenderApplication::colorImageMemory;
+VkImageView RenderApplication::colorImageView;
+VkFramebuffer RenderApplication::frameBuffer;
 VkDescriptorPool RenderApplication::descriptorPool;
 VkDescriptorSet RenderApplication::descriptorSet;
 VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
@@ -74,7 +76,10 @@ void RenderApplication::run() {
 
     createUniformBuffer();
     writeToUniformBuffer();
+
 	createColorImage();
+	createColorImageView();
+	createFrameBuffer();
 
 	//create descriptors 
     createDescriptorSet();
@@ -360,8 +365,14 @@ void RenderApplication::createColorImage() {
 		colorImage,			//image
 		colorImageMemory	//image memory
 	);
+
+	Utils::transitionImageLayout(colorImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 }
 void RenderApplication::createColorImageView() {
+	Utils::createImageView(colorImage, colorImageView, VK_FORMAT_R8G8B8A8_UNORM);
+}
+
+void RenderApplication::createFrameBuffer() {
 
 }
 void RenderApplication::createDescriptorSetLayout() {
@@ -715,15 +726,20 @@ void RenderApplication::cleanup() {
     }
 
 
-    //free uniform buffer
-    vkFreeMemory(device, uniformBufferMemory, NULL);
+    //free uniform buffer   
     vkDestroyBuffer(device, uniformBuffer, NULL);
+	vkFreeMemory(device, uniformBufferMemory, NULL);
 
+	//free color image
+	vkDestroyImageView(device, colorImageView, NULL);
+	vkDestroyImage(device, colorImage, NULL);
+	vkFreeMemory(device, colorImageMemory, NULL);
 
 	vkDestroyRenderPass(device,renderPass, NULL);
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
 
+	
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);
     vkDestroyCommandPool(device, commandPool, NULL);        
