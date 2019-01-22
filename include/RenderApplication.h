@@ -70,15 +70,15 @@ class RenderApplication{
 	
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
-	static VkCommandPool commandPool;
+	static VkCommandPool graphicsCommandPool;
 	static VkCommandBuffer mainCommandBuffer;
 
 
-	//Index of queue family which supports our desired features, in our case, graphics and compute
-	static uint32_t queueFamilyIndex;
+	//Index of queue family which supports our desired features, in our case, graphics
+	static uint32_t graphicsQueueFamilyIndex;
 
 	//Queue for graphics and compute operation
-	static VkQueue queue;
+	static VkQueue graphicsQueue;
 
 	//The layers and instance extensions required for our application
 	const static std::vector<const char *> requiredLayers;
@@ -128,8 +128,9 @@ private:
 
 	static void createMainCommandBuffer();
 
+	static void runMainCommandBuffer();
 
-	static void runCommandBuffer();
+	static void exportAsImage();
 
 	static void cleanup();
 

@@ -29,10 +29,10 @@ VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
 VkRenderPass RenderApplication::renderPass;
 VkPipelineLayout RenderApplication::pipelineLayout;
 VkPipeline RenderApplication::graphicsPipeline;
-VkCommandPool RenderApplication::commandPool;
+VkCommandPool RenderApplication::graphicsCommandPool;
 VkCommandBuffer RenderApplication::mainCommandBuffer;
-uint32_t RenderApplication::queueFamilyIndex;
-VkQueue RenderApplication::queue;
+uint32_t RenderApplication::graphicsQueueFamilyIndex;
+VkQueue RenderApplication::graphicsQueue;
 
 
 const std::vector<const char *> RenderApplication::requiredLayers = {
@@ -94,7 +94,9 @@ void RenderApplication::run() {
     createMainCommandBuffer();
 
     // Finally, run the recorded command buffer.
-    runCommandBuffer();
+    runMainCommandBuffer();
+
+	exportAsImage();
 
     // Clean up all Vulkan resources.
     cleanup();
@@ -229,7 +231,7 @@ void RenderApplication::findPhysicalDevice() {
 
     for (VkPhysicalDevice currPhysicalDevice : allPhysicalDevices) {
 
-		if (isValidPhysicalDevice(currPhysicalDevice, queueFamilyIndex)) {
+		if (isValidPhysicalDevice(currPhysicalDevice, graphicsQueueFamilyIndex)) {
 			physicalDevice = currPhysicalDevice;
 			return;
 		}	
@@ -273,7 +275,7 @@ uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDev
         VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
 
         if ((currFamily.queueCount > 0) && 
-			(currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) && 
+			/*(currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&*/
 			(currFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
 
             // found a queue family with compute and graphics. We're done!
@@ -293,7 +295,7 @@ void RenderApplication::createDevice() {
     //When creating the device, we also specify what queues it has.
     VkDeviceQueueCreateInfo queueCreateInfo = {};
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
+    queueCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
     queueCreateInfo.queueCount = 1; // get one queue from this family. We don't need more.
     float queuePriorities = 1.0;  // we only have one queue, so this is not that imporant. 
     queueCreateInfo.pQueuePriorities = &queuePriorities;
@@ -324,7 +326,7 @@ void RenderApplication::createDevice() {
     uint32_t particularQueueIndex = 0;	
 
     // Get a handle to the only member of the queue family.
-    vkGetDeviceQueue(device, queueFamilyIndex, particularQueueIndex, &queue);
+    vkGetDeviceQueue(device, graphicsQueueFamilyIndex, particularQueueIndex, &graphicsQueue);
 }
 
 void RenderApplication::createUniformBuffer(){
@@ -362,7 +364,7 @@ void RenderApplication::createColorImage() {
 		resolution.height,	//height
 		VK_FORMAT_R8G8B8A8_UNORM,	//format
 		VK_IMAGE_TILING_OPTIMAL,	//tiling
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,	//usage
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,	//usage
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//memory properties
 		colorImage,			//image
 		colorImageMemory	//image memory
@@ -525,8 +527,8 @@ void RenderApplication::createCommandPool(){
 
     // the queue family of this command pool. All command buffers allocated from this command pool,
     // must be submitted to queues of this family ONLY. 
-    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
-    VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool));
+    commandPoolCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
+    VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &graphicsCommandPool));
 }
 
 void RenderApplication::createRenderPass() {
@@ -693,13 +695,50 @@ void RenderApplication::createGraphicsPipeline(){
 }
 void RenderApplication::createMainCommandBuffer() {
     
-    
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = graphicsCommandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = 1;	//no swap chain, so just need one command buffer
+
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &allocInfo, &mainCommandBuffer));
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	beginInfo.pInheritanceInfo = NULL;
+
+	//main command buffer scope
+	VK_CHECK_RESULT(vkBeginCommandBuffer(mainCommandBuffer, &beginInfo));
+
+		VkRenderPassBeginInfo renderPassInfo = {};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.renderPass = renderPass;
+		renderPassInfo.framebuffer = frameBuffer;
+		renderPassInfo.renderArea.offset = { 0,0 };
+		renderPassInfo.renderArea.extent = resolution;
+
+		VkClearValue clearColor = { 0.0f,0.0f,0.0f,1.0f };
+		renderPassInfo.clearValueCount = 1;
+		renderPassInfo.pClearValues = &clearColor;
+
+		//render pass scope
+		vkCmdBeginRenderPass(mainCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+
+			vkCmdBindPipeline(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+			vkCmdDraw(mainCommandBuffer, 3, 1, 0, 0);
+
+		vkCmdEndRenderPass(mainCommandBuffer);
+
+	VK_CHECK_RESULT(vkEndCommandBuffer(mainCommandBuffer));
+
    
 }
 
-void RenderApplication::runCommandBuffer() {
+void RenderApplication::runMainCommandBuffer() {
 
-	/* THIS CODE PROBABLY DOESN'T CHANGE AT ALL, ENABLE WHEN READY
 
     //Now we shall finally submit the recorded command buffer to a the compute queue.
     VkSubmitInfo submitInfo = {};
@@ -715,28 +754,44 @@ void RenderApplication::runCommandBuffer() {
     VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &fence));
 
     //We submit the command buffer on the queue, at the same time giving a fence.
-    VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
+    VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence));
 
     VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
 
     //no longer need fence
     vkDestroyFence(device, fence, NULL);
-	*/
+
 }
 
+void RenderApplication::exportAsImage() {
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	VkDeviceSize bufferByteSize = resolution.width * resolution.height * 4;
+
+	Utils::createBuffer(bufferByteSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
+
+	//NOTE: We don't need to transition the color attachment image to transfer src since the render pass already did for us
+
+
+	//Clean Up Staging Buffer
+	vkDestroyBuffer(device, stagingBuffer, nullptr);
+	vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+}
 void RenderApplication::cleanup() {
 
 	//clean up all Vulkan resources
-
-    if (enableValidationLayers) {
-        // destroy callback.
-        auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
-        if (func == nullptr) {
-            throw std::runtime_error("Could not load vkDestroyDebugReportCallbackEXT");
-        }
-        func(instance, debugReportCallback, NULL);
-    }
-
+	if (enableValidationLayers) {
+		// destroy callback.
+		auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+		if (func == nullptr) {
+			throw std::runtime_error("Could not load vkDestroyDebugReportCallbackEXT");
+		}
+		func(instance, debugReportCallback, NULL);
+	}
+    
 
     //free uniform buffer   
     vkDestroyBuffer(device, uniformBuffer, NULL);
@@ -755,8 +810,8 @@ void RenderApplication::cleanup() {
 	
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);
-    vkDestroyCommandPool(device, commandPool, NULL);        
+    vkDestroyCommandPool(device, graphicsCommandPool, NULL);        
     vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);      
-	
+
 }

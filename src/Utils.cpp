@@ -209,10 +209,11 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	}
+	
 
 	//no other layout combo options
 	else {
-		throw std::invalid_argument("unsupported layout transition!");
+		throw std::runtime_error("unsupported layout transition!");
 	}
 
 
@@ -236,7 +237,7 @@ VkCommandBuffer Utils::beginSingleTimeCommandBuffer() {
 	//allocate command buffer
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = RenderApplication::commandPool;
+	allocInfo.commandPool = RenderApplication::graphicsCommandPool;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = 1;
 	VK_CHECK_RESULT(vkAllocateCommandBuffers(RenderApplication::device, &allocInfo, &newCommandBuffer));
@@ -260,9 +261,9 @@ void Utils::endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer) {
 	submitInfo.pCommandBuffers = &singleTimeCmdBuffer;
 
 	//NEED A GRAPHICS QUEUE
-	vkQueueSubmit(RenderApplication::queue, 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(RenderApplication::queue);
-	vkFreeCommandBuffers(RenderApplication::device, RenderApplication::commandPool, 1, &singleTimeCmdBuffer);
+	vkQueueSubmit(RenderApplication::graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(RenderApplication::graphicsQueue);
+	vkFreeCommandBuffers(RenderApplication::device, RenderApplication::graphicsCommandPool, 1, &singleTimeCmdBuffer);
 }
 
 void Utils::createImageSampler(VkSampler &sampler) {
