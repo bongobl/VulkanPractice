@@ -1,9 +1,50 @@
-#include <utils.h>
+#include <Utils.h>
 #include <RenderApplication.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 
+#include <map>
+
+
+bool Vertex::operator<(const Vertex& other) const {
+
+	//compare based on position
+	if (position.x != other.position.x) {
+		return position.x < other.position.x;
+	}
+	else if (position.y != other.position.y) {
+		return position.y < other.position.y;
+	}
+	else if (position.z != other.position.z) {
+		return position.z < other.position.z;
+	}
+
+	//compare based on normal
+	if (normal.x != other.normal.x) {
+		return normal.x < other.normal.x;
+	}
+	else if (normal.y != other.normal.y) {
+		return normal.y < other.normal.y;
+	}
+	else if (normal.z != other.normal.z) {
+		return normal.z < other.normal.z;
+	}
+
+	//texCoord
+	if (texCoord.x != other.texCoord.x) {
+		return texCoord.x < other.texCoord.x;
+	}
+	else if (texCoord.y != other.texCoord.y) {
+		return texCoord.y < other.texCoord.y;
+	}
+
+	
+	return false;
+}
 void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
 	
+
 	//create buffer
 	VkBufferCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -342,6 +383,53 @@ uint32_t Utils::findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags pr
 	throw std::runtime_error("Memory type not found");
 }
 
+void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray) {
+
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string err;
+
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, modelFilename.c_str())) {
+		throw std::runtime_error("Failed to load model " + modelFilename);
+	}
+
+	std::map<Vertex, uint32_t> uniqueVertices = {};
+	for (const auto& shape : shapes) {
+		for (const auto& index : shape.mesh.indices) {
+			Vertex vertex = {};
+
+			vertex.position = {
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
+			};
+			
+			vertex.normal = {
+				attrib.normals[3 * index.normal_index + 0],
+				attrib.normals[3 * index.normal_index + 1],
+				attrib.normals[3 * index.normal_index + 2]
+			};
+
+			vertex.texCoord = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1 - attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+
+			
+
+			if (uniqueVertices.count(vertex) == 0) {
+				uniqueVertices[vertex] = (uint32_t)vertexArray.size();
+				indexArray.push_back((uint32_t)vertexArray.size());
+				vertexArray.push_back(vertex);
+			}
+			else {
+				indexArray.push_back(uniqueVertices[vertex]);
+			}
+		}
+	}
+
+}
 //debug callback
 VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
 	VkDebugReportFlagsEXT                       flags,

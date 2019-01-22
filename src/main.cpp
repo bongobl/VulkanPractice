@@ -15,6 +15,7 @@ int main() {
     }
     
     //open image
+	system("\"Rendered Image.png\"");
     cout << "Successful Execution" << endl;
     return EXIT_SUCCESS;
 }

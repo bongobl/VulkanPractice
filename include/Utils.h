@@ -2,7 +2,30 @@
 #include <vulkan/vulkan.h>
 #include <fstream>
 #include <vector>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/hash.hpp>
+
 using namespace std;
+
+struct Vertex {
+	glm::vec3 position;
+	glm::vec3 normal;
+	glm::vec2 texCoord;
+
+	bool operator<(const Vertex& other) const;
+};
+
+struct UniformBufferObject {
+
+	glm::mat4 model;
+	glm::mat4 view;
+	glm::mat4 projection;
+};
 
 class Utils{
 
@@ -21,7 +44,7 @@ class Utils{
 	static std::vector<char> readFile(const std::string& filename);
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 	
-	
+	static void loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray);
 
 	friend class RenderApplication;
 };

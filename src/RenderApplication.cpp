@@ -10,7 +10,6 @@
 #include <stb_image_write.h>
 #endif
 
-#include <fstream>
 
 VkExtent2D RenderApplication::resolution = {600,600};
 VkInstance RenderApplication::instance;
@@ -40,23 +39,6 @@ const std::vector<const char *> RenderApplication::requiredLayers = {
 };
 const std::vector<const char *> RenderApplication::requiredInstanceExtensions = {
 	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
-};
-
-
-
-
-struct Color {
-	float r, g, b, a;
-};
-
-struct UniformBufferObject{
-    
-	Color color;
-
-    uint32_t width;
-    uint32_t height;
-    float saturation;
-    int32_t blur;
 };
 
 void RenderApplication::run() {
@@ -340,12 +322,10 @@ void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
-	ubo.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	
-    ubo.width = 4;	//dubby val
-    ubo.height = 4;	//dummy val
-    ubo.saturation = 1.5;
-    ubo.blur = 51;
+	ubo.model = glm::mat4(1.0f);
+	ubo.view = glm::lookAt(glm::vec3(0, 0, 100), glm::vec3(0,0,0), glm::vec3(0, 1, 0));
+	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.height) / resolution.width, 0.0f, 1000.0f);
+
 
     void* mappedMemory;
 
@@ -773,6 +753,16 @@ void RenderApplication::exportAsImage() {
 	Utils::createBuffer(bufferByteSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
 
 	//NOTE: We don't need to transition the color attachment image to transfer src since the render pass already did for us
+	Utils::copyImageToBuffer(stagingBuffer, colorImage, resolution.width, resolution.height);
+
+	void* mappedMemory;
+	vkMapMemory(device, stagingBufferMemory, 0, bufferByteSize, 0, &mappedMemory);
+
+	//write output image to disk as a png
+	stbi_write_png("Rendered Image.png", resolution.width, resolution.height, 4, mappedMemory, resolution.width * 4);
+
+	//write pixels to another array
+	vkUnmapMemory(device, stagingBufferMemory);
 
 
 	//Clean Up Staging Buffer
