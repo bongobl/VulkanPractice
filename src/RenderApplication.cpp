@@ -11,7 +11,7 @@
 #endif
 
 
-VkExtent2D RenderApplication::resolution = {600,600};
+VkExtent2D RenderApplication::resolution = {900,900};
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
@@ -228,13 +228,13 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 	vkGetPhysicalDeviceFeatures(potentialPhysicalDevice, &supportedFeatures);
 
 	//We would normally check the supportedFeatures structure to see that all our device features are supported
-	//by this potential physical device. Since we have none, we just choose this device and get the queue family we need
+	//by this potential physical device. Since we have none, we just move on
 
 
     //If we had any required device extensions, we would check if they are supported by the physical device here before
     //supplying them to the logical device create info.
 
-
+	//lastly, we make sure there exists a queue family index that supports the operations we want
 	familyIndex = getQueueFamilyIndex(potentialPhysicalDevice);
 	return familyIndex != -1;
 
@@ -350,7 +350,7 @@ void RenderApplication::createColorImage() {
 		colorImageMemory	//image memory
 	);
 
-	Utils::transitionImageLayout(colorImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	//Note: no need to transition to layout VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, render pass will do that for us
 }
 void RenderApplication::createColorImageView() {
 	Utils::createImageView(colorImage, colorImageView, VK_FORMAT_R8G8B8A8_UNORM);
@@ -371,34 +371,21 @@ void RenderApplication::createFrameBuffer() {
 }
 void RenderApplication::createDescriptorSetLayout() {
 
-	/*
-	//define a storage image binding for our input image
-	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-	samplerLayoutBinding.binding = 0;	//binding = 0
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	samplerLayoutBinding.pImmutableSamplers = NULL;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
 
     //define a binding for a UBO
     VkDescriptorSetLayoutBinding uniformBufferBinding = {};
-    uniformBufferBinding.binding = 1;	//binding = 1
+    uniformBufferBinding.binding = 0;	//binding = 0
     uniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uniformBufferBinding.descriptorCount = 1;
-    uniformBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    uniformBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-	//define a storage image binding for our output image
-	VkDescriptorSetLayoutBinding outputImageBinding = {};
-	outputImageBinding.binding = 2;		//binding = 2
-	outputImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	outputImageBinding.descriptorCount = 1;
-	outputImageBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 3> allBindings = { samplerLayoutBinding, uniformBufferBinding, outputImageBinding};
+    std::array<VkDescriptorSetLayoutBinding, 1> allBindings = {uniformBufferBinding};
 
-    //create descriptor set layout for binding to a storage buffer, UBO and another storage buffer
+    //create descriptor set layout for binding to a UBO
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
     descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descriptorSetLayoutCreateInfo.bindingCount = (uint32_t)allBindings.size(); //number of bindings
@@ -406,20 +393,16 @@ void RenderApplication::createDescriptorSetLayout() {
 
     // Create the descriptor set layout. 
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
-	*/
+	
 }
 
 void RenderApplication::createDescriptorPool(){
 
 
-	/*
-    std::array<VkDescriptorPoolSize, 3> poolSizes = {};
-	poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	poolSizes[0].descriptorCount = 1;
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[1].descriptorCount = 1;
-	poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	poolSizes[2].descriptorCount = 1;
+	
+    std::array<VkDescriptorPoolSize, 1> poolSizes = {};
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 1;
 	
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -431,11 +414,11 @@ void RenderApplication::createDescriptorPool(){
     //Create descriptor pool.
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
 
-	*/
+	
 }
 void RenderApplication::createDescriptorSet() {
     
-	/*
+	
     //With the pool allocated, we can now allocate the descriptor set. 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO; 
@@ -446,10 +429,6 @@ void RenderApplication::createDescriptorSet() {
     // allocate descriptor set.
     VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet));
 
-	// Specify the input image info
-	VkDescriptorImageInfo inputImageInfo = {};
-	inputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	inputImageInfo.imageView = inputImageView;
 	
     // Specify the uniform buffer info
     VkDescriptorBufferInfo descriptorUniformBufferInfo = {};
@@ -457,42 +436,21 @@ void RenderApplication::createDescriptorSet() {
     descriptorUniformBufferInfo.offset = 0;
     descriptorUniformBufferInfo.range = sizeof(UniformBufferObject);
 
-	// Specify the output image info
-	VkDescriptorImageInfo outputImageInfo = {};
-	outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	outputImageInfo.imageView = outputImageView;
 
+    std::array<VkWriteDescriptorSet, 1> descriptorWrites = {};
 
-    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
-
-	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[0].dstSet = descriptorSet;
-	descriptorWrites[0].dstBinding = 0;
-	descriptorWrites[0].dstArrayElement = 0;
-	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	descriptorWrites[0].descriptorCount = 1;
-	descriptorWrites[0].pImageInfo = &inputImageInfo;
-
-    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = descriptorSet;
-    descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;	
-    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pBufferInfo = &descriptorUniformBufferInfo;
-
-	descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[2].dstSet = descriptorSet;
-	descriptorWrites[2].dstBinding = 2;
-	descriptorWrites[2].dstArrayElement = 0;
-	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	descriptorWrites[2].descriptorCount = 1;
-	descriptorWrites[2].pImageInfo = &outputImageInfo;
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = descriptorSet;
+    descriptorWrites[0].dstBinding = 0;		//binding = 0
+    descriptorWrites[0].dstArrayElement = 0;	
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &descriptorUniformBufferInfo;
 
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
-	*/
+	
 }
 
 
@@ -641,8 +599,8 @@ void RenderApplication::createGraphicsPipeline(){
 	//Pipeline Layout
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 0;	//CHANGE LATER
-	pipelineLayoutInfo.pSetLayouts = NULL;	//CHANGE LATER
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
 
 	//Create Pipeline Layout
@@ -708,6 +666,8 @@ void RenderApplication::createMainCommandBuffer() {
 
 			vkCmdBindPipeline(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
+			vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			
 			vkCmdDraw(mainCommandBuffer, 3, 1, 0, 0);
 
 		vkCmdEndRenderPass(mainCommandBuffer);

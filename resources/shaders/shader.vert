@@ -7,6 +7,12 @@
 //layout(location = 2) in vec2 inTexCoord;
 
 
+layout(binding = 0) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+} ubo;
+
 //to fragment shader
 layout(location = 0) out vec3 position;
 layout(location = 1) out vec3 color;
