@@ -7,41 +7,6 @@
 #include <map>
 
 
-bool Vertex::operator<(const Vertex& other) const {
-
-	//compare based on position
-	if (position.x != other.position.x) {
-		return position.x < other.position.x;
-	}
-	else if (position.y != other.position.y) {
-		return position.y < other.position.y;
-	}
-	else if (position.z != other.position.z) {
-		return position.z < other.position.z;
-	}
-
-	//compare based on normal
-	if (normal.x != other.normal.x) {
-		return normal.x < other.normal.x;
-	}
-	else if (normal.y != other.normal.y) {
-		return normal.y < other.normal.y;
-	}
-	else if (normal.z != other.normal.z) {
-		return normal.z < other.normal.z;
-	}
-
-	//texCoord
-	if (texCoord.x != other.texCoord.x) {
-		return texCoord.x < other.texCoord.x;
-	}
-	else if (texCoord.y != other.texCoord.y) {
-		return texCoord.y < other.texCoord.y;
-	}
-
-	
-	return false;
-}
 void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
 	
 
@@ -101,6 +66,18 @@ void Utils::createImage(uint32_t width, uint32_t height, VkFormat format, VkImag
 	VK_CHECK_RESULT(vkAllocateMemory(RenderApplication::device, &allocInfo, NULL, &imageMemory));
 
 	VK_CHECK_RESULT(vkBindImageMemory(RenderApplication::device, image, imageMemory, 0));
+}
+
+void Utils::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size){
+
+	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
+
+	VkBufferCopy copyInfo = {};
+	copyInfo.size = size;
+
+	vkCmdCopyBuffer(singleTimeCommandBuffer, srcBuffer, dstBuffer, 1, &copyInfo);
+
+	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
 }
 
 void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat format) {
@@ -269,7 +246,7 @@ VkCommandBuffer Utils::beginSingleTimeCommandBuffer() {
 	//allocate command buffer
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = RenderApplication::graphicsCommandPool;
+	allocInfo.commandPool = RenderApplication::getTransferCmdPool();		
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = 1;
 	VK_CHECK_RESULT(vkAllocateCommandBuffers(RenderApplication::device, &allocInfo, &newCommandBuffer));
@@ -293,9 +270,9 @@ void Utils::endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer) {
 	submitInfo.pCommandBuffers = &singleTimeCmdBuffer;
 
 	//NEED A GRAPHICS QUEUE
-	vkQueueSubmit(RenderApplication::graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(RenderApplication::graphicsQueue);
-	vkFreeCommandBuffers(RenderApplication::device, RenderApplication::graphicsCommandPool, 1, &singleTimeCmdBuffer);
+	vkQueueSubmit(RenderApplication::getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(RenderApplication::getTransferQueue());
+	vkFreeCommandBuffers(RenderApplication::device, RenderApplication::getTransferCmdPool(), 1, &singleTimeCmdBuffer);
 }
 
 void Utils::createImageSampler(VkSampler &sampler) {
@@ -321,8 +298,12 @@ void Utils::createImageSampler(VkSampler &sampler) {
 	VK_CHECK_RESULT(vkCreateSampler(RenderApplication::device, &samplerInfo, NULL, &sampler));
 }
 
-VkShaderModule Utils::createShaderModule(const std::vector<char> &shaderCode) {
+VkShaderModule Utils::createShaderModule(const std::string& filename) {
 
+	//read shader code int a char array
+	std::vector<char> shaderCode = Utils::readFile(filename);
+
+	//create shader model from shader code
 	VkShaderModule shaderModule;
 
 	VkShaderModuleCreateInfo createInfo = {};

@@ -1,6 +1,6 @@
+#pragma once
 #include <iostream>
 #include <vulkan/vulkan.h>
-
 #include <array>
 #include <vector>
 #include <string.h>
@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <cmath>
 #include <string>
+#include <Utils.h>
 using namespace std;
 
 #ifdef NDEBUG
@@ -16,7 +17,7 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
-using namespace std;
+
 class RenderApplication{
 
 
@@ -36,6 +37,11 @@ class RenderApplication{
     //Then we have the logical device VkDevice, which basically allows 
     //us to interact with the physical device. 
 	static VkDevice device;
+
+	//used to store all the vertices
+	static VkBuffer vertexBuffer;
+	static VkDeviceMemory vertexBufferMemory;
+
 
     //Uniform buffer used to pass simple parameters to compute shader
 	static VkBuffer uniformBuffer;
@@ -84,6 +90,8 @@ class RenderApplication{
 	const static std::vector<const char *> requiredLayers;
 	const static std::vector<const char *> requiredInstanceExtensions;
 
+
+
 public:
 
 	static void run();
@@ -111,6 +119,9 @@ private:
 	static void createCommandPool();
 
 	//GPU resources
+	static void createVertexBuffer();
+    static void writeToVertexBuffer();
+
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
 	
@@ -134,6 +145,10 @@ private:
 
 	static void cleanup();
 
+	//to allow Utils class to perform transfer operations
+	static VkCommandPool& getTransferCmdPool();
+	static VkQueue& getTransferQueue();
+	
 	friend class Utils;
 };
 

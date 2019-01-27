@@ -23,6 +23,7 @@ set (SRC_FILES
 	"${SRC_DIRECTORY}/main.cpp"
     "${SRC_DIRECTORY}/RenderApplication.cpp"
     "${SRC_DIRECTORY}/Utils.cpp"
+    "${SRC_DIRECTORY}/Vertex.cpp"
 )
 
 set(ALL_LIBS ${Vulkan_LIBRARY} )

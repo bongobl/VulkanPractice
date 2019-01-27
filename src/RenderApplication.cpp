@@ -1,5 +1,5 @@
 #include <RenderApplication.h>
-#include <Utils.h>
+
 #ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -16,6 +16,8 @@ VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
 VkDevice RenderApplication::device;
+VkBuffer RenderApplication::vertexBuffer;
+VkDeviceMemory RenderApplication::vertexBufferMemory;
 VkBuffer RenderApplication::uniformBuffer;
 VkDeviceMemory RenderApplication::uniformBufferMemory;
 VkImage RenderApplication::colorImage;
@@ -41,6 +43,13 @@ const std::vector<const char *> RenderApplication::requiredInstanceExtensions = 
 	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
 };
 
+//Temp
+const Vertex singleTriangle[3] = {
+	{{0.0, -0.85f,0},{0,0,1},{0,0}},
+	{{0.8f, 0.7f,0},{0,1,0},{0,0}},
+	{{-0.8f, 0.7f,0},{1,0,0},{0,0}}
+};
+
 void RenderApplication::run() {
 
     
@@ -55,6 +64,9 @@ void RenderApplication::run() {
     createDescriptorPool();
     createCommandPool();
 
+
+    createVertexBuffer();
+    writeToVertexBuffer();
 
     createUniformBuffer();
     writeToUniformBuffer();
@@ -258,9 +270,10 @@ uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDev
 
         if ((currFamily.queueCount > 0) && 
 			/*(currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&*/
-			(currFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+			(currFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+			(currFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
 
-            // found a queue family with compute and graphics. We're done!
+            // found a queue family with transfer and graphics. We're done!
             break;
         }
     }
@@ -311,12 +324,51 @@ void RenderApplication::createDevice() {
     vkGetDeviceQueue(device, graphicsQueueFamilyIndex, particularQueueIndex, &graphicsQueue);
 }
 
+void RenderApplication::createVertexBuffer(){
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	//create staging buffer
+	Utils::createBuffer(
+		sizeof(singleTriangle),
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+		stagingBuffer, stagingBufferMemory
+	);
+
+	//create actual vertex buffer
+	Utils::createBuffer(
+		sizeof(singleTriangle),
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		vertexBuffer, vertexBufferMemory
+	);
+
+	//copy contents of our hard coded triangle into the staging buffer
+	void* mappedMemory;
+	vkMapMemory(device, stagingBufferMemory, 0, sizeof(singleTriangle), 0, &mappedMemory);
+	memcpy(mappedMemory, singleTriangle, sizeof(singleTriangle));
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	//copy contents of staging buffer to vertex buffer
+	Utils::copyBuffer(stagingBuffer, vertexBuffer, sizeof(singleTriangle));
+
+	//destroy staging buffer
+	vkDestroyBuffer(device, stagingBuffer, NULL);
+	vkFreeMemory(device, stagingBufferMemory, NULL);
+
+}
+
+void RenderApplication::writeToVertexBuffer(){
+
+}
+
 void RenderApplication::createUniformBuffer(){
 
 	Utils::createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, uniformBuffer, uniformBufferMemory);
 
 }
-
 
 void RenderApplication::writeToUniformBuffer(){
 
@@ -504,12 +556,10 @@ void RenderApplication::createRenderPass() {
 void RenderApplication::createGraphicsPipeline(){
     
 	//create vertex shader module
-	auto vertexShaderCode = Utils::readFile("resources/shaders/vert.spv");
-	VkShaderModule vertexShaderModule = Utils::createShaderModule(vertexShaderCode);
+	VkShaderModule vertexShaderModule = Utils::createShaderModule("resources/shaders/vert.spv");
 	
 	//create fragment shader module
-	auto fragmentShaderCode = Utils::readFile("resources/shaders/frag.spv");
-	VkShaderModule fragmentShaderModule = Utils::createShaderModule(fragmentShaderCode);
+	VkShaderModule fragmentShaderModule = Utils::createShaderModule("resources/shaders/frag.spv");
 
 
 	//Vertex Shader Stage
@@ -529,12 +579,16 @@ void RenderApplication::createGraphicsPipeline(){
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, fragmentShaderStageInfo };
 
     //Vertex Input
+	auto vertexBindingDescription = Vertex::getBindingDescription();
+	auto vertexAttributeDescriptions = Vertex::getAttributeDescriptions();
+
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = NULL;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = NULL;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &vertexBindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)vertexAttributeDescriptions.size();
+    vertexInputInfo.pVertexAttributeDescriptions = vertexAttributeDescriptions.data();
+
 
     //Input Assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
@@ -663,8 +717,12 @@ void RenderApplication::createMainCommandBuffer() {
 		//render pass scope
 		vkCmdBeginRenderPass(mainCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-
+			//bind our graphics pipeline
 			vkCmdBindPipeline(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+			VkBuffer vertexBuffers[] = { vertexBuffer };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(mainCommandBuffer, 0, 1, vertexBuffers, offsets);
 
 			vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			
@@ -742,6 +800,9 @@ void RenderApplication::cleanup() {
 		func(instance, debugReportCallback, NULL);
 	}
     
+	//free vertex buffer   
+	vkDestroyBuffer(device, vertexBuffer, NULL);
+	vkFreeMemory(device, vertexBufferMemory, NULL);
 
     //free uniform buffer   
     vkDestroyBuffer(device, uniformBuffer, NULL);
@@ -764,4 +825,11 @@ void RenderApplication::cleanup() {
     vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);      
 
+}
+
+VkCommandPool& RenderApplication::getTransferCmdPool(){
+	return graphicsCommandPool;
+}
+VkQueue& RenderApplication::getTransferQueue(){
+	return graphicsQueue;
 }

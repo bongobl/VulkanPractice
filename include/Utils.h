@@ -1,24 +1,19 @@
+#pragma once
 #include <iostream>
 #include <vulkan/vulkan.h>
 #include <fstream>
+#include <array>
 #include <vector>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/hash.hpp>
+
+#include <Vertex.h>
 
 using namespace std;
 
-struct Vertex {
-	glm::vec3 position;
-	glm::vec3 normal;
-	glm::vec2 texCoord;
-
-	bool operator<(const Vertex& other) const;
-};
 
 struct UniformBufferObject {
 
@@ -31,6 +26,7 @@ class Utils{
 
 	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 	static void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
+	static void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	static void createImageView(VkImage image, VkImageView &imageView, VkFormat format);
 	static void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	static void copyImageToBuffer(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
@@ -40,7 +36,7 @@ class Utils{
 	static void endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer);
 	
 	static void createImageSampler(VkSampler &sampler);
-	static VkShaderModule createShaderModule(const std::vector<char> &shaderCode);
+	static VkShaderModule createShaderModule(const std::string& filename);
 	static std::vector<char> readFile(const std::string& filename);
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 	
