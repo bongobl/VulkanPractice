@@ -18,6 +18,8 @@ VkPhysicalDevice RenderApplication::physicalDevice;
 VkDevice RenderApplication::device;
 VkBuffer RenderApplication::vertexBuffer;
 VkDeviceMemory RenderApplication::vertexBufferMemory;
+VkBuffer RenderApplication::indexBuffer;
+VkDeviceMemory RenderApplication::indexBufferMemory;
 VkBuffer RenderApplication::uniformBuffer;
 VkDeviceMemory RenderApplication::uniformBufferMemory;
 VkImage RenderApplication::colorImage;
@@ -43,12 +45,14 @@ const std::vector<const char *> RenderApplication::requiredInstanceExtensions = 
 	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
 };
 
-//Temp
+//Hard coded vertex and index buffers
 const Vertex singleTriangle[3] = {
 	{{0.0, -0.85f,0},{0,0,1},{0,0}},
 	{{0.8f, 0.7f,0},{0,1,0},{0,0}},
 	{{-0.8f, 0.7f,0},{1,0,0},{0,0}}
 };
+
+const uint32_t triangleIndices[3] = {0,1,2};
 
 void RenderApplication::run() {
 
@@ -67,6 +71,9 @@ void RenderApplication::run() {
 
     createVertexBuffer();
     writeToVertexBuffer();
+
+    createIndexBuffer();
+    writeToIndexBuffer();
 
     createUniformBuffer();
     writeToUniformBuffer();
@@ -326,6 +333,18 @@ void RenderApplication::createDevice() {
 
 void RenderApplication::createVertexBuffer(){
 
+	Utils::createBuffer(
+		sizeof(singleTriangle),
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		vertexBuffer, vertexBufferMemory
+	);
+
+}
+
+void RenderApplication::writeToVertexBuffer(){
+
+
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 
@@ -335,14 +354,6 @@ void RenderApplication::createVertexBuffer(){
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 		stagingBuffer, stagingBufferMemory
-	);
-
-	//create actual vertex buffer
-	Utils::createBuffer(
-		sizeof(singleTriangle),
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		vertexBuffer, vertexBufferMemory
 	);
 
 	//copy contents of our hard coded triangle into the staging buffer
@@ -357,16 +368,52 @@ void RenderApplication::createVertexBuffer(){
 	//destroy staging buffer
 	vkDestroyBuffer(device, stagingBuffer, NULL);
 	vkFreeMemory(device, stagingBufferMemory, NULL);
-
 }
 
-void RenderApplication::writeToVertexBuffer(){
+void RenderApplication::createIndexBuffer(){
 
+	Utils::createBuffer(
+		sizeof(triangleIndices),
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		indexBuffer, indexBufferMemory
+	);
+}
+
+void RenderApplication::writeToIndexBuffer(){
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	//create staging buffer
+	Utils::createBuffer(
+		sizeof(triangleIndices),
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+		stagingBuffer, stagingBufferMemory
+	);
+
+	//copy contents of our hard coded triangle indices into the staging buffer
+	void* mappedMemory;
+	vkMapMemory(device, stagingBufferMemory, 0, sizeof(triangleIndices), 0, &mappedMemory);
+	memcpy(mappedMemory, triangleIndices, sizeof(triangleIndices));
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	//copy contents of staging buffer to index buffer
+	Utils::copyBuffer(stagingBuffer, indexBuffer, sizeof(triangleIndices));
+
+	//destroy staging buffer
+	vkDestroyBuffer(device, stagingBuffer, NULL);
+	vkFreeMemory(device, stagingBufferMemory, NULL);
 }
 
 void RenderApplication::createUniformBuffer(){
 
-	Utils::createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, uniformBuffer, uniformBufferMemory);
+	Utils::createBuffer(
+		sizeof(UniformBufferObject), 
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, 
+		uniformBuffer, uniformBufferMemory);
 
 }
 
@@ -388,6 +435,7 @@ void RenderApplication::writeToUniformBuffer(){
     vkUnmapMemory(device, uniformBufferMemory);
 
 }
+
 
 void RenderApplication::createColorImage() {
 
@@ -720,9 +768,12 @@ void RenderApplication::createMainCommandBuffer() {
 			//bind our graphics pipeline
 			vkCmdBindPipeline(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
+			//bind vertex buffer
 			VkBuffer vertexBuffers[] = { vertexBuffer };
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(mainCommandBuffer, 0, 1, vertexBuffers, offsets);
+
+			vkCmdBindIndexBuffer(mainCommandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 			vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			
@@ -803,6 +854,10 @@ void RenderApplication::cleanup() {
 	//free vertex buffer   
 	vkDestroyBuffer(device, vertexBuffer, NULL);
 	vkFreeMemory(device, vertexBufferMemory, NULL);
+
+	//free index buffer   
+	vkDestroyBuffer(device, indexBuffer, NULL);
+	vkFreeMemory(device, indexBufferMemory, NULL);
 
     //free uniform buffer   
     vkDestroyBuffer(device, uniformBuffer, NULL);

@@ -42,6 +42,10 @@ class RenderApplication{
 	static VkBuffer vertexBuffer;
 	static VkDeviceMemory vertexBufferMemory;
 
+	//used to store all the indices
+	static VkBuffer indexBuffer;
+	static VkDeviceMemory indexBufferMemory;
+
 
     //Uniform buffer used to pass simple parameters to compute shader
 	static VkBuffer uniformBuffer;
@@ -121,6 +125,9 @@ private:
 	//GPU resources
 	static void createVertexBuffer();
     static void writeToVertexBuffer();
+
+    static void createIndexBuffer();
+    static void writeToIndexBuffer();
 
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
