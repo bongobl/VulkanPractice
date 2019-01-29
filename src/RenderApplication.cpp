@@ -47,9 +47,10 @@ const std::vector<const char *> RenderApplication::requiredInstanceExtensions = 
 
 //Hard coded vertex and index buffers
 const Vertex singleTriangle[3] = {
-	{{0.0, -0.85f,0},{0,0,1},{0,0}},
-	{{0.8f, 0.7f,0},{0,1,0},{0,0}},
-	{{-0.8f, 0.7f,0},{1,0,0},{0,0}}
+	{{0.0, -0.85f,0},{1,0,0},{0,0}},
+	{{-0.8f, 0.7f,0},{0,1,0},{0,0}},
+	{{0.8f, 0.7f,0},{0,0,1},{0,0}}
+	
 };
 
 const uint32_t triangleIndices[3] = {0,1,2};
@@ -422,9 +423,9 @@ void RenderApplication::writeToUniformBuffer(){
     UniformBufferObject ubo;
 	
 	ubo.model = glm::mat4(1.0f);
-	ubo.view = glm::lookAt(glm::vec3(0, 0, 100), glm::vec3(0,0,0), glm::vec3(0, 1, 0));
+	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.height) / resolution.width, 0.0f, 1000.0f);
-
+	ubo.projection[1][1] *= -1;	
 
     void* mappedMemory;
 
