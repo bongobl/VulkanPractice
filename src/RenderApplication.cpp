@@ -11,7 +11,7 @@
 #endif
 
 
-VkExtent2D RenderApplication::resolution = {900,900};
+VkExtent2D RenderApplication::resolution = {1280,720};
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
@@ -46,14 +46,17 @@ const std::vector<const char *> RenderApplication::requiredInstanceExtensions = 
 };
 
 //Hard coded vertex and index buffers
-const Vertex singleTriangle[3] = {
-	{{0.0, -0.85f,0},{1,0,0},{0,0}},
-	{{-0.8f, 0.7f,0},{0,1,0},{0,0}},
-	{{0.8f, 0.7f,0},{0,0,1},{0,0}}
+const Vertex singleTriangle[6] = {
+	{{-1.5f, -1,0},{1,0,0},{0,0}},
+	{{-1.5f, 1,0},{0,1,0},{0,0}},
+	{{1.5f, -1,0},{0,0,1},{0,0}},
+	{{-1.5f, 1,0},{0,1,0},{0,0}},
+	{{1.5f, 1,0},{1,1,0},{0,0}},
+	{{1.5f, -1,0},{0,0,1},{0,0}}
 	
 };
 
-const uint32_t triangleIndices[3] = {0,1,2};
+const uint32_t triangleIndices[6] = {0,1,2,3,4,5};
 
 void RenderApplication::run() {
 
@@ -423,8 +426,8 @@ void RenderApplication::writeToUniformBuffer(){
     UniformBufferObject ubo;
 	
 	ubo.model = glm::mat4(1.0f);
-	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.height) / resolution.width, 0.0f, 1000.0f);
+	ubo.view = glm::lookAt(glm::vec3(1.5f, 1.4f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.0f, 1000.0f);
 	ubo.projection[1][1] *= -1;	
 
     void* mappedMemory;
@@ -778,7 +781,7 @@ void RenderApplication::createMainCommandBuffer() {
 
 			vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			
-			vkCmdDraw(mainCommandBuffer, 3, 1, 0, 0);
+			vkCmdDrawIndexed(mainCommandBuffer, (uint32_t)6, 1, 0, 0, 0);
 
 		vkCmdEndRenderPass(mainCommandBuffer);
 
