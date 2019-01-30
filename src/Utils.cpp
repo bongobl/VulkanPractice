@@ -365,6 +365,7 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, modelFilename.c_str())) {
 		throw std::runtime_error("Failed to load model " + modelFilename);
 	}
+	cout << "loading model " << modelFilename << endl;
 
 	std::map<Vertex, uint32_t> uniqueVertices = {};
 	for (const auto& shape : shapes) {
@@ -400,6 +401,8 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 			}
 		}
 	}
+	std::reverse(indexArray.begin(), indexArray.end());
+	cout << "Model " << modelFilename << " loaded with " << vertexArray.size() << " vertices and " << (indexArray.size() / 3) << " triangles" << endl;
 
 }
 //debug callback

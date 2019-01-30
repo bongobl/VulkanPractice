@@ -11,11 +11,13 @@
 #endif
 
 
-VkExtent2D RenderApplication::resolution = {1280,720};
+VkExtent2D RenderApplication::resolution = {1280,780};
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
 VkDevice RenderApplication::device;
+std::vector<Vertex> RenderApplication::vertexArray;
+std::vector<uint32_t> RenderApplication::indexArray;
 VkBuffer RenderApplication::vertexBuffer;
 VkDeviceMemory RenderApplication::vertexBufferMemory;
 VkBuffer RenderApplication::indexBuffer;
@@ -45,6 +47,7 @@ const std::vector<const char *> RenderApplication::requiredInstanceExtensions = 
 	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
 };
 
+/*
 //Hard coded vertex and index buffers
 const Vertex singleTriangle[6] = {
 	{{-1.5f, -1,0},{1,0,0},{0,0}},
@@ -54,9 +57,9 @@ const Vertex singleTriangle[6] = {
 	{{1.5f, 1,0},{1,1,0},{0,0}},
 	{{1.5f, -1,0},{0,0,1},{0,0}}
 	
-};
+};*/
 
-const uint32_t triangleIndices[6] = {0,1,2,3,4,5};
+//const uint32_t triangleIndices[6] = {0,1,2,3,4,5};
 
 void RenderApplication::run() {
 
@@ -72,7 +75,7 @@ void RenderApplication::run() {
     createDescriptorPool();
     createCommandPool();
 
-
+    loadVertexAndIndexArrays();
     createVertexBuffer();
     writeToVertexBuffer();
 
@@ -101,6 +104,7 @@ void RenderApplication::run() {
     // Finally, run the recorded command buffer.
     runMainCommandBuffer();
 
+    //export the contents of the color attachment to disk
 	exportAsImage();
 
     // Clean up all Vulkan resources.
@@ -335,26 +339,35 @@ void RenderApplication::createDevice() {
     vkGetDeviceQueue(device, graphicsQueueFamilyIndex, particularQueueIndex, &graphicsQueue);
 }
 
+void RenderApplication::loadVertexAndIndexArrays(){
+	Utils::loadModel("resources/models/FilletCube.obj", vertexArray, indexArray);
+}
 void RenderApplication::createVertexBuffer(){
 
+	VkDeviceSize vertexArraySize = vertexArray.size() * sizeof(Vertex);
 	Utils::createBuffer(
-		sizeof(singleTriangle),
+		vertexArraySize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		vertexBuffer, vertexBufferMemory
 	);
+
 
 }
 
 void RenderApplication::writeToVertexBuffer(){
 
 
+	VkDeviceSize vertexArraySize = vertexArray.size() * sizeof(Vertex);
+
+
+	//create staging buffer
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 
-	//create staging buffer
+	
 	Utils::createBuffer(
-		sizeof(singleTriangle),
+		vertexArraySize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 		stagingBuffer, stagingBufferMemory
@@ -362,12 +375,12 @@ void RenderApplication::writeToVertexBuffer(){
 
 	//copy contents of our hard coded triangle into the staging buffer
 	void* mappedMemory;
-	vkMapMemory(device, stagingBufferMemory, 0, sizeof(singleTriangle), 0, &mappedMemory);
-	memcpy(mappedMemory, singleTriangle, sizeof(singleTriangle));
+	vkMapMemory(device, stagingBufferMemory, 0, vertexArraySize, 0, &mappedMemory);
+	memcpy(mappedMemory, vertexArray.data(), vertexArraySize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
 	//copy contents of staging buffer to vertex buffer
-	Utils::copyBuffer(stagingBuffer, vertexBuffer, sizeof(singleTriangle));
+	Utils::copyBuffer(stagingBuffer, vertexBuffer, vertexArraySize);
 
 	//destroy staging buffer
 	vkDestroyBuffer(device, stagingBuffer, NULL);
@@ -376,8 +389,10 @@ void RenderApplication::writeToVertexBuffer(){
 
 void RenderApplication::createIndexBuffer(){
 
+	VkDeviceSize indexArraySize = indexArray.size() * sizeof(uint32_t);
+
 	Utils::createBuffer(
-		sizeof(triangleIndices),
+		indexArraySize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		indexBuffer, indexBufferMemory
@@ -386,12 +401,15 @@ void RenderApplication::createIndexBuffer(){
 
 void RenderApplication::writeToIndexBuffer(){
 
+	VkDeviceSize indexArraySize = indexArray.size() * sizeof(uint32_t);
+
+	//create staging buffer
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 
-	//create staging buffer
+	
 	Utils::createBuffer(
-		sizeof(triangleIndices),
+		indexArraySize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 		stagingBuffer, stagingBufferMemory
@@ -399,12 +417,12 @@ void RenderApplication::writeToIndexBuffer(){
 
 	//copy contents of our hard coded triangle indices into the staging buffer
 	void* mappedMemory;
-	vkMapMemory(device, stagingBufferMemory, 0, sizeof(triangleIndices), 0, &mappedMemory);
-	memcpy(mappedMemory, triangleIndices, sizeof(triangleIndices));
+	vkMapMemory(device, stagingBufferMemory, 0, indexArraySize, 0, &mappedMemory);
+	memcpy(mappedMemory, indexArray.data(), indexArraySize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
 	//copy contents of staging buffer to index buffer
-	Utils::copyBuffer(stagingBuffer, indexBuffer, sizeof(triangleIndices));
+	Utils::copyBuffer(stagingBuffer, indexBuffer, indexArraySize);
 
 	//destroy staging buffer
 	vkDestroyBuffer(device, stagingBuffer, NULL);
@@ -425,15 +443,19 @@ void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
-	ubo.model = glm::mat4(1.0f);
-	ubo.view = glm::lookAt(glm::vec3(1.5f, 1.4f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::vec3 cameraPosition(0, 0, 300);
+	ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(75.0f), glm::vec3(6, 4, 7)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.6f));
+	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.0f, 1000.0f);
 	ubo.projection[1][1] *= -1;	
-
+		
+	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3));
+	ubo.cameraPosition = cameraPosition;
+	ubo.matColor = glm::vec3(0, 1, 0);
     void* mappedMemory;
 
     vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &mappedMemory);
-
+	
     memcpy(mappedMemory, &ubo, sizeof(ubo));
 
     vkUnmapMemory(device, uniformBufferMemory);
@@ -781,7 +803,7 @@ void RenderApplication::createMainCommandBuffer() {
 
 			vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			
-			vkCmdDrawIndexed(mainCommandBuffer, (uint32_t)6, 1, 0, 0, 0);
+			vkCmdDrawIndexed(mainCommandBuffer, (uint32_t)indexArray.size(), 1, 0, 0, 0);
 
 		vkCmdEndRenderPass(mainCommandBuffer);
 
@@ -825,7 +847,8 @@ void RenderApplication::exportAsImage() {
 
 	Utils::createBuffer(bufferByteSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
 
-	//NOTE: We don't need to transition the color attachment image to transfer src since the render pass already did for us
+	//NOTE: We don't need to transition the color attachment layout image to VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL since the render pass already did for us
+
 	Utils::copyImageToBuffer(stagingBuffer, colorImage, resolution.width, resolution.height);
 
 	void* mappedMemory;

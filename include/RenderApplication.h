@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <array>
 #include <vector>
+#include <algorithm>
 #include <string.h>
 #include <assert.h>
 #include <stdexcept>
@@ -38,6 +39,9 @@ class RenderApplication{
     //us to interact with the physical device. 
 	static VkDevice device;
 
+	static std::vector<Vertex> vertexArray;
+	static std::vector<uint32_t> indexArray;
+	
 	//used to store all the vertices
 	static VkBuffer vertexBuffer;
 	static VkDeviceMemory vertexBufferMemory;
@@ -123,6 +127,7 @@ private:
 	static void createCommandPool();
 
 	//GPU resources
+	static void loadVertexAndIndexArrays();
 	static void createVertexBuffer();
     static void writeToVertexBuffer();
 
