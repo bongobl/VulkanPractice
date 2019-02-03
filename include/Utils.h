@@ -32,11 +32,11 @@ struct UniformBufferObject {
 class Utils{
 
 	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
-	static void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
+	static void createImage(VkExtent2D dimensions, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
 	static void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-	static void createImageView(VkImage image, VkImageView &imageView, VkFormat format);
-	static void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-	static void copyImageToBuffer(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	static void createImageView(VkImage image, VkImageView &imageView, VkFormat format, VkImageAspectFlags aspectFlags);
+	static void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions);
+	static void copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions);
 	static void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
 	
 	static VkCommandBuffer beginSingleTimeCommandBuffer();
@@ -48,7 +48,7 @@ class Utils{
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 	
 	static void loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray);
-
+	static void exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels);
 	friend class RenderApplication;
 };
 

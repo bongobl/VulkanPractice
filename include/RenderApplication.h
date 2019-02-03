@@ -22,8 +22,9 @@ const bool enableValidationLayers = true;
 class RenderApplication{
 
 
-	//width and height
+	//width and height of render area
 	static VkExtent2D resolution;
+
 
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;
@@ -39,6 +40,7 @@ class RenderApplication{
     //us to interact with the physical device. 
 	static VkDevice device;
 
+	//Used to store mesh data as they are loaded in from disk
 	static std::vector<Vertex> vertexArray;
 	static std::vector<uint32_t> indexArray;
 	
@@ -50,22 +52,21 @@ class RenderApplication{
 	static VkBuffer indexBuffer;
 	static VkDeviceMemory indexBufferMemory;
 
-
     //Uniform buffer used to pass simple parameters to compute shader
 	static VkBuffer uniformBuffer;
 	static VkDeviceMemory uniformBufferMemory;
 
 	//Color attachment image to render to
-	static VkImage colorImage;
-	static VkDeviceMemory colorImageMemory;
-	static VkImageView colorImageView;
+	static VkImage colorAttachmentImage;
+	static VkDeviceMemory colorAttachmentImageMemory;
+	static VkImageView colorAttachmentImageView;
 
-	
+	//Depth attachment image to use
+	static VkImage depthAttachmentImage;
+	static VkDeviceMemory depthAttachmentImageMemory;
+	static VkImageView depthAttachmentImageView;
 
-    //Descriptors provide a way of accessing resources in shaders. They allow us to use 
-    //things like uniform buffers, storage buffers and images in GLSL. 
-    //A single descriptor represents a single resource, and several descriptors are organized
-    //into descriptor sets, which are basically just collections of descriptors.
+    //Structures for Descriptor creation
 	static VkDescriptorPool descriptorPool;
 	static VkDescriptorSet descriptorSet;
 	static VkDescriptorSetLayout descriptorSetLayout;
@@ -81,7 +82,6 @@ class RenderApplication{
 	static VkPipeline graphicsPipeline;
 	
     
-	
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
 	static VkCommandPool graphicsCommandPool;
@@ -95,7 +95,7 @@ class RenderApplication{
 	static VkQueue graphicsQueue;
 
 	//The layers and instance extensions required for our application
-	const static std::vector<const char *> requiredLayers;
+	const static std::vector<const char *> requiredInstanceLayers;
 	const static std::vector<const char *> requiredInstanceExtensions;
 
 
@@ -137,8 +137,11 @@ private:
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
 	
-	static void createColorImage();
-	static void createColorImageView();
+	static void createColorAttachmentImage();
+	static void createColorAttachmentImageView();
+
+	static void createDepthAttachmentImage();
+	static void createDepthAttachmentImageView();
 
 	
 

@@ -1,16 +1,8 @@
 #include <RenderApplication.h>
 
-#ifndef STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-#endif
-
-#ifndef STB_IMAGE_WRITE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
-#endif
 
 
+//Initialize static members
 VkExtent2D RenderApplication::resolution = {1280,780};
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
@@ -24,9 +16,12 @@ VkBuffer RenderApplication::indexBuffer;
 VkDeviceMemory RenderApplication::indexBufferMemory;
 VkBuffer RenderApplication::uniformBuffer;
 VkDeviceMemory RenderApplication::uniformBufferMemory;
-VkImage RenderApplication::colorImage;
-VkDeviceMemory RenderApplication::colorImageMemory;
-VkImageView RenderApplication::colorImageView;
+VkImage RenderApplication::colorAttachmentImage;
+VkDeviceMemory RenderApplication::colorAttachmentImageMemory;
+VkImageView RenderApplication::colorAttachmentImageView;
+VkImage RenderApplication::depthAttachmentImage;
+VkDeviceMemory RenderApplication::depthAttachmentImageMemory;
+VkImageView RenderApplication::depthAttachmentImageView;
 VkFramebuffer RenderApplication::frameBuffer;
 VkDescriptorPool RenderApplication::descriptorPool;
 VkDescriptorSet RenderApplication::descriptorSet;
@@ -40,26 +35,16 @@ uint32_t RenderApplication::graphicsQueueFamilyIndex;
 VkQueue RenderApplication::graphicsQueue;
 
 
-const std::vector<const char *> RenderApplication::requiredLayers = {
+const std::vector<const char *> RenderApplication::requiredInstanceLayers = {
 	"VK_LAYER_LUNARG_standard_validation"
 };
+
+//Note: If we have are rendering to a window surface, we will have more extensions
 const std::vector<const char *> RenderApplication::requiredInstanceExtensions = {
 	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
 };
 
-/*
-//Hard coded vertex and index buffers
-const Vertex singleTriangle[6] = {
-	{{-1.5f, -1,0},{1,0,0},{0,0}},
-	{{-1.5f, 1,0},{0,1,0},{0,0}},
-	{{1.5f, -1,0},{0,0,1},{0,0}},
-	{{-1.5f, 1,0},{0,1,0},{0,0}},
-	{{1.5f, 1,0},{1,1,0},{0,0}},
-	{{1.5f, -1,0},{0,0,1},{0,0}}
-	
-};*/
 
-//const uint32_t triangleIndices[6] = {0,1,2,3,4,5};
 
 void RenderApplication::run() {
 
@@ -85,9 +70,11 @@ void RenderApplication::run() {
     createUniformBuffer();
     writeToUniformBuffer();
 
-	createColorImage();
-	createColorImageView();
+	createColorAttachmentImage();
+	createColorAttachmentImageView();
 	
+	createDepthAttachmentImage();
+	createDepthAttachmentImageView();
 	
 
 	//create descriptors 
@@ -125,7 +112,7 @@ void RenderApplication::createInstance() {
 		std::vector<VkLayerProperties> allAvailableLayerProps(numAvailableLayers);
 		vkEnumerateInstanceLayerProperties(&numAvailableLayers, allAvailableLayerProps.data());
 
-		for (const char* currRequiredLayer : requiredLayers) {
+		for (const char* currRequiredLayer : requiredInstanceLayers) {
 
 			bool foundRequiredLayer = false;
 			for (VkLayerProperties currAvailableLayerProp : allAvailableLayerProps) {
@@ -189,8 +176,8 @@ void RenderApplication::createInstance() {
 
     // Give our desired instance layers and extensions to vulkan.
 	if (enableValidationLayers) {
-		createInfo.enabledLayerCount = (uint32_t)requiredLayers.size();
-		createInfo.ppEnabledLayerNames = requiredLayers.data();
+		createInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();
+		createInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
 	} else {
 		createInfo.enabledLayerCount = 0;
 	}
@@ -321,8 +308,8 @@ void RenderApplication::createDevice() {
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
 	if (enableValidationLayers) {
-		deviceCreateInfo.enabledLayerCount = (uint32_t)requiredLayers.size();  // need to specify validation layers here as well.
-		deviceCreateInfo.ppEnabledLayerNames = requiredLayers.data();
+		deviceCreateInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();  // need to specify validation layers here as well.
+		deviceCreateInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
 	} else {
 		deviceCreateInfo.enabledLayerCount = 0;
 	}
@@ -340,7 +327,7 @@ void RenderApplication::createDevice() {
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/FilletCube.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/ring.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -443,15 +430,16 @@ void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
-	glm::vec3 cameraPosition(0, 0, 300);
-	ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(75.0f), glm::vec3(6, 4, 7)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.6f));
-	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::vec3 cameraPosition(0, -100, 500);
+	ubo.model = glm::mat4(1.0f);
+	ubo.view = glm::lookAt(cameraPosition, glm::vec3(-50.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.0f, 1000.0f);
 	ubo.projection[1][1] *= -1;	
 		
 	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3));
 	ubo.cameraPosition = cameraPosition;
-	ubo.matColor = glm::vec3(0, 1, 0);
+	ubo.matColor = glm::vec3(1, 0, 0);
+	
     void* mappedMemory;
 
     vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &mappedMemory);
@@ -463,23 +451,39 @@ void RenderApplication::writeToUniformBuffer(){
 }
 
 
-void RenderApplication::createColorImage() {
+void RenderApplication::createColorAttachmentImage() {
 
 	Utils::createImage(
-		resolution.width,	//width
-		resolution.height,	//height
+		resolution,
 		VK_FORMAT_R8G8B8A8_UNORM,	//format
 		VK_IMAGE_TILING_OPTIMAL,	//tiling
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,	//usage
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//memory properties
-		colorImage,			//image
-		colorImageMemory	//image memory
+		colorAttachmentImage,			//image
+		colorAttachmentImageMemory	//image memory
 	);
 
 	//Note: no need to transition to layout VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, render pass will do that for us
 }
-void RenderApplication::createColorImageView() {
-	Utils::createImageView(colorImage, colorImageView, VK_FORMAT_R8G8B8A8_UNORM);
+void RenderApplication::createColorAttachmentImageView() {
+	Utils::createImageView(colorAttachmentImage, colorAttachmentImageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+void RenderApplication::createDepthAttachmentImage(){
+	
+	Utils::createImage(
+		resolution,
+		VK_FORMAT_D16_UNORM,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		depthAttachmentImage,
+		depthAttachmentImageMemory
+	);
+}
+
+void RenderApplication::createDepthAttachmentImageView(){
+	Utils::createImageView(depthAttachmentImage, depthAttachmentImageView, VK_FORMAT_D16_UNORM, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 void RenderApplication::createFrameBuffer() {
@@ -488,7 +492,7 @@ void RenderApplication::createFrameBuffer() {
 	frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	frameBufferInfo.renderPass = renderPass;
 	frameBufferInfo.attachmentCount = 1;
-	frameBufferInfo.pAttachments = &colorImageView;
+	frameBufferInfo.pAttachments = &colorAttachmentImageView;
 	frameBufferInfo.width = resolution.width;
 	frameBufferInfo.height = resolution.height;
 	frameBufferInfo.layers = 1;
@@ -700,7 +704,7 @@ void RenderApplication::createGraphicsPipeline(){
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer.depthBiasEnable = VK_FALSE;
 
 	//Multisampling
@@ -838,32 +842,13 @@ void RenderApplication::runMainCommandBuffer() {
 
 }
 
-void RenderApplication::exportAsImage() {
+void RenderApplication::exportAsImage(){
 
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-
-	VkDeviceSize bufferByteSize = resolution.width * resolution.height * 4;
-
-	Utils::createBuffer(bufferByteSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
 
 	//NOTE: We don't need to transition the color attachment layout image to VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL since the render pass already did for us
 
-	Utils::copyImageToBuffer(stagingBuffer, colorImage, resolution.width, resolution.height);
+	Utils::exportImageAsPNG(colorAttachmentImage, resolution, "Rendered Image.png",4);
 
-	void* mappedMemory;
-	vkMapMemory(device, stagingBufferMemory, 0, bufferByteSize, 0, &mappedMemory);
-
-	//write output image to disk as a png
-	stbi_write_png("Rendered Image.png", resolution.width, resolution.height, 4, mappedMemory, resolution.width * 4);
-
-	//write pixels to another array
-	vkUnmapMemory(device, stagingBufferMemory);
-
-
-	//Clean Up Staging Buffer
-	vkDestroyBuffer(device, stagingBuffer, nullptr);
-	vkFreeMemory(device, stagingBufferMemory, nullptr);
 
 }
 void RenderApplication::cleanup() {
@@ -890,10 +875,15 @@ void RenderApplication::cleanup() {
     vkDestroyBuffer(device, uniformBuffer, NULL);
 	vkFreeMemory(device, uniformBufferMemory, NULL);
 
-	//free color image
-	vkDestroyImageView(device, colorImageView, NULL);
-	vkDestroyImage(device, colorImage, NULL);
-	vkFreeMemory(device, colorImageMemory, NULL);
+	//free color attachment image
+	vkDestroyImageView(device, colorAttachmentImageView, NULL);
+	vkDestroyImage(device, colorAttachmentImage, NULL);
+	vkFreeMemory(device, colorAttachmentImageMemory, NULL);
+
+	//free depth attachment image
+	vkDestroyImageView(device, depthAttachmentImageView, NULL);
+	vkDestroyImage(device, depthAttachmentImage, NULL);
+	vkFreeMemory(device, depthAttachmentImageMemory, NULL);
 
 	vkDestroyFramebuffer(device, frameBuffer, NULL);
 	vkDestroyRenderPass(device,renderPass, NULL);

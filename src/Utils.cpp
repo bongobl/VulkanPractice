@@ -1,8 +1,20 @@
 #include <Utils.h>
 #include <RenderApplication.h>
 
+#ifndef TINYOBJLOADER_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+#endif
+
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+#endif
+
+#ifndef STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+#endif
 
 #include <map>
 
@@ -33,14 +45,14 @@ void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPr
 	VK_CHECK_RESULT(vkBindBufferMemory(RenderApplication::device, buffer, bufferMemory, 0));
 }
 
-void Utils::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkImage &image, VkDeviceMemory& imageMemory) {
+void Utils::createImage(VkExtent2D dimensions, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkImage &image, VkDeviceMemory& imageMemory) {
 	
 	//Texture Image
 	VkImageCreateInfo imageInfo = {};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = width;
-	imageInfo.extent.height = height;
+	imageInfo.extent.width = dimensions.width;
+	imageInfo.extent.height = dimensions.height;
 	imageInfo.extent.depth = 1;
 	imageInfo.mipLevels = 1;
 	imageInfo.arrayLayers = 1;
@@ -80,14 +92,14 @@ void Utils::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size
 	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
 }
 
-void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat format) {
+void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat format, VkImageAspectFlags aspectFlags) {
 
 	VkImageViewCreateInfo imageViewCreateInfo = {};
 	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	imageViewCreateInfo.image = image;
 	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	imageViewCreateInfo.format = format;
-	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageViewCreateInfo.subresourceRange.aspectMask = aspectFlags;
 	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	imageViewCreateInfo.subresourceRange.levelCount = 1;
 	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
@@ -96,7 +108,7 @@ void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat form
 	VK_CHECK_RESULT(vkCreateImageView(RenderApplication::device, &imageViewCreateInfo, NULL, &imageView));
 }
 
-void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions) {
 
 	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
 
@@ -112,8 +124,8 @@ void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, ui
 
 	region.imageOffset = { 0,0,0 };
 	region.imageExtent = {
-		width,
-		height,
+		imageDimensions.width,
+		imageDimensions.height,
 		1
 	};
 
@@ -128,7 +140,7 @@ void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, ui
 	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
 }
 
-void Utils::copyImageToBuffer(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height){
+void Utils::copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions){
 
 	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
 
@@ -144,8 +156,8 @@ void Utils::copyImageToBuffer(VkBuffer buffer, VkImage image, uint32_t width, ui
 
 	region.imageOffset = { 0,0,0 };
 	region.imageExtent = {
-		width,
-		height,
+		imageDimensions.width,
+		imageDimensions.height,
 		1
 	};
 
@@ -401,9 +413,36 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 			}
 		}
 	}
-	std::reverse(indexArray.begin(), indexArray.end());
 	cout << "Model " << modelFilename << " loaded with " << vertexArray.size() << " vertices and " << (indexArray.size() / 3) << " triangles" << endl;
 
+}
+
+void Utils::exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels) {
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	VkDeviceSize bufferByteSize = dimensions.width * dimensions.height * numChannels;
+
+	Utils::createBuffer(bufferByteSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
+
+
+	Utils::copyImageToBuffer(stagingBuffer, outputImage, dimensions);
+
+	//map staging buffer memory so we can export it
+	void* mappedMemory;
+	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, bufferByteSize, 0, &mappedMemory);
+
+	//write output image to disk as a png
+	stbi_write_png(fileName.c_str(), dimensions.width, dimensions.height, numChannels, mappedMemory, dimensions.width * numChannels);
+
+	//unmap staging buffer memory
+	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
+
+
+	//Clean Up Staging Buffer
+	vkDestroyBuffer(RenderApplication::device, stagingBuffer, nullptr);
+	vkFreeMemory(RenderApplication::device, stagingBufferMemory, nullptr);
 }
 //debug callback
 VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
