@@ -39,7 +39,7 @@ const std::vector<const char *> RenderApplication::requiredInstanceLayers = {
 	"VK_LAYER_LUNARG_standard_validation"
 };
 
-//Note: If we have are rendering to a window surface, we will have more extensions
+//Note: If we are rendering to a window surface, we will have more extensions
 const std::vector<const char *> RenderApplication::requiredInstanceExtensions = {
 	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
 };
@@ -105,7 +105,7 @@ void RenderApplication::createInstance() {
 	//Make sure all required instance layers/extensions are supported and throw a runtime error if not
 	if (enableValidationLayers) {
 
-		//Check for presence of required layers
+		//Check for presence of required instance layers
 		uint32_t numAvailableLayers;
 
 		vkEnumerateInstanceLayerProperties(&numAvailableLayers, NULL);
@@ -327,7 +327,7 @@ void RenderApplication::createDevice() {
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/ring.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -430,9 +430,9 @@ void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
-	glm::vec3 cameraPosition(0, -100, 500);
+	glm::vec3 cameraPosition(0, 100, 500);
 	ubo.model = glm::mat4(1.0f);
-	ubo.view = glm::lookAt(cameraPosition, glm::vec3(-50.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.0f, 1000.0f);
 	ubo.projection[1][1] *= -1;	
 		
@@ -473,7 +473,7 @@ void RenderApplication::createDepthAttachmentImage(){
 	
 	Utils::createImage(
 		resolution,
-		VK_FORMAT_D16_UNORM,
+		VK_FORMAT_D32_SFLOAT,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -483,7 +483,7 @@ void RenderApplication::createDepthAttachmentImage(){
 }
 
 void RenderApplication::createDepthAttachmentImageView(){
-	Utils::createImageView(depthAttachmentImage, depthAttachmentImageView, VK_FORMAT_D16_UNORM, VK_IMAGE_ASPECT_DEPTH_BIT);
+	Utils::createImageView(depthAttachmentImage, depthAttachmentImageView, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 void RenderApplication::createFrameBuffer() {
@@ -608,7 +608,7 @@ void RenderApplication::createRenderPass() {
 	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;		//we don't care what the inital layout of the image is
 	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;	//we want to copy it to a staging buffer and export it after rendering
 
 	VkAttachmentReference colorAttachmentRef = {};
