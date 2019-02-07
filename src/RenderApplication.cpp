@@ -1,5 +1,5 @@
 #include <RenderApplication.h>
-
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 
 //Initialize static members
@@ -327,7 +327,7 @@ void RenderApplication::createDevice() {
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/bunnyNew.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -430,15 +430,15 @@ void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 	
-	glm::vec3 cameraPosition(0, 100, 500);
-	ubo.model = glm::mat4(1.0f);
-	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.0f, 1000.0f);
+	glm::vec3 cameraPosition(-4, 3, 10);
+	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.4f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.023f, 0.023f, 0.023f));
+	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
 	ubo.projection[1][1] *= -1;	
 		
 	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3));
 	ubo.cameraPosition = cameraPosition;
-	ubo.matColor = glm::vec3(1, 0, 0);
+	ubo.matColor = glm::vec3(1, 0, 1);
 	
     void* mappedMemory;
 
@@ -462,7 +462,6 @@ void RenderApplication::createColorAttachmentImage() {
 		colorAttachmentImage,			//image
 		colorAttachmentImageMemory	//image memory
 	);
-
 	//Note: no need to transition to layout VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, render pass will do that for us
 }
 void RenderApplication::createColorAttachmentImageView() {
@@ -480,6 +479,7 @@ void RenderApplication::createDepthAttachmentImage(){
 		depthAttachmentImage,
 		depthAttachmentImageMemory
 	);
+	Utils::transitionImageLayout(depthAttachmentImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 void RenderApplication::createDepthAttachmentImageView(){
@@ -488,11 +488,17 @@ void RenderApplication::createDepthAttachmentImageView(){
 
 void RenderApplication::createFrameBuffer() {
 
+	std::array<VkImageView, 2> attachments = {
+		colorAttachmentImageView,
+		depthAttachmentImageView
+	};
+
+
 	VkFramebufferCreateInfo frameBufferInfo = {};
 	frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	frameBufferInfo.renderPass = renderPass;
-	frameBufferInfo.attachmentCount = 1;
-	frameBufferInfo.pAttachments = &colorAttachmentImageView;
+	frameBufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	frameBufferInfo.pAttachments = attachments.data();
 	frameBufferInfo.width = resolution.width;
 	frameBufferInfo.height = resolution.height;
 	frameBufferInfo.layers = 1;
@@ -611,19 +617,35 @@ void RenderApplication::createRenderPass() {
 	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;		//we don't care what the inital layout of the image is
 	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;	//we want to copy it to a staging buffer and export it after rendering
 
+	VkAttachmentDescription depthAttachment = {};
+	depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 	VkAttachmentReference colorAttachmentRef = {};
 	colorAttachmentRef.attachment = 0;
 	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depthAttachmentRef = {};
+	depthAttachmentRef.attachment = 1;
+	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachmentRef;
+	subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
+	std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
 	VkRenderPassCreateInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = 1;
-	renderPassInfo.pAttachments = &colorAttachment;
+	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());;
+	renderPassInfo.pAttachments = attachments.data();
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = &subpass;
 
@@ -713,6 +735,15 @@ void RenderApplication::createGraphicsPipeline(){
 	multisampling.sampleShadingEnable = VK_FALSE;
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
+	//Depth Testing
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStencil.depthTestEnable = VK_TRUE;
+	depthStencil.depthWriteEnable = VK_TRUE;
+	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+	depthStencil.depthBoundsTestEnable = VK_FALSE;
+	depthStencil.stencilTestEnable = VK_FALSE;
+
 
 	//Color Blending (per frame buffer)
 	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
@@ -747,7 +778,7 @@ void RenderApplication::createGraphicsPipeline(){
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;
-	pipelineInfo.pDepthStencilState = NULL;
+	pipelineInfo.pDepthStencilState = &depthStencil;
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = NULL;
 	pipelineInfo.layout = pipelineLayout;
@@ -788,9 +819,12 @@ void RenderApplication::createMainCommandBuffer() {
 		renderPassInfo.renderArea.offset = { 0,0 };
 		renderPassInfo.renderArea.extent = resolution;
 
-		VkClearValue clearColor = { 0.0f,0.0f,0.0f,1.0f };
-		renderPassInfo.clearValueCount = 1;
-		renderPassInfo.pClearValues = &clearColor;
+		std::array<VkClearValue, 2> clearValues = {};
+		clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		clearValues[1].depthStencil = { 1, 0 };
+
+		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+		renderPassInfo.pClearValues = clearValues.data();
 
 		//render pass scope
 		vkCmdBeginRenderPass(mainCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
