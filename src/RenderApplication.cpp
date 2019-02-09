@@ -3,7 +3,7 @@
 
 
 //Initialize static members
-VkExtent2D RenderApplication::resolution = {1280,780};
+VkExtent2D RenderApplication::resolution = {1920,1080};
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
@@ -35,25 +35,22 @@ uint32_t RenderApplication::graphicsQueueFamilyIndex;
 VkQueue RenderApplication::graphicsQueue;
 
 
-const std::vector<const char *> RenderApplication::requiredInstanceLayers = {
-	"VK_LAYER_LUNARG_standard_validation"
-};
+std::vector<const char*> RenderApplication::requiredInstanceLayers;
 
 //Note: If we are rendering to a window surface, we will have more extensions
-const std::vector<const char *> RenderApplication::requiredInstanceExtensions = {
-	VK_EXT_DEBUG_REPORT_EXTENSION_NAME
-};
-
-
+std::vector<const char*> RenderApplication::requiredInstanceExtensions;
+std::vector<const char*> RenderApplication::requiredDeviceExtensions;
 
 void RenderApplication::run() {
 
-    
+
+	checkToAddValidation();
+
     // Initialize vulkan
     createInstance();
     findPhysicalDevice();
     createDevice();
-    
+
 
     //create descriptor and command resources
     createDescriptorSetLayout();
@@ -72,12 +69,12 @@ void RenderApplication::run() {
 
 	createColorAttachmentImage();
 	createColorAttachmentImageView();
-	
+
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
-	
 
-	//create descriptors 
+
+	//create descriptors
     createDescriptorSet();
 
     //for graphics
@@ -88,9 +85,11 @@ void RenderApplication::run() {
     //record command buffer
     createMainCommandBuffer();
 
+    cout << "Rendering Scene" << endl;
     // Finally, run the recorded command buffer.
     runMainCommandBuffer();
 
+    cout << "Exporting Image to Disk" << endl;
     //export the contents of the color attachment to disk
 	exportAsImage();
 
@@ -98,65 +97,71 @@ void RenderApplication::run() {
     cleanup();
 }
 
+void RenderApplication::checkToAddValidation(){
 
+	if(enableValidationLayers){
+		cout << "<Debug Mode: Validation Layers Enabled>" << endl;
+		requiredInstanceLayers.push_back("VK_LAYER_LUNARG_standard_validation");
+		requiredInstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	}
+}
 void RenderApplication::createInstance() {
+
+
+
+
+	//Check for presence of required instance layers
+	uint32_t numAvailableLayers;
+
+	vkEnumerateInstanceLayerProperties(&numAvailableLayers, NULL);
+	std::vector<VkLayerProperties> allAvailableInstanceLayers(numAvailableLayers);
+	vkEnumerateInstanceLayerProperties(&numAvailableLayers, allAvailableInstanceLayers.data());
+
+	for (const char* currRequiredLayer : requiredInstanceLayers) {
+
+		bool foundRequiredLayer = false;
+		for (VkLayerProperties currAvailableLayerProp : allAvailableInstanceLayers) {
+			if (strcmp(currRequiredLayer, currAvailableLayerProp.layerName) == 0) {
+				foundRequiredLayer = true;
+				break;
+			}
+		}
+		if (!foundRequiredLayer) {
+			string errorMessage = "Layer " + string(currRequiredLayer) + " not supported\n";
+			throw std::runtime_error(errorMessage);
+		}
+	}
+
+
+	//check for presence of required instance extensions
+    uint32_t numAvailableExtensions;
+
+    vkEnumerateInstanceExtensionProperties(NULL, &numAvailableExtensions, NULL);
+    std::vector<VkExtensionProperties> allAvailableExtensions(numAvailableExtensions);
+    vkEnumerateInstanceExtensionProperties(NULL, &numAvailableExtensions, allAvailableExtensions.data());
+
+
+	for (const char* currRequiredExtension : requiredInstanceExtensions) {
+
+		bool foundRequiredExtension = false;
+		for (VkExtensionProperties currAvailableExtension : allAvailableExtensions) {
+			if (strcmp(currRequiredExtension, currAvailableExtension.extensionName) == 0) {
+				foundRequiredExtension = true;
+				break;
+			}
+		}
+		if (!foundRequiredExtension) {
+			string errorMessage = "Extension " + string(currRequiredExtension) + " not supported\n";
+			throw std::runtime_error(errorMessage);
+		}
+	}
+
     
-
-	//Make sure all required instance layers/extensions are supported and throw a runtime error if not
-	if (enableValidationLayers) {
-
-		//Check for presence of required instance layers
-		uint32_t numAvailableLayers;
-
-		vkEnumerateInstanceLayerProperties(&numAvailableLayers, NULL);
-		std::vector<VkLayerProperties> allAvailableLayerProps(numAvailableLayers);
-		vkEnumerateInstanceLayerProperties(&numAvailableLayers, allAvailableLayerProps.data());
-
-		for (const char* currRequiredLayer : requiredInstanceLayers) {
-
-			bool foundRequiredLayer = false;
-			for (VkLayerProperties currAvailableLayerProp : allAvailableLayerProps) {
-				if (strcmp(currRequiredLayer, currAvailableLayerProp.layerName) == 0) {
-					foundRequiredLayer = true;
-					break;
-				}
-			}
-			if (!foundRequiredLayer) {
-				string errorMessage = "Layer " + string(currRequiredLayer) + " not supported\n";
-				throw std::runtime_error(errorMessage);
-			}
-		}
-        
-        
-		//check for presence of required instance extensions
-        uint32_t numAvailableExtensions;
-        
-        vkEnumerateInstanceExtensionProperties(NULL, &numAvailableExtensions, NULL);
-        std::vector<VkExtensionProperties> allAvailableExtensionProps(numAvailableExtensions);
-        vkEnumerateInstanceExtensionProperties(NULL, &numAvailableExtensions, allAvailableExtensionProps.data());
-
-
-		for (const char* currRequiredExtension : requiredInstanceExtensions) {
-
-			bool foundRequiredExtension = false;
-			for (VkExtensionProperties currAvailableExtProp : allAvailableExtensionProps) {
-				if (strcmp(currRequiredExtension, currAvailableExtProp.extensionName) == 0) {
-					foundRequiredExtension = true;
-					break;
-				}			
-			}
-			if (!foundRequiredExtension) {
-				string errorMessage = "Extension " + string(currRequiredExtension) + " not supported\n";
-				throw std::runtime_error(errorMessage);
-			}
-		}
-
-    }//End if(enableValidationLayers)
 
 
     //Next, we actually create the instance.
-    
-    
+
+
 
     //Contains application info. This is actually not that important.
     //The only real important field is apiVersion.
@@ -167,29 +172,26 @@ void RenderApplication::createInstance() {
     applicationInfo.pEngineName = "ComputeEngine";
     applicationInfo.engineVersion = 0;
     applicationInfo.apiVersion = VK_API_VERSION_1_1;;
-    
+
     VkInstanceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.flags = 0;
     createInfo.pApplicationInfo = &applicationInfo;
-    
 
-    // Give our desired instance layers and extensions to vulkan.
-	if (enableValidationLayers) {
-		createInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();
-		createInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
-	} else {
-		createInfo.enabledLayerCount = 0;
-	}
 
+    // Give our desired instance layers to vulkan.
+	createInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();
+	createInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
+
+	// Give our desired instance extensions to vulkan
     createInfo.enabledExtensionCount = (uint32_t)requiredInstanceExtensions.size();
     createInfo.ppEnabledExtensionNames = requiredInstanceExtensions.data();
 
-    
+
     //Actually create the instance. Having created the instance, we can actually start using vulkan.
     VK_CHECK_RESULT( vkCreateInstance( &createInfo, NULL, &instance));
 
-    
+
     //Register a callback function for the extension VK_EXT_DEBUG_REPORT_EXTENSION_NAME, so that warnings emitted from the validation
     //layer are actually printed.
     if (enableValidationLayers) {
@@ -211,7 +213,7 @@ void RenderApplication::createInstance() {
 }
 
 void RenderApplication::findPhysicalDevice() {
-    
+
     //In this function, we find a physical device that can be used with Vulkan.
     //So, first we will list all physical devices on the system with vkEnumeratePhysicalDevices .
 
@@ -230,7 +232,7 @@ void RenderApplication::findPhysicalDevice() {
 		if (isValidPhysicalDevice(currPhysicalDevice, graphicsQueueFamilyIndex)) {
 			physicalDevice = currPhysicalDevice;
 			return;
-		}	
+		}
     }
 
 	throw std::runtime_error("Could not load find a valid physical device for our operations");
@@ -245,8 +247,28 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 	//by this potential physical device. Since we have none, we just move on
 
 
-    //If we had any required device extensions, we would check if they are supported by the physical device here before
-    //supplying them to the logical device create info.
+    //Check for support of required device extensions
+	uint32_t numAvailableExtensions;
+	vkEnumerateDeviceExtensionProperties(potentialPhysicalDevice, NULL, &numAvailableExtensions, NULL);
+	std::vector<VkExtensionProperties> allAvailableExtensions(numAvailableExtensions);
+	vkEnumerateDeviceExtensionProperties(potentialPhysicalDevice, NULL, &numAvailableExtensions, allAvailableExtensions.data());
+
+	for (const char* currRequiredExtension : requiredDeviceExtensions) {
+
+		bool foundRequiredExtension = false;
+		for (VkExtensionProperties currAvailableExtension : allAvailableExtensions) {
+			if (strcmp(currRequiredExtension, currAvailableExtension.extensionName) == 0) {
+				foundRequiredExtension = true;
+				break;
+			}
+		}
+		if (!foundRequiredExtension) {
+			string errorMessage = "Device Extension " + string(currRequiredExtension) + " not supported\n";
+			throw std::runtime_error(errorMessage);
+		}
+	}
+
+
 
 	//lastly, we make sure there exists a queue family index that supports the operations we want
 	familyIndex = getQueueFamilyIndex(potentialPhysicalDevice);
@@ -254,7 +276,7 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 
 
 }
-// Returns the index of a queue family that supports compute and graphics operations. 
+// Returns the index of a queue family that supports compute and graphics operations.
 uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDevice) {
 
     uint32_t queueFamilyCount;
@@ -270,7 +292,7 @@ uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDev
     for (currFamilyIndex = 0; currFamilyIndex < queueFamilies.size(); ++currFamilyIndex) {
         VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
 
-        if ((currFamily.queueCount > 0) && 
+        if ((currFamily.queueCount > 0) &&
 			/*(currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&*/
 			(currFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
 			(currFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
@@ -294,7 +316,7 @@ void RenderApplication::createDevice() {
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queueCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
     queueCreateInfo.queueCount = 1; // get one queue from this family. We don't need more.
-    float queuePriorities = 1.0;  // we only have one queue, so this is not that imporant. 
+    float queuePriorities = 1.0;  // we only have one queue, so this is not that imporant.
     queueCreateInfo.pQueuePriorities = &queuePriorities;
 
     // Specify any desired device features here. We do not need any for this application, though.
@@ -307,27 +329,25 @@ void RenderApplication::createDevice() {
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
-	if (enableValidationLayers) {
-		deviceCreateInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();  // need to specify validation layers here as well.
-		deviceCreateInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
-	} else {
-		deviceCreateInfo.enabledLayerCount = 0;
-	}
+	// need to specify instance layers here as well.
+	deviceCreateInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();  
+	deviceCreateInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
 
-	// no device extensions for this app since we aren't using a swapchain
-	deviceCreateInfo.enabledExtensionCount = 0;
+	// specify device extensions
+	deviceCreateInfo.enabledExtensionCount = (uint32_t)requiredDeviceExtensions.size();
+	deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 
     VK_CHECK_RESULT(vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); // create logical device.
 
 	//the index within this queue family of the queue to retrieve, we just take the first one
-    uint32_t particularQueueIndex = 0;	
+    uint32_t particularQueueIndex = 0;
 
     // Get a handle to the only member of the queue family.
     vkGetDeviceQueue(device, graphicsQueueFamilyIndex, particularQueueIndex, &graphicsQueue);
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/bunnyNew.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -352,7 +372,7 @@ void RenderApplication::writeToVertexBuffer(){
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 
-	
+
 	Utils::createBuffer(
 		vertexArraySize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -394,7 +414,7 @@ void RenderApplication::writeToIndexBuffer(){
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 
-	
+
 	Utils::createBuffer(
 		indexArraySize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -419,9 +439,9 @@ void RenderApplication::writeToIndexBuffer(){
 void RenderApplication::createUniformBuffer(){
 
 	Utils::createBuffer(
-		sizeof(UniformBufferObject), 
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, 
+		sizeof(UniformBufferObject),
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 		uniformBuffer, uniformBufferMemory);
 
 }
@@ -429,21 +449,21 @@ void RenderApplication::createUniformBuffer(){
 void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
-	
-	glm::vec3 cameraPosition(-4, 3, 10);
-	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.4f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.023f, 0.023f, 0.023f));
+
+	glm::vec3 cameraPosition(0, 4, 9);
+	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
-	ubo.projection[1][1] *= -1;	
-		
+	ubo.projection[1][1] *= -1;
+
 	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3));
 	ubo.cameraPosition = cameraPosition;
-	ubo.matColor = glm::vec3(1, 0, 1);
-	
+	ubo.matColor = glm::vec3(0, 0, 1);
+
     void* mappedMemory;
 
     vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &mappedMemory);
-	
+
     memcpy(mappedMemory, &ubo, sizeof(ubo));
 
     vkUnmapMemory(device, uniformBufferMemory);
@@ -469,7 +489,7 @@ void RenderApplication::createColorAttachmentImageView() {
 }
 
 void RenderApplication::createDepthAttachmentImage(){
-	
+
 	Utils::createImage(
 		resolution,
 		VK_FORMAT_D32_SFLOAT,
@@ -479,6 +499,8 @@ void RenderApplication::createDepthAttachmentImage(){
 		depthAttachmentImage,
 		depthAttachmentImageMemory
 	);
+
+	//we choose to transition layout here (not in render pass) since the transition only needs to happen once in a realtime app
 	Utils::transitionImageLayout(depthAttachmentImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
@@ -507,8 +529,6 @@ void RenderApplication::createFrameBuffer() {
 }
 void RenderApplication::createDescriptorSetLayout() {
 
-
-
     //define a binding for a UBO
     VkDescriptorSetLayoutBinding uniformBufferBinding = {};
     uniformBufferBinding.binding = 0;	//binding = 0
@@ -516,7 +536,7 @@ void RenderApplication::createDescriptorSetLayout() {
     uniformBufferBinding.descriptorCount = 1;
     uniformBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-	
+
 
     //put all bindings in an array
     std::array<VkDescriptorSetLayoutBinding, 1> allBindings = {uniformBufferBinding};
@@ -527,19 +547,19 @@ void RenderApplication::createDescriptorSetLayout() {
     descriptorSetLayoutCreateInfo.bindingCount = (uint32_t)allBindings.size(); //number of bindings
     descriptorSetLayoutCreateInfo.pBindings = allBindings.data();
 
-    // Create the descriptor set layout. 
+    // Create the descriptor set layout.
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
-	
+
 }
 
 void RenderApplication::createDescriptorPool(){
 
 
-	
+
     std::array<VkDescriptorPoolSize, 1> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = 1;
-	
+
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -550,14 +570,14 @@ void RenderApplication::createDescriptorPool(){
     //Create descriptor pool.
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
 
-	
+
 }
 void RenderApplication::createDescriptorSet() {
-    
-	
-    //With the pool allocated, we can now allocate the descriptor set. 
+
+
+    //With the pool allocated, we can now allocate the descriptor set.
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
-    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO; 
+    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     descriptorSetAllocateInfo.descriptorPool = descriptorPool; // pool to allocate from.
     descriptorSetAllocateInfo.descriptorSetCount = 1; // allocate a single descriptor set.
     descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
@@ -565,7 +585,7 @@ void RenderApplication::createDescriptorSet() {
     // allocate descriptor set.
     VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet));
 
-	
+
     // Specify the uniform buffer info
     VkDescriptorBufferInfo descriptorUniformBufferInfo = {};
     descriptorUniformBufferInfo.buffer = uniformBuffer;
@@ -578,7 +598,7 @@ void RenderApplication::createDescriptorSet() {
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = descriptorSet;
     descriptorWrites[0].dstBinding = 0;		//binding = 0
-    descriptorWrites[0].dstArrayElement = 0;	
+    descriptorWrites[0].dstArrayElement = 0;
     descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorWrites[0].descriptorCount = 1;
     descriptorWrites[0].pBufferInfo = &descriptorUniformBufferInfo;
@@ -586,7 +606,7 @@ void RenderApplication::createDescriptorSet() {
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
-	
+
 }
 
 
@@ -600,7 +620,7 @@ void RenderApplication::createCommandPool(){
     commandPoolCreateInfo.flags = 0;
 
     // the queue family of this command pool. All command buffers allocated from this command pool,
-    // must be submitted to queues of this family ONLY. 
+    // must be submitted to queues of this family ONLY.
     commandPoolCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
     VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &graphicsCommandPool));
 }
@@ -624,7 +644,7 @@ void RenderApplication::createRenderPass() {
 	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentReference colorAttachmentRef = {};
@@ -654,10 +674,10 @@ void RenderApplication::createRenderPass() {
 }
 
 void RenderApplication::createGraphicsPipeline(){
-    
+
 	//create vertex shader module
 	VkShaderModule vertexShaderModule = Utils::createShaderModule("resources/shaders/vert.spv");
-	
+
 	//create fragment shader module
 	VkShaderModule fragmentShaderModule = Utils::createShaderModule("resources/shaders/frag.spv");
 
@@ -668,7 +688,7 @@ void RenderApplication::createGraphicsPipeline(){
 	vertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 	vertexShaderStageInfo.module = vertexShaderModule;
 	vertexShaderStageInfo.pName = "main";
-	
+
 	//Fragment Shader Stage
 	VkPipelineShaderStageCreateInfo fragmentShaderStageInfo = {};
 	fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -786,16 +806,16 @@ void RenderApplication::createGraphicsPipeline(){
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-	//Create Graphics Pipeline 
+	//Create Graphics Pipeline
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &graphicsPipeline));
 
 
-	//destroy shader modules 
+	//destroy shader modules
 	vkDestroyShaderModule(device,vertexShaderModule, NULL);
 	vkDestroyShaderModule(device, fragmentShaderModule, NULL);
 }
 void RenderApplication::createMainCommandBuffer() {
-    
+
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = graphicsCommandPool;
@@ -840,14 +860,14 @@ void RenderApplication::createMainCommandBuffer() {
 			vkCmdBindIndexBuffer(mainCommandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 			vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-			
+
 			vkCmdDrawIndexed(mainCommandBuffer, (uint32_t)indexArray.size(), 1, 0, 0, 0);
 
 		vkCmdEndRenderPass(mainCommandBuffer);
 
 	VK_CHECK_RESULT(vkEndCommandBuffer(mainCommandBuffer));
 
-   
+
 }
 
 void RenderApplication::runMainCommandBuffer() {
@@ -859,7 +879,7 @@ void RenderApplication::runMainCommandBuffer() {
     submitInfo.commandBufferCount = 1; // submit a single command buffer
     submitInfo.pCommandBuffers = &mainCommandBuffer; // the command buffer to submit.
 
-    //Create a fence to make the CPU wait for the GPU to finish before proceeding 
+    //Create a fence to make the CPU wait for the GPU to finish before proceeding
     VkFence fence;
     VkFenceCreateInfo fenceCreateInfo = {};
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -896,16 +916,16 @@ void RenderApplication::cleanup() {
 		}
 		func(instance, debugReportCallback, NULL);
 	}
-    
-	//free vertex buffer   
+
+	//free vertex buffer
 	vkDestroyBuffer(device, vertexBuffer, NULL);
 	vkFreeMemory(device, vertexBufferMemory, NULL);
 
-	//free index buffer   
+	//free index buffer
 	vkDestroyBuffer(device, indexBuffer, NULL);
 	vkFreeMemory(device, indexBufferMemory, NULL);
 
-    //free uniform buffer   
+    //free uniform buffer
     vkDestroyBuffer(device, uniformBuffer, NULL);
 	vkFreeMemory(device, uniformBufferMemory, NULL);
 
@@ -924,12 +944,12 @@ void RenderApplication::cleanup() {
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
 
-	
+
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);
-    vkDestroyCommandPool(device, graphicsCommandPool, NULL);        
+    vkDestroyCommandPool(device, graphicsCommandPool, NULL);
     vkDestroyDevice(device, NULL);
-    vkDestroyInstance(instance, NULL);      
+    vkDestroyInstance(instance, NULL);
 
 }
 

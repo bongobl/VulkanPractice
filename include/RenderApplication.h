@@ -95,8 +95,9 @@ class RenderApplication{
 	static VkQueue graphicsQueue;
 
 	//The layers and instance extensions required for our application
-	const static std::vector<const char *> requiredInstanceLayers;
-	const static std::vector<const char *> requiredInstanceExtensions;
+	static std::vector<const char*> requiredInstanceLayers;
+	static std::vector<const char*> requiredInstanceExtensions;
+	static std::vector<const char*> requiredDeviceExtensions;
 
 
 
@@ -108,6 +109,7 @@ private:
 
 
     //app info
+    static void checkToAddValidation();
 	static void createInstance();
 	static void findPhysicalDevice();
 	static void createDevice();

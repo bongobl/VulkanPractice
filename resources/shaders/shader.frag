@@ -26,7 +26,7 @@ void main() {
 
 	vec3 reflectedLight = reflect(lightDirection, worldNormal);
 	vec3 fragToCam = normalize(cameraPosition - worldPosition);
-	vec3 specular = pow(max(0, dot(reflectedLight, fragToCam)),20) * vec3(1.0f);
+	vec3 specular = pow(max(0, dot(reflectedLight, fragToCam)),10) * vec3(1.0f);
 
 	vec3 ambient = 0.04f * matColor;
 
