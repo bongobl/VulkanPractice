@@ -25,6 +25,14 @@ class RenderApplication{
 	//width and height of render area
 	static VkExtent2D resolution;
 
+	//Structures to hold all of our app's requirements
+	static std::vector<const char*> requiredInstanceLayers;
+	static std::vector<const char*> requiredInstanceExtensions;
+	static std::vector<const char*> requiredDeviceExtensions;
+	static VkPhysicalDeviceFeatures requiredDeviceFeatures;
+
+	//To store the flag bits specifying which queue types our application needs
+	static VkQueueFlags requiredQueueTypes;
 
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;
@@ -55,6 +63,14 @@ class RenderApplication{
     //Uniform buffer used to pass simple parameters to compute shader
 	static VkBuffer uniformBuffer;
 	static VkDeviceMemory uniformBufferMemory;
+
+	//for our diffuse image
+	static VkImage diffuseTexture;
+	static VkDeviceMemory diffuseTextureMemory;
+	static VkImageView diffuseTextureView;
+
+	//to sample image textures
+	static VkSampler textureSampler;
 
 	//Color attachment image to render to
 	static VkImage colorAttachmentImage;
@@ -94,12 +110,6 @@ class RenderApplication{
 	//Queue for graphics and compute operation
 	static VkQueue graphicsQueue;
 
-	//The layers and instance extensions required for our application
-	static std::vector<const char*> requiredInstanceLayers;
-	static std::vector<const char*> requiredInstanceExtensions;
-	static std::vector<const char*> requiredDeviceExtensions;
-
-
 
 public:
 
@@ -108,8 +118,10 @@ public:
 private:
 
 
-    //app info
-    static void checkToAddValidation();
+    //specify all required instance layers, instance extensions and device extensions here
+    static void configureAllRequirements();
+
+	//app info
 	static void createInstance();
 	static void findPhysicalDevice();
 	static void createDevice();
@@ -122,7 +134,6 @@ private:
 	static uint32_t getQueueFamilyIndex(VkPhysicalDevice currPhysicalDevice);
 
 	
-
     //layouts and pools
 	static void createDescriptorSetLayout();
 	static void createDescriptorPool();
@@ -138,6 +149,12 @@ private:
 
 	static void createUniformBuffer();
 	static void writeToUniformBuffer();
+
+	static void createDiffuseTexture();
+	static void writeToDiffuseTexture();
+	static void createDiffuseTextureView();
+
+	static void createTextureSampler();
 	
 	static void createColorAttachmentImage();
 	static void createColorAttachmentImageView();

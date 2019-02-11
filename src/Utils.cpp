@@ -438,7 +438,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
 
 {
 
-	printf("Debug Report: %s: %s\n", pLayerPrefix, pMessage);
+	printf("\nDebug Report: %s: %s\n\n", pLayerPrefix, pMessage);
 
 	return VK_FALSE;
 }

@@ -4,6 +4,12 @@
 
 //Initialize static members
 VkExtent2D RenderApplication::resolution = {1920,1080};
+std::vector<const char*> RenderApplication::requiredInstanceLayers;
+std::vector<const char*> RenderApplication::requiredInstanceExtensions;
+std::vector<const char*> RenderApplication::requiredDeviceExtensions;
+VkPhysicalDeviceFeatures RenderApplication::requiredDeviceFeatures = {};
+VkQueueFlags RenderApplication::requiredQueueTypes;
+
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
@@ -16,6 +22,10 @@ VkBuffer RenderApplication::indexBuffer;
 VkDeviceMemory RenderApplication::indexBufferMemory;
 VkBuffer RenderApplication::uniformBuffer;
 VkDeviceMemory RenderApplication::uniformBufferMemory;
+VkImage RenderApplication::diffuseTexture;
+VkDeviceMemory RenderApplication::diffuseTextureMemory;
+VkImageView RenderApplication::diffuseTextureView;
+VkSampler RenderApplication::textureSampler;
 VkImage RenderApplication::colorAttachmentImage;
 VkDeviceMemory RenderApplication::colorAttachmentImageMemory;
 VkImageView RenderApplication::colorAttachmentImageView;
@@ -35,16 +45,12 @@ uint32_t RenderApplication::graphicsQueueFamilyIndex;
 VkQueue RenderApplication::graphicsQueue;
 
 
-std::vector<const char*> RenderApplication::requiredInstanceLayers;
 
-//Note: If we are rendering to a window surface, we will have more extensions
-std::vector<const char*> RenderApplication::requiredInstanceExtensions;
-std::vector<const char*> RenderApplication::requiredDeviceExtensions;
 
 void RenderApplication::run() {
 
-
-	checkToAddValidation();
+	//add all required instance layers/extensions and device extensions
+	configureAllRequirements();
 
     // Initialize vulkan
     createInstance();
@@ -66,6 +72,11 @@ void RenderApplication::run() {
 
     createUniformBuffer();
     writeToUniformBuffer();
+
+	createDiffuseTexture();
+	writeToDiffuseTexture();
+	createDiffuseTextureView();
+	createTextureSampler();
 
 	createColorAttachmentImage();
 	createColorAttachmentImageView();
@@ -97,17 +108,28 @@ void RenderApplication::run() {
     cleanup();
 }
 
-void RenderApplication::checkToAddValidation(){
+void RenderApplication::configureAllRequirements(){
+
 
 	if(enableValidationLayers){
 		cout << "<Debug Mode: Validation Layers Enabled>" << endl;
+
+		//our validation requires one instance layer and one instance extension
 		requiredInstanceLayers.push_back("VK_LAYER_LUNARG_standard_validation");
 		requiredInstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 	}
+
+	//Note: In realtime app, glfw will have extra instance extensions we need to add.
+	//And usage of the swapchain would require a device extension. 
+
+	//specify required device features 
+	requiredDeviceFeatures.samplerAnisotropy = VK_TRUE;
+
+	//specify what capabilities we need from a queue
+	requiredQueueTypes = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT;
+	
 }
 void RenderApplication::createInstance() {
-
-
 
 
 	//Check for presence of required instance layers
@@ -156,20 +178,15 @@ void RenderApplication::createInstance() {
 		}
 	}
 
-    
-
-
     //Next, we actually create the instance.
-
-
 
     //Contains application info. This is actually not that important.
     //The only real important field is apiVersion.
     VkApplicationInfo applicationInfo = {};
     applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    applicationInfo.pApplicationName = "Vulkan Compute Application";
+    applicationInfo.pApplicationName = "Vulkan Render Application";
     applicationInfo.applicationVersion = 0;
-    applicationInfo.pEngineName = "ComputeEngine";
+    applicationInfo.pEngineName = "RenderEngine";
     applicationInfo.engineVersion = 0;
     applicationInfo.apiVersion = VK_API_VERSION_1_1;;
 
@@ -240,12 +257,22 @@ void RenderApplication::findPhysicalDevice() {
 
 bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice, uint32_t &familyIndex) {
 
-	VkPhysicalDeviceFeatures supportedFeatures;
-	vkGetPhysicalDeviceFeatures(potentialPhysicalDevice, &supportedFeatures);
+	//For this physical device to be valid, it needs to support our device features, device extensions and have
+	//a queue family for our operations
 
-	//We would normally check the supportedFeatures structure to see that all our device features are supported
-	//by this potential physical device. Since we have none, we just move on
+	//Check for support of required device features
+	VkPhysicalDeviceFeatures supportedFeatures;		//Not used 
+	vkGetPhysicalDeviceFeatures(potentialPhysicalDevice, &supportedFeatures);	//Not used
 
+	VkBool32* allRequired = (VkBool32*)&requiredDeviceFeatures;
+	VkBool32* allSupported = (VkBool32*)&supportedFeatures;
+	for(int i =  0; i< 55; ++i){
+
+		if(allRequired[i] == VK_TRUE && allSupported[i] == VK_FALSE){
+			cout << "Feature not supported" << endl;
+			return false;
+		}
+	}
 
     //Check for support of required device extensions
 	uint32_t numAvailableExtensions;
@@ -257,17 +284,18 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 
 		bool foundRequiredExtension = false;
 		for (VkExtensionProperties currAvailableExtension : allAvailableExtensions) {
+
 			if (strcmp(currRequiredExtension, currAvailableExtension.extensionName) == 0) {
 				foundRequiredExtension = true;
 				break;
 			}
 		}
+
+		//this physical device doesn't support all our required extensions
 		if (!foundRequiredExtension) {
-			string errorMessage = "Device Extension " + string(currRequiredExtension) + " not supported\n";
-			throw std::runtime_error(errorMessage);
+			return false;
 		}
 	}
-
 
 
 	//lastly, we make sure there exists a queue family index that supports the operations we want
@@ -281,21 +309,18 @@ uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDev
 
     uint32_t queueFamilyCount;
 
+	// Retrieve all queue families.
     vkGetPhysicalDeviceQueueFamilyProperties(currPhysicalDevice, &queueFamilyCount, NULL);
-
-    // Retrieve all queue families.
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(currPhysicalDevice, &queueFamilyCount, queueFamilies.data());
 
-    // Now find a family that supports compute.
+    // Now find a family that supports graphics and transfer.
     uint32_t currFamilyIndex;
     for (currFamilyIndex = 0; currFamilyIndex < queueFamilies.size(); ++currFamilyIndex) {
         VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
 
         if ((currFamily.queueCount > 0) &&
-			/*(currFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&*/
-			(currFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
-			(currFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+			(currFamily.queueFlags & requiredQueueTypes)){
 
             // found a queue family with transfer and graphics. We're done!
             break;
@@ -305,6 +330,7 @@ uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDev
     if (currFamilyIndex == queueFamilies.size()) {
 		return -1;
     }
+	
     return currFamilyIndex;
 }
 
@@ -319,21 +345,19 @@ void RenderApplication::createDevice() {
     float queuePriorities = 1.0;  // we only have one queue, so this is not that imporant.
     queueCreateInfo.pQueuePriorities = &queuePriorities;
 
-    // Specify any desired device features here. We do not need any for this application, though.
-    VkPhysicalDeviceFeatures deviceFeatures = {};
 
     //Now we create the logical device. The logical device allows us to interact with the physical device.
     VkDeviceCreateInfo deviceCreateInfo = {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo; // when creating the logical device, we also specify what queues it has.
     deviceCreateInfo.queueCreateInfoCount = 1;
-    deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+    deviceCreateInfo.pEnabledFeatures = &requiredDeviceFeatures;
 
 	// need to specify instance layers here as well.
 	deviceCreateInfo.enabledLayerCount = (uint32_t)requiredInstanceLayers.size();  
 	deviceCreateInfo.ppEnabledLayerNames = requiredInstanceLayers.data();
 
-	// specify device extensions
+	// give our required device extensions to vulkan
 	deviceCreateInfo.enabledExtensionCount = (uint32_t)requiredDeviceExtensions.size();
 	deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 
@@ -342,7 +366,7 @@ void RenderApplication::createDevice() {
 	//the index within this queue family of the queue to retrieve, we just take the first one
     uint32_t particularQueueIndex = 0;
 
-    // Get a handle to the only member of the queue family.
+    // Get a handle to the first member of the queue family.
     vkGetDeviceQueue(device, graphicsQueueFamilyIndex, particularQueueIndex, &graphicsQueue);
 }
 
@@ -359,14 +383,11 @@ void RenderApplication::createVertexBuffer(){
 		vertexBuffer, vertexBufferMemory
 	);
 
-
 }
 
 void RenderApplication::writeToVertexBuffer(){
 
-
 	VkDeviceSize vertexArraySize = vertexArray.size() * sizeof(Vertex);
-
 
 	//create staging buffer
 	VkBuffer stagingBuffer;
@@ -458,7 +479,7 @@ void RenderApplication::writeToUniformBuffer(){
 
 	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3));
 	ubo.cameraPosition = cameraPosition;
-	ubo.matColor = glm::vec3(0, 0, 1);
+	ubo.matColor = glm::vec3(0, 1, 0);
 
     void* mappedMemory;
 
@@ -470,6 +491,27 @@ void RenderApplication::writeToUniformBuffer(){
 
 }
 
+void RenderApplication::createDiffuseTexture(){
+
+	Utils::createImage(
+		resolution,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		diffuseTexture,
+		diffuseTextureMemory
+	);
+}
+void RenderApplication::writeToDiffuseTexture(){
+
+}
+void RenderApplication::createDiffuseTextureView(){
+
+}
+void RenderApplication::createTextureSampler(){
+	Utils::createImageSampler(textureSampler);
+}
 
 void RenderApplication::createColorAttachmentImage() {
 
@@ -535,7 +577,6 @@ void RenderApplication::createDescriptorSetLayout() {
     uniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uniformBufferBinding.descriptorCount = 1;
     uniformBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
 
 
     //put all bindings in an array
@@ -857,10 +898,13 @@ void RenderApplication::createMainCommandBuffer() {
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(mainCommandBuffer, 0, 1, vertexBuffers, offsets);
 
+			//bind index buffer
 			vkCmdBindIndexBuffer(mainCommandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
+			//bind descriptor set
 			vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
+			//invoke graphics pipeline and draw
 			vkCmdDrawIndexed(mainCommandBuffer, (uint32_t)indexArray.size(), 1, 0, 0, 0);
 
 		vkCmdEndRenderPass(mainCommandBuffer);
@@ -928,6 +972,13 @@ void RenderApplication::cleanup() {
     //free uniform buffer
     vkDestroyBuffer(device, uniformBuffer, NULL);
 	vkFreeMemory(device, uniformBufferMemory, NULL);
+
+	//free diffuse texture
+	vkDestroyImage(device, diffuseTexture, NULL);
+	vkFreeMemory(device, diffuseTextureMemory, NULL);
+
+	//free sampler
+	vkDestroySampler(device, textureSampler, nullptr);
 
 	//free color attachment image
 	vkDestroyImageView(device, colorAttachmentImageView, NULL);
