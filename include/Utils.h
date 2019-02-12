@@ -48,7 +48,9 @@ class Utils{
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 	
 	static void loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray);
+	static void loadPNGToImage(const string imageName, VkImage &image, VkExtent2D &imageExtent);
 	static void exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels);
+
 	friend class RenderApplication;
 };
 

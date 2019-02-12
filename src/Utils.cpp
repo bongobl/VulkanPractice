@@ -203,8 +203,24 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 	VkPipelineStageFlags sourceStage, destinationStage;
 
 
+	//to allow for copying to
+	if(oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL){
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	//to allow shader to read
+	else if(oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL){
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
 	//depth buffer
-	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+	else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
 		barrier.srcAccessMask = 0;
 		barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
@@ -398,6 +414,52 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 
 }
 
+void Utils::loadPNGToImage(const string imageName, VkImage &image, VkExtent2D &imageExtent){
+
+	//Load image from disk
+	int numChannels = -1;
+	unsigned char* imageData = stbi_load(imageName.c_str(), (int*)&imageExtent.width, (int*)&imageExtent.height, &numChannels, STBI_rgb_alpha);
+	if (numChannels == -1) {
+        std::string error =  "Render Application::loadImage: failed to load image " + imageName + "\n";
+        throw std::runtime_error(error.c_str());
+    }
+
+	//debug output
+    cout << "loaded " << imageName << endl;
+    cout << "Num numChannels: " << numChannels << endl;
+    cout << "Width: " << imageExtent.width << endl << "Height: " << imageExtent.height << endl;
+
+	//define byte size and extent of image
+	VkDeviceSize imageSize = imageExtent.width * imageExtent.height * 4;
+
+	//Create Staging Buffer
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	Utils::createBuffer(
+		imageSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer, stagingBufferMemory
+	);
+
+	//copy image data over to staging buffer
+	void* mappedStagingBuffer;
+	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, imageSize, 0, &mappedStagingBuffer);
+	memcpy(mappedStagingBuffer, imageData, imageSize);
+	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
+
+	//copy image data to diffuse texture
+	Utils::copyBufferToImage(stagingBuffer, image, imageExtent);
+
+	//clean up staging buffer
+	vkDestroyBuffer(RenderApplication::device, stagingBuffer, NULL);
+	vkFreeMemory(RenderApplication::device, stagingBufferMemory, NULL);
+
+	//delete main memory copy of image
+	stbi_image_free(imageData);
+
+}
 void Utils::exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels) {
 
 	VkBuffer stagingBuffer;

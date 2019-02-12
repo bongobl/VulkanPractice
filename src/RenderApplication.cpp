@@ -45,11 +45,9 @@ uint32_t RenderApplication::graphicsQueueFamilyIndex;
 VkQueue RenderApplication::graphicsQueue;
 
 
-
-
 void RenderApplication::run() {
 
-	//add all required instance layers/extensions and device extensions
+	//add all requirements that this app will need from the device and instance
 	configureAllRequirements();
 
     // Initialize vulkan
@@ -261,15 +259,17 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 	//a queue family for our operations
 
 	//Check for support of required device features
-	VkPhysicalDeviceFeatures supportedFeatures;		//Not used 
-	vkGetPhysicalDeviceFeatures(potentialPhysicalDevice, &supportedFeatures);	//Not used
+	VkPhysicalDeviceFeatures supportedFeatures;
+	vkGetPhysicalDeviceFeatures(potentialPhysicalDevice, &supportedFeatures);
 
 	VkBool32* allRequired = (VkBool32*)&requiredDeviceFeatures;
 	VkBool32* allSupported = (VkBool32*)&supportedFeatures;
-	for(int i =  0; i< 55; ++i){
+	int numPossibleFeatures = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
+	
+	for(int i =  0; i < numPossibleFeatures; ++i){
 
 		if(allRequired[i] == VK_TRUE && allSupported[i] == VK_FALSE){
-			cout << "Feature not supported" << endl;
+			cout << "Physica Device Feature " << i << " not supported" << endl;
 			return false;
 		}
 	}
@@ -322,7 +322,7 @@ uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDev
         if ((currFamily.queueCount > 0) &&
 			(currFamily.queueFlags & requiredQueueTypes)){
 
-            // found a queue family with transfer and graphics. We're done!
+            // found a queue family with out required queue types, we're done
             break;
         }
     }
@@ -479,7 +479,7 @@ void RenderApplication::writeToUniformBuffer(){
 
 	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3));
 	ubo.cameraPosition = cameraPosition;
-	ubo.matColor = glm::vec3(0, 1, 0);
+	ubo.matColor = glm::vec3(1, 0, 0);
 
     void* mappedMemory;
 
@@ -502,12 +502,22 @@ void RenderApplication::createDiffuseTexture(){
 		diffuseTexture,
 		diffuseTextureMemory
 	);
+
+
 }
 void RenderApplication::writeToDiffuseTexture(){
 
+	//load in image data from disk
+	VkExtent2D diffuseTextureExtent;
+
+	//copy image data to diffuse texture
+	Utils::transitionImageLayout(diffuseTexture, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	Utils::loadPNGToImage("resources/images/rock.jpg", diffuseTexture, diffuseTextureExtent);
+	Utils::transitionImageLayout(diffuseTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
 }
 void RenderApplication::createDiffuseTextureView(){
-
+	Utils::createImageView(diffuseTexture, diffuseTextureView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 void RenderApplication::createTextureSampler(){
 	Utils::createImageSampler(textureSampler);
@@ -974,6 +984,7 @@ void RenderApplication::cleanup() {
 	vkFreeMemory(device, uniformBufferMemory, NULL);
 
 	//free diffuse texture
+	vkDestroyImageView(device, diffuseTextureView, NULL);
 	vkDestroyImage(device, diffuseTexture, NULL);
 	vkFreeMemory(device, diffuseTextureMemory, NULL);
 
