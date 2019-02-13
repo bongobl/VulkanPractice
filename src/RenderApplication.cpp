@@ -3,7 +3,7 @@
 
 
 //Initialize static members
-VkExtent2D RenderApplication::resolution = {1920,1080};
+VkExtent2D RenderApplication::resolution = {1280,720};
 std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
@@ -477,9 +477,9 @@ void RenderApplication::writeToUniformBuffer(){
 	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
 	ubo.projection[1][1] *= -1;
 
-	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3));
+	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
 	ubo.cameraPosition = cameraPosition;
-	ubo.matColor = glm::vec3(1, 0, 0);
+	ubo.matColor = glm::vec3(1, 1, 1);
 
     void* mappedMemory;
 
@@ -493,8 +493,9 @@ void RenderApplication::writeToUniformBuffer(){
 
 void RenderApplication::createDiffuseTexture(){
 
+	VkExtent2D temp = { 512,512 }; //NEED TO REFACTOR, DIFFUSE IMAGE NEEDS TO BE CALLED AFTER LOADING FROM DISK
 	Utils::createImage(
-		resolution,
+		temp,
 		VK_FORMAT_R8G8B8A8_UNORM,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -512,7 +513,7 @@ void RenderApplication::writeToDiffuseTexture(){
 
 	//copy image data to diffuse texture
 	Utils::transitionImageLayout(diffuseTexture, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	Utils::loadPNGToImage("resources/images/rock.jpg", diffuseTexture, diffuseTextureExtent);
+	Utils::createImageFromPNG("resources/images/rock.jpg", diffuseTexture, diffuseTextureExtent);
 	Utils::transitionImageLayout(diffuseTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 }
@@ -588,18 +589,24 @@ void RenderApplication::createDescriptorSetLayout() {
     uniformBufferBinding.descriptorCount = 1;
     uniformBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	samplerLayoutBinding.binding = 1;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding.pImmutableSamplers = NULL;
+	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 1> allBindings = {uniformBufferBinding};
+    std::array<VkDescriptorSetLayoutBinding, 2> allBindings = {uniformBufferBinding, samplerLayoutBinding};
 
     //create descriptor set layout for binding to a UBO
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
-    descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorSetLayoutCreateInfo.bindingCount = (uint32_t)allBindings.size(); //number of bindings
-    descriptorSetLayoutCreateInfo.pBindings = allBindings.data();
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = (uint32_t)allBindings.size(); //number of bindings
+    layoutInfo.pBindings = allBindings.data();
 
     // Create the descriptor set layout.
-    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &layoutInfo, NULL, &descriptorSetLayout));
 
 }
 
@@ -607,10 +614,11 @@ void RenderApplication::createDescriptorPool(){
 
 
 
-    std::array<VkDescriptorPoolSize, 1> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = 1;
-
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[1].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -633,6 +641,7 @@ void RenderApplication::createDescriptorSet() {
     descriptorSetAllocateInfo.descriptorSetCount = 1; // allocate a single descriptor set.
     descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
 
+
     // allocate descriptor set.
     VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet));
 
@@ -643,8 +652,15 @@ void RenderApplication::createDescriptorSet() {
     descriptorUniformBufferInfo.offset = 0;
     descriptorUniformBufferInfo.range = sizeof(UniformBufferObject);
 
+	// Specify the diffuse texture info
+	VkDescriptorImageInfo descriptorDiffuseTextureInfo = {};
+	descriptorDiffuseTextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	descriptorDiffuseTextureInfo.imageView = diffuseTextureView;
+	descriptorDiffuseTextureInfo.sampler = textureSampler;
 
-    std::array<VkWriteDescriptorSet, 1> descriptorWrites = {};
+
+
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
 
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = descriptorSet;
@@ -654,6 +670,13 @@ void RenderApplication::createDescriptorSet() {
     descriptorWrites[0].descriptorCount = 1;
     descriptorWrites[0].pBufferInfo = &descriptorUniformBufferInfo;
 
+	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[1].dstSet = descriptorSet;
+	descriptorWrites[1].dstBinding = 1;		//binding = 1
+	descriptorWrites[1].dstArrayElement = 0;
+	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[1].descriptorCount = 1;
+	descriptorWrites[1].pImageInfo = &descriptorDiffuseTextureInfo;
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);

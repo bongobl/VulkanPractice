@@ -414,7 +414,7 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 
 }
 
-void Utils::loadPNGToImage(const string imageName, VkImage &image, VkExtent2D &imageExtent){
+void Utils::createImageFromPNG(const string imageName, VkImage &image, VkExtent2D &imageExtent){
 
 	//Load image from disk
 	int numChannels = -1;
