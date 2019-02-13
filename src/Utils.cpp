@@ -414,10 +414,12 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 
 }
 
-void Utils::createImageFromPNG(const string imageName, VkImage &image, VkExtent2D &imageExtent){
+void Utils::createImageFromPNG(const string imageName, VkImage &image, VkDeviceMemory &imageMemory, VkImageLayout finalLayout){
 
 	//Load image from disk
 	int numChannels = -1;
+	VkExtent2D imageExtent;
+
 	unsigned char* imageData = stbi_load(imageName.c_str(), (int*)&imageExtent.width, (int*)&imageExtent.height, &numChannels, STBI_rgb_alpha);
 	if (numChannels == -1) {
         std::string error =  "Render Application::loadImage: failed to load image " + imageName + "\n";
@@ -449,8 +451,21 @@ void Utils::createImageFromPNG(const string imageName, VkImage &image, VkExtent2
 	memcpy(mappedStagingBuffer, imageData, imageSize);
 	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
 
+	//create output image
+	Utils::createImage(
+		imageExtent,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		image,
+		imageMemory
+	);
+
 	//copy image data to diffuse texture
+	Utils::transitionImageLayout(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	Utils::copyBufferToImage(stagingBuffer, image, imageExtent);
+	Utils::transitionImageLayout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout);
 
 	//clean up staging buffer
 	vkDestroyBuffer(RenderApplication::device, stagingBuffer, NULL);

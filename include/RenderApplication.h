@@ -151,7 +151,6 @@ private:
 	static void writeToUniformBuffer();
 
 	static void createDiffuseTexture();
-	static void writeToDiffuseTexture();
 	static void createDiffuseTextureView();
 
 	static void createTextureSampler();

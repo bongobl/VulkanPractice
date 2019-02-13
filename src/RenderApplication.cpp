@@ -72,7 +72,6 @@ void RenderApplication::run() {
     writeToUniformBuffer();
 
 	createDiffuseTexture();
-	writeToDiffuseTexture();
 	createDiffuseTextureView();
 	createTextureSampler();
 
@@ -463,7 +462,8 @@ void RenderApplication::createUniformBuffer(){
 		sizeof(UniformBufferObject),
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		uniformBuffer, uniformBufferMemory);
+		uniformBuffer, uniformBufferMemory
+	);
 
 }
 
@@ -493,30 +493,15 @@ void RenderApplication::writeToUniformBuffer(){
 
 void RenderApplication::createDiffuseTexture(){
 
-	VkExtent2D temp = { 512,512 }; //NEED TO REFACTOR, DIFFUSE IMAGE NEEDS TO BE CALLED AFTER LOADING FROM DISK
-	Utils::createImage(
-		temp,
-		VK_FORMAT_R8G8B8A8_UNORM,
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		diffuseTexture,
-		diffuseTextureMemory
+	Utils::createImageFromPNG(
+		"resources/images/rock.jpg",	//File name on Disk
+		diffuseTexture,					//image
+		diffuseTextureMemory,			//image memory
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL	//Layout of image
 	);
 
-
 }
-void RenderApplication::writeToDiffuseTexture(){
 
-	//load in image data from disk
-	VkExtent2D diffuseTextureExtent;
-
-	//copy image data to diffuse texture
-	Utils::transitionImageLayout(diffuseTexture, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	Utils::createImageFromPNG("resources/images/rock.jpg", diffuseTexture, diffuseTextureExtent);
-	Utils::transitionImageLayout(diffuseTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-}
 void RenderApplication::createDiffuseTextureView(){
 	Utils::createImageView(diffuseTexture, diffuseTextureView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
