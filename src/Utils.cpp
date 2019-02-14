@@ -431,7 +431,7 @@ void Utils::createImageFromPNG(const string imageName, VkImage &image, VkDeviceM
     cout << "Num numChannels: " << numChannels << endl;
     cout << "Width: " << imageExtent.width << endl << "Height: " << imageExtent.height << endl;
 
-	//define byte size and extent of image
+	//define byte size of image
 	VkDeviceSize imageSize = imageExtent.width * imageExtent.height * 4;
 
 	//Create Staging Buffer
@@ -462,7 +462,7 @@ void Utils::createImageFromPNG(const string imageName, VkImage &image, VkDeviceM
 		imageMemory
 	);
 
-	//copy image data to diffuse texture
+	//copy image data from staging buffer to output image
 	Utils::transitionImageLayout(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	Utils::copyBufferToImage(stagingBuffer, image, imageExtent);
 	Utils::transitionImageLayout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout);
@@ -471,30 +471,34 @@ void Utils::createImageFromPNG(const string imageName, VkImage &image, VkDeviceM
 	vkDestroyBuffer(RenderApplication::device, stagingBuffer, NULL);
 	vkFreeMemory(RenderApplication::device, stagingBufferMemory, NULL);
 
-	//delete main memory copy of image
+	//delete image fram main memory
 	stbi_image_free(imageData);
 
 }
 void Utils::exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels) {
 
+	//define image byte size
+	VkDeviceSize bufferByteSize = dimensions.width * dimensions.height * numChannels;
+
+	//create staging buffer
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 
-	VkDeviceSize bufferByteSize = dimensions.width * dimensions.height * numChannels;
+	Utils::createBuffer(
+		bufferByteSize, 
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, 
+		stagingBuffer, 
+		stagingBufferMemory
+	);
 
-	Utils::createBuffer(bufferByteSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
-
-
+	//copy image data from image to buffer
 	Utils::copyImageToBuffer(stagingBuffer, outputImage, dimensions);
 
-	//map staging buffer memory so we can export it
-	void* mappedMemory;
-	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, bufferByteSize, 0, &mappedMemory);
-
-	//write output image to disk as a png
-	stbi_write_png(fileName.c_str(), dimensions.width, dimensions.height, numChannels, mappedMemory, dimensions.width * numChannels);
-
-	//unmap staging buffer memory
+	//map staging buffer memory and export it
+	void* mappedStagingBuffer;
+	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, bufferByteSize, 0, &mappedStagingBuffer);
+	stbi_write_png(fileName.c_str(), dimensions.width, dimensions.height, numChannels, mappedStagingBuffer, dimensions.width * numChannels);
 	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
 
 

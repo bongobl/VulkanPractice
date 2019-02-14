@@ -61,6 +61,7 @@ void RenderApplication::run() {
     createDescriptorPool();
     createCommandPool();
 
+    //create all device data
     loadVertexAndIndexArrays();
     createVertexBuffer();
     writeToVertexBuffer();
@@ -85,7 +86,7 @@ void RenderApplication::run() {
 	//create descriptors
     createDescriptorSet();
 
-    //for graphics
+    //create rendering utils
 	createRenderPass();
 	createFrameBuffer();
     createGraphicsPipeline();
@@ -94,6 +95,7 @@ void RenderApplication::run() {
     createMainCommandBuffer();
 
     cout << "Rendering Scene" << endl;
+
     // Finally, run the recorded command buffer.
     runMainCommandBuffer();
 
@@ -268,7 +270,7 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 	for(int i =  0; i < numPossibleFeatures; ++i){
 
 		if(allRequired[i] == VK_TRUE && allSupported[i] == VK_FALSE){
-			cout << "Physica Device Feature " << i << " not supported" << endl;
+			cout << "Physical Device Feature " << i << " not supported" << endl;
 			return false;
 		}
 	}
