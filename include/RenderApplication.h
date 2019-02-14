@@ -153,6 +153,9 @@ private:
 	static void createDiffuseTexture();
 	static void createDiffuseTextureView();
 
+	static void createEnvironmentMap();
+	static void createEnvironmentMapView();
+
 	static void createTextureSampler();
 	
 	static void createColorAttachmentImage();

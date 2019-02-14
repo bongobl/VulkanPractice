@@ -3,7 +3,7 @@
 
 
 //Initialize static members
-VkExtent2D RenderApplication::resolution = {1280,720};
+VkExtent2D RenderApplication::resolution = {1280,980};
 std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
@@ -74,6 +74,10 @@ void RenderApplication::run() {
 
 	createDiffuseTexture();
 	createDiffuseTextureView();
+
+	createEnvironmentMap();
+	createEnvironmentMapView();
+
 	createTextureSampler();
 
 	createColorAttachmentImage();
@@ -473,7 +477,7 @@ void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 
-	glm::vec3 cameraPosition(0, 4, 9);
+	glm::vec3 cameraPosition(0, 12, 7);
 	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
@@ -495,7 +499,7 @@ void RenderApplication::writeToUniformBuffer(){
 
 void RenderApplication::createDiffuseTexture(){
 
-	Utils::createImageFromPNG(
+	Utils::createImageFromFile(
 		"resources/images/rock.jpg",	//File name on Disk
 		diffuseTexture,					//image
 		diffuseTextureMemory,			//image memory
@@ -507,6 +511,26 @@ void RenderApplication::createDiffuseTexture(){
 void RenderApplication::createDiffuseTextureView(){
 	Utils::createImageView(diffuseTexture, diffuseTextureView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
+
+void RenderApplication::createEnvironmentMap() {
+
+	VkImage testImage;
+	VkDeviceMemory testImageMemory;
+	std::vector<string> faceNames;
+	faceNames.push_back("resources/images/ocean view/right.jpg");
+	faceNames.push_back("resources/images/ocean view/left.jpg");
+	faceNames.push_back("resources/images/ocean view/top.jpg");
+	faceNames.push_back("resources/images/ocean view/bottom.jpg");
+	faceNames.push_back("resources/images/ocean view/back.jpg");
+	faceNames.push_back("resources/images/ocean view/front.jpg");
+	Utils::createCubeMapImageFromFile(faceNames, testImage, testImageMemory, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+}
+
+void RenderApplication::createEnvironmentMapView() {
+
+}
+
 void RenderApplication::createTextureSampler(){
 	Utils::createImageSampler(textureSampler);
 }

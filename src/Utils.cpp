@@ -19,7 +19,8 @@
 #include <map>
 
 
-void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
+void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
+	VkMemoryPropertyFlags propertyFlags, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
 	
 
 	//create buffer
@@ -45,7 +46,8 @@ void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPr
 	VK_CHECK_RESULT(vkBindBufferMemory(RenderApplication::device, buffer, bufferMemory, 0));
 }
 
-void Utils::createImage(VkExtent2D dimensions, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags propertyFlags, VkImage &image, VkDeviceMemory& imageMemory) {
+void Utils::createImage(VkExtent2D dimensions, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, 
+	VkMemoryPropertyFlags propertyFlags, VkImage &image, VkDeviceMemory& imageMemory, bool cubeMapFlag) {
 	
 	//Texture Image
 	VkImageCreateInfo imageInfo = {};
@@ -92,7 +94,8 @@ void Utils::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size
 	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
 }
 
-void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat format, VkImageAspectFlags aspectFlags) {
+void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat format, 
+	VkImageAspectFlags aspectFlags, bool cubeMapFalg) {
 
 	VkImageViewCreateInfo imageViewCreateInfo = {};
 	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -108,7 +111,7 @@ void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat form
 	VK_CHECK_RESULT(vkCreateImageView(RenderApplication::device, &imageViewCreateInfo, NULL, &imageView));
 }
 
-void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions) {
+void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions, bool cubeMapFlag) {
 
 	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
 
@@ -175,7 +178,7 @@ void Utils::copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDi
 }
 
 
-void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
+void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, bool cubeMapFlag) {
 
 	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
 
@@ -414,7 +417,8 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 
 }
 
-void Utils::createImageFromPNG(const string imageName, VkImage &image, VkDeviceMemory &imageMemory, VkImageLayout finalLayout){
+
+void Utils::createImageFromFile(const string imageName, VkImage &image, VkDeviceMemory &imageMemory, VkImageLayout finalLayout){
 
 	//Load image from disk
 	int numChannels = -1;
@@ -475,6 +479,71 @@ void Utils::createImageFromPNG(const string imageName, VkImage &image, VkDeviceM
 	stbi_image_free(imageData);
 
 }
+
+void Utils::createCubeMapImageFromFile(const std::vector<string> imageNames, VkImage &image, VkDeviceMemory &deviceMemory, VkImageLayout finalLayout) {
+
+	unsigned char* imageData[6];
+	VkExtent2D imageExtent;
+
+	for (int i = 0; i < 6; ++i) {
+
+		//Load image from disk
+		int numChannels = -1;
+		
+		imageData[i] = stbi_load(imageNames[i].c_str(), (int*)&imageExtent.width, (int*)&imageExtent.height, &numChannels, STBI_rgb_alpha);
+		if (numChannels == -1) {
+			std::string error = "Render Application::loadImage: failed to load image " + imageNames[i] + "\n";
+			throw std::runtime_error(error.c_str());
+		}
+		//debug output
+		cout << "\nloaded " << imageNames[i] << endl;
+		cout << "Num numChannels: " << numChannels << endl;
+		cout << "Width: " << imageExtent.width << endl << "Height: " << imageExtent.height << endl << endl;
+	}
+
+	
+	//define byte size of image
+	VkDeviceSize faceSize = imageExtent.width * imageExtent.height * 4;
+	VkDeviceSize cubeMapSize = faceSize * 6;
+
+	//Create Staging Buffer
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	Utils::createBuffer(
+		cubeMapSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer, stagingBufferMemory
+	);
+
+	
+	//copy image data over to staging buffer
+	void* mappedStagingBuffer;
+	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, cubeMapSize, 0, &mappedStagingBuffer);
+
+
+	for (int i = 0; i < 6; ++i) {
+		memcpy((unsigned char*)mappedStagingBuffer + (faceSize * i), imageData[i], faceSize);
+	}
+	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
+	
+	/*
+		Fill in implementation to copy from staging buffer to image
+	
+	*/
+
+	//clean up staging buffer
+	vkDestroyBuffer(RenderApplication::device, stagingBuffer, NULL);
+	vkFreeMemory(RenderApplication::device, stagingBufferMemory, NULL);
+
+	//delete all images fram main memory
+	for (int i = 0; i < 6; ++i) {
+		stbi_image_free(imageData[i]);
+	}
+	
+}
+
 void Utils::exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels) {
 
 	//define image byte size

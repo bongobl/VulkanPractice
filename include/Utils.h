@@ -31,13 +31,20 @@ struct UniformBufferObject {
 
 class Utils{
 
-	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
-	static void createImage(VkExtent2D dimensions, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory);
+	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
+		VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+
+	static void createImage(VkExtent2D dimensions, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, 
+		VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory, bool cubeMapFlag = false);
+
 	static void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-	static void createImageView(VkImage image, VkImageView &imageView, VkFormat format, VkImageAspectFlags aspectFlags);
-	static void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions);
+	static void createImageView(VkImage image, VkImageView &imageView, 
+		VkFormat format, VkImageAspectFlags aspectFlags, bool cubeMapFlag = false);
+
+	static void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions, bool cubeMapFlag = false);
 	static void copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions);
-	static void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
+	static void transitionImageLayout(VkImage image, VkImageLayout oldLayout, 
+		VkImageLayout newLayout, bool cubeMapFlag = false);
 	
 	static VkCommandBuffer beginSingleTimeCommandBuffer();
 	static void endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer);
@@ -48,7 +55,12 @@ class Utils{
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 	
 	static void loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray);
-	static void createImageFromPNG(const string imageName, VkImage &image, VkDeviceMemory &imageMemory, VkImageLayout finalLayout);
+	static void createImageFromFile(const string imageName, VkImage &image, 
+		VkDeviceMemory &imageMemory, VkImageLayout finalLayout);
+
+	static void createCubeMapImageFromFile(const std::vector<string> imageNames, 
+		VkImage &image, VkDeviceMemory &deviceMemory, VkImageLayout finalLayout);
+
 	static void exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels);
 
 	friend class RenderApplication;
