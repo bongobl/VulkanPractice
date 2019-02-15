@@ -69,6 +69,11 @@ class RenderApplication{
 	static VkDeviceMemory diffuseTextureMemory;
 	static VkImageView diffuseTextureView;
 
+	//for our environment map
+	static VkImage environmentMap;
+	static VkDeviceMemory environmentMapMemory;
+	static VkImageView environmentMapView;
+
 	//to sample image textures
 	static VkSampler textureSampler;
 

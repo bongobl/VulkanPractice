@@ -25,6 +25,9 @@ VkDeviceMemory RenderApplication::uniformBufferMemory;
 VkImage RenderApplication::diffuseTexture;
 VkDeviceMemory RenderApplication::diffuseTextureMemory;
 VkImageView RenderApplication::diffuseTextureView;
+VkImage RenderApplication::environmentMap;
+VkDeviceMemory RenderApplication::environmentMapMemory;
+VkImageView RenderApplication::environmentMapView;
 VkSampler RenderApplication::textureSampler;
 VkImage RenderApplication::colorAttachmentImage;
 VkDeviceMemory RenderApplication::colorAttachmentImageMemory;
@@ -500,7 +503,7 @@ void RenderApplication::writeToUniformBuffer(){
 void RenderApplication::createDiffuseTexture(){
 
 	Utils::createImageFromFile(
-		"resources/images/rock.jpg",	//File name on Disk
+		"resources/images/steel.jpg",	//File name on Disk
 		diffuseTexture,					//image
 		diffuseTextureMemory,			//image memory
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL	//Layout of image
@@ -514,8 +517,6 @@ void RenderApplication::createDiffuseTextureView(){
 
 void RenderApplication::createEnvironmentMap() {
 
-	VkImage testImage;
-	VkDeviceMemory testImageMemory;
 	std::vector<string> faceNames;
 	faceNames.push_back("resources/images/ocean view/right.jpg");
 	faceNames.push_back("resources/images/ocean view/left.jpg");
@@ -523,7 +524,7 @@ void RenderApplication::createEnvironmentMap() {
 	faceNames.push_back("resources/images/ocean view/bottom.jpg");
 	faceNames.push_back("resources/images/ocean view/back.jpg");
 	faceNames.push_back("resources/images/ocean view/front.jpg");
-	Utils::createCubeMapImageFromFile(faceNames, testImage, testImageMemory, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	Utils::createCubeMapImageFromFile(faceNames, environmentMap, environmentMapMemory, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 }
 
