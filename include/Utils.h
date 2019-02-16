@@ -59,7 +59,7 @@ class Utils{
 		VkDeviceMemory &imageMemory, VkImageLayout finalLayout);
 
 	static void createCubeMapImageFromFile(const std::vector<string> imageNames, 
-		VkImage &image, VkDeviceMemory &deviceMemory, VkImageLayout finalLayout);
+		VkImage &image, VkDeviceMemory &imageMemory, VkImageLayout finalLayout);
 
 	static void exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels);
 

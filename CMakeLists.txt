@@ -32,6 +32,7 @@ include_directories(${ALL_INCLUDE_DIRECTORIES})
 
 add_executable(BasicVulkanRender "${SRC_FILES}")
 
+#sets the working director to the this directory
 #set_target_properties(BasicVulkanRender PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 target_link_libraries(BasicVulkanRender ${ALL_LIBS} )

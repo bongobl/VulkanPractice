@@ -32,7 +32,7 @@ class RenderApplication{
 	static VkPhysicalDeviceFeatures requiredDeviceFeatures;
 
 	//To store the flag bits specifying which queue types our application needs
-	static VkQueueFlags requiredQueueTypes;
+	static std::vector<VkQueueFlags> requiredQueueTypes;
 
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;

@@ -8,7 +8,7 @@ std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
 VkPhysicalDeviceFeatures RenderApplication::requiredDeviceFeatures = {};
-VkQueueFlags RenderApplication::requiredQueueTypes;
+std::vector<VkQueueFlags> RenderApplication::requiredQueueTypes;
 
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
@@ -131,9 +131,9 @@ void RenderApplication::configureAllRequirements(){
 	//specify required device features 
 	requiredDeviceFeatures.samplerAnisotropy = VK_TRUE;
 
-	//specify what capabilities we need from a queue
-	requiredQueueTypes = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT;
-	
+	//specify what capabilities we need from a queue	
+	requiredQueueTypes.push_back(VK_QUEUE_GRAPHICS_BIT);
+	requiredQueueTypes.push_back(VK_QUEUE_TRANSFER_BIT); 
 }
 void RenderApplication::createInstance() {
 
@@ -246,6 +246,7 @@ void RenderApplication::findPhysicalDevice() {
     if (physicalDeviceCount == 0) {
         throw std::runtime_error("could not find a device with vulkan support");
     }
+
     std::vector<VkPhysicalDevice> allPhysicalDevices(physicalDeviceCount);
     vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, allPhysicalDevices.data());
 
@@ -258,7 +259,7 @@ void RenderApplication::findPhysicalDevice() {
 		}
     }
 
-	throw std::runtime_error("Could not load find a valid physical device for our operations");
+	throw std::runtime_error("Error: Could not load find a valid physical device for our operations");
 }
 
 bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice, uint32_t &familyIndex) {
@@ -327,12 +328,22 @@ uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDev
     for (currFamilyIndex = 0; currFamilyIndex < queueFamilies.size(); ++currFamilyIndex) {
         VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
 
-        if ((currFamily.queueCount > 0) &&
-			(currFamily.queueFlags & requiredQueueTypes)){
 
-            // found a queue family with out required queue types, we're done
-            break;
-        }
+		if (currFamily.queueCount > 0) {
+
+			bool hasAllQueueTypes = true;
+			for (int i = 0; i < requiredQueueTypes.size(); ++i) {
+				if (! (currFamily.queueFlags & requiredQueueTypes[i])) {
+					hasAllQueueTypes = false;
+					break;
+				}
+			}
+			if (hasAllQueueTypes) {
+
+				// found a queue family with out required queue types, we're done
+				break;
+			}
+		}
     }
 
     if (currFamilyIndex == queueFamilies.size()) {
@@ -529,7 +540,7 @@ void RenderApplication::createEnvironmentMap() {
 }
 
 void RenderApplication::createEnvironmentMapView() {
-
+	Utils::createImageView(environmentMap, environmentMapView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, true);
 }
 
 void RenderApplication::createTextureSampler(){
@@ -601,6 +612,7 @@ void RenderApplication::createDescriptorSetLayout() {
     uniformBufferBinding.descriptorCount = 1;
     uniformBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+	//define a binding for a combined image sampler
 	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
 	samplerLayoutBinding.binding = 1;
 	samplerLayoutBinding.descriptorCount = 1;
@@ -623,7 +635,6 @@ void RenderApplication::createDescriptorSetLayout() {
 }
 
 void RenderApplication::createDescriptorPool(){
-
 
 
     std::array<VkDescriptorPoolSize, 2> poolSizes = {};
@@ -875,6 +886,8 @@ void RenderApplication::createGraphicsPipeline(){
 	//Create Pipeline Layout
 	VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, &pipelineLayout));
 
+
+	//Info to create graphics pipeline
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipelineInfo.stageCount = 2;
@@ -962,7 +975,7 @@ void RenderApplication::createMainCommandBuffer() {
 void RenderApplication::runMainCommandBuffer() {
 
 
-    //Now we shall finally submit the recorded command buffer to a the compute queue.
+    //Now we shall finally submit the recorded command buffer to our graphics queue.
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1; // submit a single command buffer
@@ -975,7 +988,7 @@ void RenderApplication::runMainCommandBuffer() {
     fenceCreateInfo.flags = 0;
     VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &fence));
 
-    //We submit the command buffer on the queue, at the same time giving a fence.
+    //We submit the command buffer on the graphics queue, at the same time giving a fence.
     VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence));
 
     VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
@@ -987,12 +1000,9 @@ void RenderApplication::runMainCommandBuffer() {
 
 void RenderApplication::exportAsImage(){
 
-
 	//NOTE: We don't need to transition the color attachment layout image to VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL since the render pass already did for us
 
 	Utils::exportImageAsPNG(colorAttachmentImage, resolution, "Rendered Image.png",4);
-
-
 }
 void RenderApplication::cleanup() {
 
@@ -1001,7 +1011,7 @@ void RenderApplication::cleanup() {
 		// destroy callback.
 		auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
 		if (func == nullptr) {
-			throw std::runtime_error("Could not load vkDestroyDebugReportCallbackEXT");
+			throw std::runtime_error("Error: Could not load vkDestroyDebugReportCallbackEXT");
 		}
 		func(instance, debugReportCallback, NULL);
 	}
@@ -1022,6 +1032,11 @@ void RenderApplication::cleanup() {
 	vkDestroyImageView(device, diffuseTextureView, NULL);
 	vkDestroyImage(device, diffuseTexture, NULL);
 	vkFreeMemory(device, diffuseTextureMemory, NULL);
+
+	//free environment map texture
+	vkDestroyImageView(device, environmentMapView, NULL);
+	vkDestroyImage(device, environmentMap, NULL);
+	vkFreeMemory(device, environmentMapMemory, NULL);
 
 	//free sampler
 	vkDestroySampler(device, textureSampler, nullptr);

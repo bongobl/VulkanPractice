@@ -66,6 +66,11 @@ void Utils::createImage(VkExtent2D dimensions, VkFormat format, VkImageTiling ti
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.flags = 0;
 
+	if (cubeMapFlag) {
+		imageInfo.arrayLayers = 6;
+		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+	}
+
 	VK_CHECK_RESULT(vkCreateImage(RenderApplication::device, &imageInfo, NULL, &image));
 
 	//Texture Image Memory
@@ -95,7 +100,7 @@ void Utils::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size
 }
 
 void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat format, 
-	VkImageAspectFlags aspectFlags, bool cubeMapFalg) {
+	VkImageAspectFlags aspectFlags, bool cubeMapFlag) {
 
 	VkImageViewCreateInfo imageViewCreateInfo = {};
 	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -107,6 +112,11 @@ void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat form
 	imageViewCreateInfo.subresourceRange.levelCount = 1;
 	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
 	imageViewCreateInfo.subresourceRange.layerCount = 1;
+
+	if (cubeMapFlag) {
+		imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+		imageViewCreateInfo.subresourceRange.layerCount = 6;
+	}
 
 	VK_CHECK_RESULT(vkCreateImageView(RenderApplication::device, &imageViewCreateInfo, NULL, &imageView));
 }
@@ -125,6 +135,9 @@ void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDi
 	region.imageSubresource.baseArrayLayer = 0;
 	region.imageSubresource.layerCount = 1;
 
+	if (cubeMapFlag) {
+		region.imageSubresource.layerCount = 6;
+	}
 	region.imageOffset = { 0,0,0 };
 	region.imageExtent = {
 		imageDimensions.width,
@@ -190,12 +203,10 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.image = image;
-	
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
 	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
 		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	}
-	else {
-		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	}
 
 	barrier.subresourceRange.baseMipLevel = 0;
@@ -203,6 +214,9 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 	barrier.subresourceRange.baseArrayLayer = 0;
 	barrier.subresourceRange.layerCount = 1;
 
+	if (cubeMapFlag) {
+		barrier.subresourceRange.layerCount = 6;
+	}
 	VkPipelineStageFlags sourceStage, destinationStage;
 
 
@@ -480,7 +494,7 @@ void Utils::createImageFromFile(const string imageName, VkImage &image, VkDevice
 
 }
 
-void Utils::createCubeMapImageFromFile(const std::vector<string> imageNames, VkImage &image, VkDeviceMemory &deviceMemory, VkImageLayout finalLayout) {
+void Utils::createCubeMapImageFromFile(const std::vector<string> imageNames, VkImage &image, VkDeviceMemory &imageMemory, VkImageLayout finalLayout) {
 
 	unsigned char* imageData[6];
 	VkExtent2D imageExtent;
@@ -528,10 +542,22 @@ void Utils::createCubeMapImageFromFile(const std::vector<string> imageNames, VkI
 	}
 	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
 	
-	/*
-		Fill in implementation to copy from staging buffer to image
-	
-	*/
+	//create output image
+	Utils::createImage(
+		imageExtent,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		image,
+		imageMemory,
+		true
+	);
+
+	//copy image data from staging buffer to output image
+	Utils::transitionImageLayout(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, true);
+	Utils::copyBufferToImage(stagingBuffer, image, imageExtent, true);
+	Utils::transitionImageLayout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout, true);
 
 	//clean up staging buffer
 	vkDestroyBuffer(RenderApplication::device, stagingBuffer, NULL);
