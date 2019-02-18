@@ -22,7 +22,7 @@ struct UniformBufferObject {
 	glm::mat4 projection;
 
 	glm::vec3 lightDirection;
-	float padding;
+	float textureParam;
 	glm::vec3 cameraPosition;
 	float padding2;
 	glm::vec3 matColor;

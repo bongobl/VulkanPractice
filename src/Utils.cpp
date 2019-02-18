@@ -427,7 +427,7 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 			}
 		}
 	}
-	cout << "Model " << modelFilename << " loaded with " << vertexArray.size() << " vertices and " << (indexArray.size() / 3) << " triangles" << endl;
+	cout << "Model " << modelFilename << " loaded with " << vertexArray.size() << " vertices and " << (indexArray.size() / 3) << " triangles" << endl << endl;
 
 }
 

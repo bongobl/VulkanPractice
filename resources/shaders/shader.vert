@@ -13,7 +13,7 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 projection;
 
     vec3 lightDirection;
-    float padding;
+    float textureParam;
     vec3 cameraPosition;
     float padding2;
     vec3 matColor;
@@ -28,8 +28,9 @@ layout(location = 1) out vec3 modelSpaceNormal;
 layout(location = 2) out vec2 texCoord;
 layout(location = 3) out mat4 modelMatrix;
 layout(location = 7) out vec3 lightDirection;
-layout(location = 8) out vec3 cameraPosition;
-layout(location = 9) out vec3 matColor;
+layout(location = 8) out float textureParam;
+layout(location = 9) out vec3 cameraPosition;
+layout(location = 10) out vec3 matColor;
 
 
 void main() {
@@ -41,6 +42,7 @@ void main() {
     modelMatrix = ubo.model;
 
     lightDirection = ubo.lightDirection;
+	textureParam = ubo.textureParam;
     cameraPosition = ubo.cameraPosition;
     matColor = ubo.matColor;
 }

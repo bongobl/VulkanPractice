@@ -491,13 +491,14 @@ void RenderApplication::writeToUniformBuffer(){
 
     UniformBufferObject ubo;
 
-	glm::vec3 cameraPosition(0, 12, 7);
+	glm::vec3 cameraPosition(0, 8, 9);
 	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
 	ubo.projection[1][1] *= -1;
 
 	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
+	ubo.textureParam = 0.7f;
 	ubo.cameraPosition = cameraPosition;
 	ubo.matColor = glm::vec3(1, 1, 1);
 
@@ -605,23 +606,32 @@ void RenderApplication::createFrameBuffer() {
 }
 void RenderApplication::createDescriptorSetLayout() {
 
-    //define a binding for a UBO
+    //define a binding for out UBO
     VkDescriptorSetLayoutBinding uniformBufferBinding = {};
     uniformBufferBinding.binding = 0;	//binding = 0
     uniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uniformBufferBinding.descriptorCount = 1;
     uniformBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-	//define a binding for a combined image sampler
-	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-	samplerLayoutBinding.binding = 1;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = NULL;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	//define a binding for our diffuse texture
+	VkDescriptorSetLayoutBinding diffuseTextureBinding = {};
+	diffuseTextureBinding.binding = 1;
+	diffuseTextureBinding.descriptorCount = 1;
+	diffuseTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	diffuseTextureBinding.pImmutableSamplers = NULL;
+	diffuseTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	//define a binding for our environment map
+	VkDescriptorSetLayoutBinding environmentMapBinding = {};
+	environmentMapBinding.binding = 2;
+	environmentMapBinding.descriptorCount = 1;
+	environmentMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	environmentMapBinding.pImmutableSamplers = NULL;
+	environmentMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 2> allBindings = {uniformBufferBinding, samplerLayoutBinding};
+    std::array<VkDescriptorSetLayoutBinding, 3> allBindings = {uniformBufferBinding, diffuseTextureBinding, environmentMapBinding };
 
     //create descriptor set layout for binding to a UBO
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
@@ -637,11 +647,13 @@ void RenderApplication::createDescriptorSetLayout() {
 void RenderApplication::createDescriptorPool(){
 
 
-    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 3> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = 1;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[1].descriptorCount = 1;
+	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[2].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -681,9 +693,14 @@ void RenderApplication::createDescriptorSet() {
 	descriptorDiffuseTextureInfo.imageView = diffuseTextureView;
 	descriptorDiffuseTextureInfo.sampler = textureSampler;
 
+	// Specify the envirmnemt map info
+	VkDescriptorImageInfo descriptorEnvironmentMapInfo = {};
+	descriptorEnvironmentMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	descriptorEnvironmentMapInfo.imageView = environmentMapView;
+	descriptorEnvironmentMapInfo.sampler = textureSampler;
 
 
-    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
 
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = descriptorSet;
@@ -700,6 +717,14 @@ void RenderApplication::createDescriptorSet() {
 	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	descriptorWrites[1].descriptorCount = 1;
 	descriptorWrites[1].pImageInfo = &descriptorDiffuseTextureInfo;
+
+	descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[2].dstSet = descriptorSet;
+	descriptorWrites[2].dstBinding = 2;		//binding = 2
+	descriptorWrites[2].dstArrayElement = 0;
+	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[2].descriptorCount = 1;
+	descriptorWrites[2].pImageInfo = &descriptorEnvironmentMapInfo;
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
