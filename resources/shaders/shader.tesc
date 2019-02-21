@@ -4,16 +4,16 @@
 //Layout specification.
 layout (vertices = 3) out;
  
-//In parameters.
+//In parameters
 layout (location = 0) in vec3 vertexPositions[];
 layout (location = 1) in vec3 vertexNormals[];
 layout (location = 2) in vec2 vertexTexCoords[];
 
 
-//Out parameters.
-layout (location = 0) out vec3 positions[];
-layout (location = 1) out vec3 normals[];
-layout (location = 2) out vec2 texCoords[];
+//Out parameters
+layout (location = 0) out vec3 contPointPositions[];
+layout (location = 1) out vec3 contPointNormals[];
+layout (location = 2) out vec2 contPointTexCoords[];
 
 
 
@@ -28,9 +28,9 @@ vec3 GetMiddlePoint(vec3 v1, vec3 v2, vec3 v3){
 void main()
 {   
     //Pass along the values to the tessellation evaluation shader.
-    positions[gl_InvocationID] = vertexPositions[gl_InvocationID];
-    texCoords[gl_InvocationID] = vertexTexCoords[gl_InvocationID];
-    normals[gl_InvocationID] = vertexNormals[gl_InvocationID];
+    contPointPositions[gl_InvocationID] = vertexPositions[gl_InvocationID];
+    contPointNormals[gl_InvocationID] = vertexNormals[gl_InvocationID];
+    contPointTexCoords[gl_InvocationID] = vertexTexCoords[gl_InvocationID];
 
     
  

@@ -60,9 +60,11 @@ class RenderApplication{
 	static VkBuffer indexBuffer;
 	static VkDeviceMemory indexBufferMemory;
 
-    //Uniform buffer used to pass simple parameters to compute shader
-	static VkBuffer uniformBuffer;
-	static VkDeviceMemory uniformBufferMemory;
+    //Uniform buffers used to pass simple parameters to compute shader
+	static VkBuffer vertexUBO;
+	static VkDeviceMemory vertexUBOMemory;
+	static VkBuffer fragmentUBO;
+	static VkDeviceMemory fragmentUBOMemory;
 
 	//for our diffuse image
 	static VkImage diffuseTexture;
@@ -152,8 +154,8 @@ private:
     static void createIndexBuffer();
     static void writeToIndexBuffer();
 
-	static void createUniformBuffer();
-	static void writeToUniformBuffer();
+	static void createUniformBuffers();
+	static void writeToUniformBuffers();
 
 	static void createDiffuseTexture();
 	static void createDiffuseTextureView();

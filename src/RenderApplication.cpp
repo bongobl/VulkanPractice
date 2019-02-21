@@ -20,8 +20,10 @@ VkBuffer RenderApplication::vertexBuffer;
 VkDeviceMemory RenderApplication::vertexBufferMemory;
 VkBuffer RenderApplication::indexBuffer;
 VkDeviceMemory RenderApplication::indexBufferMemory;
-VkBuffer RenderApplication::uniformBuffer;
-VkDeviceMemory RenderApplication::uniformBufferMemory;
+VkBuffer RenderApplication::vertexUBO;
+VkDeviceMemory RenderApplication::vertexUBOMemory;
+VkBuffer RenderApplication::fragmentUBO;
+VkDeviceMemory RenderApplication::fragmentUBOMemory;
 VkImage RenderApplication::diffuseTexture;
 VkDeviceMemory RenderApplication::diffuseTextureMemory;
 VkImageView RenderApplication::diffuseTextureView;
@@ -72,8 +74,8 @@ void RenderApplication::run() {
     createIndexBuffer();
     writeToIndexBuffer();
 
-    createUniformBuffer();
-    writeToUniformBuffer();
+    createUniformBuffers();
+    writeToUniformBuffers();
 
 	createDiffuseTexture();
 	createDiffuseTextureView();
@@ -477,39 +479,55 @@ void RenderApplication::writeToIndexBuffer(){
 	vkFreeMemory(device, stagingBufferMemory, NULL);
 }
 
-void RenderApplication::createUniformBuffer(){
+void RenderApplication::createUniformBuffers(){
 
+	//Create UBO for vertex shader data
 	Utils::createBuffer(
-		sizeof(UniformBufferObject),
+		sizeof(UniformVertexData),
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		uniformBuffer, uniformBufferMemory
+		vertexUBO, vertexUBOMemory
+	);
+
+	//Create UBO for fragment shader data
+	Utils::createBuffer(
+		sizeof(UniformFragmentData),
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+		fragmentUBO, fragmentUBOMemory
 	);
 
 }
 
-void RenderApplication::writeToUniformBuffer(){
+void RenderApplication::writeToUniformBuffers(){
 
-    UniformBufferObject ubo;
+	void* mappedMemory;
+
+	//Copy over Vertex Shader UBO
+    UniformVertexData uboVertexData;
 
 	glm::vec3 cameraPosition(0, 8, 9);
-	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
-	ubo.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	ubo.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
-	ubo.projection[1][1] *= -1;
+	uboVertexData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	uboVertexData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	uboVertexData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
+	uboVertexData.projection[1][1] *= -1;
 
-	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
-	ubo.textureParam = 0.77f;
-	ubo.cameraPosition = cameraPosition;
-	ubo.matColor = glm::vec3(1, 1, 1);
+	
+	vkMapMemory(device, vertexUBOMemory, 0, sizeof(uboVertexData), 0, &mappedMemory);
+	memcpy(mappedMemory, &uboVertexData, sizeof(uboVertexData));
+	vkUnmapMemory(device, vertexUBOMemory);
 
-    void* mappedMemory;
+	//Copy over Fragment Shader UBO
+	UniformFragmentData uboFragmentData;
+	uboFragmentData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
+	uboFragmentData.textureParam = 0.77f;
+	uboFragmentData.cameraPosition = cameraPosition;
+	uboFragmentData.matColor = glm::vec3(1, 0, 1);
 
-    vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &mappedMemory);
+	vkMapMemory(device, fragmentUBOMemory, 0, sizeof(uboFragmentData), 0, &mappedMemory);
+	memcpy(mappedMemory, &uboFragmentData, sizeof(uboFragmentData));
+	vkUnmapMemory(device, fragmentUBOMemory);
 
-    memcpy(mappedMemory, &ubo, sizeof(ubo));
-
-    vkUnmapMemory(device, uniformBufferMemory);
 
 }
 
@@ -607,12 +625,12 @@ void RenderApplication::createFrameBuffer() {
 }
 void RenderApplication::createDescriptorSetLayout() {
 
-    //define a binding for out UBO
-    VkDescriptorSetLayoutBinding uniformBufferBinding = {};
-    uniformBufferBinding.binding = 0;	//binding = 0
-    uniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uniformBufferBinding.descriptorCount = 1;
-    uniformBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    //define a binding for our vertex UBO
+    VkDescriptorSetLayoutBinding vertexUBOBinding = {};
+	vertexUBOBinding.binding = 0;	//binding = 0
+	vertexUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	vertexUBOBinding.descriptorCount = 1;
+	vertexUBOBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 	//define a binding for our diffuse texture
 	VkDescriptorSetLayoutBinding diffuseTextureBinding = {};
@@ -630,9 +648,16 @@ void RenderApplication::createDescriptorSetLayout() {
 	environmentMapBinding.pImmutableSamplers = NULL;
 	environmentMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+	//define a binding for our fragment UBO
+	VkDescriptorSetLayoutBinding fragmentUBOBinding = {};
+	fragmentUBOBinding.binding = 3;	//binding = 3
+	fragmentUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	fragmentUBOBinding.descriptorCount = 1;
+	fragmentUBOBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 3> allBindings = {uniformBufferBinding, diffuseTextureBinding, environmentMapBinding };
+    std::array<VkDescriptorSetLayoutBinding, 4> allBindings = { vertexUBOBinding, diffuseTextureBinding, environmentMapBinding, fragmentUBOBinding };
 
     //create descriptor set layout for binding to a UBO
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
@@ -648,13 +673,15 @@ void RenderApplication::createDescriptorSetLayout() {
 void RenderApplication::createDescriptorPool(){
 
 
-    std::array<VkDescriptorPoolSize, 3> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 4> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = 1;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[1].descriptorCount = 1;
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[2].descriptorCount = 1;
+	poolSizes[3].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[3].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -682,11 +709,11 @@ void RenderApplication::createDescriptorSet() {
     VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet));
 
 
-    // Specify the uniform buffer info
-    VkDescriptorBufferInfo descriptorUniformBufferInfo = {};
-    descriptorUniformBufferInfo.buffer = uniformBuffer;
-    descriptorUniformBufferInfo.offset = 0;
-    descriptorUniformBufferInfo.range = sizeof(UniformBufferObject);
+    // Specify the vertex UBO info
+    VkDescriptorBufferInfo descriptorVertexUBOInfo = {};
+	descriptorVertexUBOInfo.buffer = vertexUBO;
+	descriptorVertexUBOInfo.offset = 0;
+	descriptorVertexUBOInfo.range = sizeof(UniformVertexData);
 
 	// Specify the diffuse texture info
 	VkDescriptorImageInfo descriptorDiffuseTextureInfo = {};
@@ -700,8 +727,14 @@ void RenderApplication::createDescriptorSet() {
 	descriptorEnvironmentMapInfo.imageView = environmentMapView;
 	descriptorEnvironmentMapInfo.sampler = textureSampler;
 
+	// Specify the fragment UBO info
+	VkDescriptorBufferInfo descriptorFragmentUBOInfo = {};
+	descriptorFragmentUBOInfo.buffer = fragmentUBO;
+	descriptorFragmentUBOInfo.offset = 0;
+	descriptorFragmentUBOInfo.range = sizeof(UniformFragmentData);
 
-    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
+
+    std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
 
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = descriptorSet;
@@ -709,7 +742,7 @@ void RenderApplication::createDescriptorSet() {
     descriptorWrites[0].dstArrayElement = 0;
     descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &descriptorUniformBufferInfo;
+    descriptorWrites[0].pBufferInfo = &descriptorVertexUBOInfo;
 
 	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrites[1].dstSet = descriptorSet;
@@ -726,6 +759,14 @@ void RenderApplication::createDescriptorSet() {
 	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	descriptorWrites[2].descriptorCount = 1;
 	descriptorWrites[2].pImageInfo = &descriptorEnvironmentMapInfo;
+
+	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[3].dstSet = descriptorSet;
+	descriptorWrites[3].dstBinding = 3;		//binding = 3
+	descriptorWrites[3].dstArrayElement = 0;
+	descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrites[3].descriptorCount = 1;
+	descriptorWrites[3].pBufferInfo = &descriptorFragmentUBOInfo;
 
     // perform the update of the descriptor set.
     vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
@@ -1077,9 +1118,11 @@ void RenderApplication::cleanup() {
 	vkDestroyBuffer(device, indexBuffer, NULL);
 	vkFreeMemory(device, indexBufferMemory, NULL);
 
-    //free uniform buffer
-    vkDestroyBuffer(device, uniformBuffer, NULL);
-	vkFreeMemory(device, uniformBufferMemory, NULL);
+    //free uniform buffers
+    vkDestroyBuffer(device, vertexUBO, NULL);
+	vkFreeMemory(device, vertexUBOMemory, NULL);
+	vkDestroyBuffer(device, fragmentUBO, NULL);
+	vkFreeMemory(device, fragmentUBOMemory, NULL);
 
 	//free diffuse texture
 	vkDestroyImageView(device, diffuseTextureView, NULL);

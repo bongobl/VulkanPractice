@@ -15,11 +15,15 @@
 using namespace std;
 
 
-struct UniformBufferObject {
+struct UniformVertexData {
 
 	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 projection;
+	
+};
+
+struct UniformFragmentData {
 
 	glm::vec3 lightDirection;
 	float textureParam;
