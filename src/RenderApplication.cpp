@@ -130,6 +130,7 @@ void RenderApplication::configureAllRequirements(){
 
 	//specify required device features 
 	requiredDeviceFeatures.samplerAnisotropy = VK_TRUE;
+	requiredDeviceFeatures.tessellationShader = VK_TRUE;
 
 	//specify what capabilities we need from a queue	
 	requiredQueueTypes.push_back(VK_QUEUE_GRAPHICS_BIT);
@@ -498,7 +499,7 @@ void RenderApplication::writeToUniformBuffer(){
 	ubo.projection[1][1] *= -1;
 
 	ubo.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
-	ubo.textureParam = 0.7f;
+	ubo.textureParam = 0.77f;
 	ubo.cameraPosition = cameraPosition;
 	ubo.matColor = glm::vec3(1, 1, 1);
 
@@ -797,14 +798,11 @@ void RenderApplication::createRenderPass() {
 
 void RenderApplication::createGraphicsPipeline(){
 
-	//create vertex shader module
-	VkShaderModule vertexShaderModule = Utils::createShaderModule("resources/shaders/vert.spv");
-
-	//create fragment shader module
-	VkShaderModule fragmentShaderModule = Utils::createShaderModule("resources/shaders/frag.spv");
-
+	
 
 	//Vertex Shader Stage
+	VkShaderModule vertexShaderModule = Utils::createShaderModule("resources/shaders/vert.spv");
+
 	VkPipelineShaderStageCreateInfo vertexShaderStageInfo = {};
 	vertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -812,12 +810,33 @@ void RenderApplication::createGraphicsPipeline(){
 	vertexShaderStageInfo.pName = "main";
 
 	//Fragment Shader Stage
+	VkShaderModule fragmentShaderModule = Utils::createShaderModule("resources/shaders/frag.spv");
+
 	VkPipelineShaderStageCreateInfo fragmentShaderStageInfo = {};
 	fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	fragmentShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	fragmentShaderStageInfo.module = fragmentShaderModule;
 	fragmentShaderStageInfo.pName = "main";
 
+	//Tessalation Control Shader Stage
+	VkShaderModule tessContShaderModule = Utils::createShaderModule("resources/shaders/tesc.spv");
+
+	VkPipelineShaderStageCreateInfo tessContShaderStageInfo = {};
+	tessContShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	tessContShaderStageInfo.stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+	tessContShaderStageInfo.module = tessContShaderModule;
+	tessContShaderStageInfo.pName = "main";
+
+	//Tessalation Control Shader Stage
+	VkShaderModule tessEvalShaderModule = Utils::createShaderModule("resources/shaders/tese.spv");
+
+	VkPipelineShaderStageCreateInfo tessEvalShaderStageInfo = {};
+	tessEvalShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	tessEvalShaderStageInfo.stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+	tessEvalShaderStageInfo.module = tessEvalShaderModule;
+	tessEvalShaderStageInfo.pName = "main";
+
+	
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, fragmentShaderStageInfo };
 
     //Vertex Input
@@ -837,6 +856,13 @@ void RenderApplication::createGraphicsPipeline(){
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+	//Tesselation
+	VkPipelineTessellationStateCreateInfo tesselation = {};
+	tesselation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+	tesselation.pNext = NULL;
+	tesselation.flags = 0;
+	tesselation.patchControlPoints = 3;
 
     //Viewports
     VkViewport viewport = {};
@@ -934,9 +960,11 @@ void RenderApplication::createGraphicsPipeline(){
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &graphicsPipeline));
 
 
-	//destroy shader modules
+	//destroy shader modules since we don't need their source code anymore
 	vkDestroyShaderModule(device,vertexShaderModule, NULL);
 	vkDestroyShaderModule(device, fragmentShaderModule, NULL);
+	vkDestroyShaderModule(device, tessContShaderModule, NULL);
+	vkDestroyShaderModule(device, tessEvalShaderModule, NULL);
 }
 void RenderApplication::createMainCommandBuffer() {
 

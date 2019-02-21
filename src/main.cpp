@@ -7,7 +7,9 @@ using namespace std;
 //On BasicRender branch
 int main() {
 
+	
     cout << "Running Render Application" << endl;
+
     try {
 		RenderApplication::run();
     }
@@ -16,9 +18,11 @@ int main() {
         return EXIT_FAILURE;
     }
     
+	
     //open image
 	system("\"Rendered Image.png\"");
+	
+
     return EXIT_SUCCESS;
 }
-
 
