@@ -18,10 +18,6 @@ int main() {
         return EXIT_FAILURE;
     }
     
-	
-    //open image
-	system("\"Rendered Image.png\"");
-	
 
     return EXIT_SUCCESS;
 }

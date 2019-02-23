@@ -8,7 +8,8 @@ add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
 set (CMAKE_CXX_STANDARD 17)
 
-set(EXTERNAL_INCLUDE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/")
+set(EXTERNAL_INCLUDE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/include")
+set(EXTERNAL_LIB_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/lib")
 set(INCLUDE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(ALL_INCLUDE_DIRECTORIES
 	"${INCLUDE_DIRECTORY}"
@@ -26,14 +27,16 @@ set (SRC_FILES
     "${SRC_DIRECTORY}/Vertex.cpp"
 )
 
-set(ALL_LIBS ${Vulkan_LIBRARY} )
+set(ALL_LIBS ${Vulkan_LIBRARY} glfw3)
 
-include_directories(${ALL_INCLUDE_DIRECTORIES})
+include_directories(BasicVulkanRender ${ALL_INCLUDE_DIRECTORIES})
+link_directories(BasicVulkanRender ${EXTERNAL_LIB_DIRECTORY})
 
 add_executable(BasicVulkanRender "${SRC_FILES}")
 
 #sets the working director to the this directory
 #set_target_properties(BasicVulkanRender PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
 
 target_link_libraries(BasicVulkanRender ${ALL_LIBS} )
 

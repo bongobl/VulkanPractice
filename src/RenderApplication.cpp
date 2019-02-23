@@ -3,6 +3,7 @@
 
 
 //Initialize static members
+GLFWwindow* RenderApplication::window;
 VkExtent2D RenderApplication::resolution = {1280,980};
 std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
@@ -52,6 +53,8 @@ VkQueue RenderApplication::graphicsQueue;
 
 void RenderApplication::run() {
 
+	//test initing glfw window
+	initGLFWWindow();
 	//add all requirements that this app will need from the device and instance
 	configureAllRequirements();
 
@@ -112,10 +115,24 @@ void RenderApplication::run() {
     //export the contents of the color attachment to disk
 	exportAsImage();
 
+
+	//open image
+	system("\"Rendered Image.png\"");
+
+	//play around with window as long as we want
+	while(!glfwWindowShouldClose(window)){
+		glfwPollEvents();
+	}
     // Clean up all Vulkan resources.
     cleanup();
 }
 
+void RenderApplication::initGLFWWindow(){
+	glfwInit();
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	window = glfwCreateWindow(resolution.width,resolution.height, "Test Window", NULL, NULL);
+}
 void RenderApplication::configureAllRequirements(){
 
 
@@ -127,8 +144,16 @@ void RenderApplication::configureAllRequirements(){
 		requiredInstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 	}
 
-	//Note: In realtime app, glfw will have extra instance extensions we need to add.
-	//And usage of the swapchain would require a device extension. 
+	//add glfw extensions
+	uint32_t glfwExtensionCount = 0;
+	const char** glfwExtensions;
+	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+	cout << "extension count " << glfwExtensionCount << endl;
+	for(unsigned int i = 0; i < glfwExtensionCount; ++i){
+		printf("%s\n", glfwExtensions[i]);
+		requiredInstanceExtensions.push_back(glfwExtensions[i]);
+	}
+
 
 	//specify required device features 
 	requiredDeviceFeatures.samplerAnisotropy = VK_TRUE;
@@ -158,7 +183,7 @@ void RenderApplication::createInstance() {
 			}
 		}
 		if (!foundRequiredLayer) {
-			string errorMessage = "Layer " + string(currRequiredLayer) + " not supported\n";
+			string errorMessage = "Instance Layer " + string(currRequiredLayer) + " not supported\n";
 			throw std::runtime_error(errorMessage);
 		}
 	}
@@ -182,7 +207,7 @@ void RenderApplication::createInstance() {
 			}
 		}
 		if (!foundRequiredExtension) {
-			string errorMessage = "Extension " + string(currRequiredExtension) + " not supported\n";
+			string errorMessage = "Instance Extension " + string(currRequiredExtension) + " not supported\n";
 			throw std::runtime_error(errorMessage);
 		}
 	}
@@ -326,7 +351,7 @@ uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDev
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(currPhysicalDevice, &queueFamilyCount, queueFamilies.data());
 
-    // Now find a family that supports graphics and transfer.
+    // Now find a single queue family that supports all our required operations (not ideal way to do this)
     uint32_t currFamilyIndex;
     for (currFamilyIndex = 0; currFamilyIndex < queueFamilies.size(); ++currFamilyIndex) {
         VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
@@ -520,7 +545,7 @@ void RenderApplication::writeToUniformBuffers(){
 	//Copy over Fragment Shader UBO
 	UniformFragmentData uboFragmentData;
 	uboFragmentData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
-	uboFragmentData.textureParam = 0.77f;
+	uboFragmentData.textureParam = 0.67f;
 	uboFragmentData.cameraPosition = cameraPosition;
 	uboFragmentData.matColor = glm::vec3(1, 0, 1);
 
@@ -1158,6 +1183,9 @@ void RenderApplication::cleanup() {
     vkDestroyCommandPool(device, graphicsCommandPool, NULL);
     vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
 
 }
 

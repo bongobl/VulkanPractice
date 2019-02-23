@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 #include <array>
 #include <vector>
@@ -21,6 +22,8 @@ const bool enableValidationLayers = true;
 
 class RenderApplication{
 
+	//test glfw window
+	static GLFWwindow* window;
 
 	//width and height of render area
 	static VkExtent2D resolution;
@@ -124,6 +127,8 @@ public:
 
 private:
 
+	//test
+	static void initGLFWWindow();
 
     //specify all required instance layers, instance extensions and device extensions here
     static void configureAllRequirements();
