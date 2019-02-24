@@ -128,6 +128,7 @@ void RenderApplication::run() {
 }
 
 void RenderApplication::initGLFWWindow(){
+
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
@@ -144,7 +145,7 @@ void RenderApplication::configureAllRequirements(){
 		requiredInstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 	}
 
-	//add glfw extensions
+	//add glfw instance extensions
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions;
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -158,6 +159,8 @@ void RenderApplication::configureAllRequirements(){
 	//specify required device features 
 	requiredDeviceFeatures.samplerAnisotropy = VK_TRUE;
 	requiredDeviceFeatures.tessellationShader = VK_TRUE;
+	requiredDeviceFeatures.fillModeNonSolid = VK_TRUE;
+	requiredDeviceFeatures.wideLines = VK_TRUE;
 
 	//specify what capabilities we need from a queue	
 	requiredQueueTypes.push_back(VK_QUEUE_GRAPHICS_BIT);
@@ -508,7 +511,7 @@ void RenderApplication::createUniformBuffers(){
 
 	//Create UBO for vertex shader data
 	Utils::createBuffer(
-		sizeof(UniformVertexData),
+		sizeof(UniformDataTessShader),
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 		vertexUBO, vertexUBOMemory
@@ -516,7 +519,7 @@ void RenderApplication::createUniformBuffers(){
 
 	//Create UBO for fragment shader data
 	Utils::createBuffer(
-		sizeof(UniformFragmentData),
+		sizeof(UniformDataFragShader),
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 		fragmentUBO, fragmentUBOMemory
@@ -529,25 +532,25 @@ void RenderApplication::writeToUniformBuffers(){
 	void* mappedMemory;
 
 	//Copy over Vertex Shader UBO
-    UniformVertexData uboVertexData;
+    UniformDataTessShader uboVertexData;
 
 	glm::vec3 cameraPosition(0, 8, 9);
 	uboVertexData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	uboVertexData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	uboVertexData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
 	uboVertexData.projection[1][1] *= -1;
-
+	
 	
 	vkMapMemory(device, vertexUBOMemory, 0, sizeof(uboVertexData), 0, &mappedMemory);
 	memcpy(mappedMemory, &uboVertexData, sizeof(uboVertexData));
 	vkUnmapMemory(device, vertexUBOMemory);
 
 	//Copy over Fragment Shader UBO
-	UniformFragmentData uboFragmentData;
+	UniformDataFragShader uboFragmentData;
 	uboFragmentData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
 	uboFragmentData.textureParam = 0.67f;
 	uboFragmentData.cameraPosition = cameraPosition;
-	uboFragmentData.matColor = glm::vec3(1, 0, 1);
+	uboFragmentData.matColor = glm::vec3(0, 1, 1);
 
 	vkMapMemory(device, fragmentUBOMemory, 0, sizeof(uboFragmentData), 0, &mappedMemory);
 	memcpy(mappedMemory, &uboFragmentData, sizeof(uboFragmentData));
@@ -655,7 +658,7 @@ void RenderApplication::createDescriptorSetLayout() {
 	vertexUBOBinding.binding = 0;	//binding = 0
 	vertexUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	vertexUBOBinding.descriptorCount = 1;
-	vertexUBOBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	vertexUBOBinding.stageFlags = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
 
 	//define a binding for our diffuse texture
 	VkDescriptorSetLayoutBinding diffuseTextureBinding = {};
@@ -738,7 +741,7 @@ void RenderApplication::createDescriptorSet() {
     VkDescriptorBufferInfo descriptorVertexUBOInfo = {};
 	descriptorVertexUBOInfo.buffer = vertexUBO;
 	descriptorVertexUBOInfo.offset = 0;
-	descriptorVertexUBOInfo.range = sizeof(UniformVertexData);
+	descriptorVertexUBOInfo.range = sizeof(UniformDataTessShader);
 
 	// Specify the diffuse texture info
 	VkDescriptorImageInfo descriptorDiffuseTextureInfo = {};
@@ -756,7 +759,7 @@ void RenderApplication::createDescriptorSet() {
 	VkDescriptorBufferInfo descriptorFragmentUBOInfo = {};
 	descriptorFragmentUBOInfo.buffer = fragmentUBO;
 	descriptorFragmentUBOInfo.offset = 0;
-	descriptorFragmentUBOInfo.range = sizeof(UniformFragmentData);
+	descriptorFragmentUBOInfo.range = sizeof(UniformDataFragShader);
 
 
     std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
@@ -875,15 +878,6 @@ void RenderApplication::createGraphicsPipeline(){
 	vertexShaderStageInfo.module = vertexShaderModule;
 	vertexShaderStageInfo.pName = "main";
 
-	//Fragment Shader Stage
-	VkShaderModule fragmentShaderModule = Utils::createShaderModule("resources/shaders/frag.spv");
-
-	VkPipelineShaderStageCreateInfo fragmentShaderStageInfo = {};
-	fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragmentShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragmentShaderStageInfo.module = fragmentShaderModule;
-	fragmentShaderStageInfo.pName = "main";
-
 	//Tessalation Control Shader Stage
 	VkShaderModule tessContShaderModule = Utils::createShaderModule("resources/shaders/tesc.spv");
 
@@ -901,9 +895,19 @@ void RenderApplication::createGraphicsPipeline(){
 	tessEvalShaderStageInfo.stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
 	tessEvalShaderStageInfo.module = tessEvalShaderModule;
 	tessEvalShaderStageInfo.pName = "main";
+	
+	//Fragment Shader Stage
+	VkShaderModule fragmentShaderModule = Utils::createShaderModule("resources/shaders/frag.spv");
+
+	VkPipelineShaderStageCreateInfo fragmentShaderStageInfo = {};
+	fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragmentShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragmentShaderStageInfo.module = fragmentShaderModule;
+	fragmentShaderStageInfo.pName = "main";
 
 	
-	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, fragmentShaderStageInfo };
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, tessContShaderStageInfo, 
+	tessEvalShaderStageInfo, fragmentShaderStageInfo };
 
     //Vertex Input
 	auto vertexBindingDescription = Vertex::getBindingDescription();
@@ -920,15 +924,15 @@ void RenderApplication::createGraphicsPipeline(){
     //Input Assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
 	//Tesselation
-	VkPipelineTessellationStateCreateInfo tesselation = {};
-	tesselation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
-	tesselation.pNext = NULL;
-	tesselation.flags = 0;
-	tesselation.patchControlPoints = 3;
+	VkPipelineTessellationStateCreateInfo tessellation = {};
+	tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+	tessellation.pNext = NULL;
+	tessellation.flags = 0;
+	tessellation.patchControlPoints = 3;
 
     //Viewports
     VkViewport viewport = {};
@@ -957,7 +961,7 @@ void RenderApplication::createGraphicsPipeline(){
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer.depthClampEnable = VK_FALSE;
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -1007,10 +1011,11 @@ void RenderApplication::createGraphicsPipeline(){
 	//Info to create graphics pipeline
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineInfo.stageCount = 2;
+	pipelineInfo.stageCount = 4;
 	pipelineInfo.pStages = shaderStages;
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pTessellationState = &tessellation;
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;

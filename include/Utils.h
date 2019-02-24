@@ -15,7 +15,7 @@
 using namespace std;
 
 
-struct UniformVertexData {
+struct UniformDataTessShader {
 
 	glm::mat4 model;
 	glm::mat4 view;
@@ -23,7 +23,7 @@ struct UniformVertexData {
 	
 };
 
-struct UniformFragmentData {
+struct UniformDataFragShader {
 
 	glm::vec3 lightDirection;
 	float textureParam;

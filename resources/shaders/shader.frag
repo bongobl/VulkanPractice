@@ -61,6 +61,7 @@ void main() {
 
 	//final color
 	outColor.rgb = diffuse + specular + ambient; 
+
     outColor.a = 1.0f;
 
 }

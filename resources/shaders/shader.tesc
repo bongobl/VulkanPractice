@@ -47,9 +47,9 @@ void main()
  
         vec3 middleOfTriangle = GetMiddlePoint(middlePoint1, middlePoint2, middlePoint3);
  
-        gl_TessLevelInner[0] = 0;
-        gl_TessLevelOuter[0] = 0;
-        gl_TessLevelOuter[1] = 0;
-        gl_TessLevelOuter[2] = 0;
+        gl_TessLevelInner[0] = 1;
+        gl_TessLevelOuter[0] = 1;
+        gl_TessLevelOuter[1] = 1;
+        gl_TessLevelOuter[2] = 1;
     }
 }
