@@ -25,6 +25,7 @@ set (SRC_FILES
     "${SRC_DIRECTORY}/RenderApplication.cpp"
     "${SRC_DIRECTORY}/Utils.cpp"
     "${SRC_DIRECTORY}/Vertex.cpp"
+    "${SRC_DIRECTORY}/QueueFamilyIndices.cpp"
 )
 
 set(ALL_LIBS ${Vulkan_LIBRARY} glfw3)

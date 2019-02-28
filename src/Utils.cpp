@@ -19,6 +19,9 @@
 #include <map>
 
 
+
+///////////////////////////////Utils//////////////////////////////////
+
 void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 	VkMemoryPropertyFlags propertyFlags, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
 	

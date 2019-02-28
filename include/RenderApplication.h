@@ -11,6 +11,8 @@
 #include <cmath>
 #include <string>
 #include <Utils.h>
+#include <QueueFamilyIndices.h>
+
 using namespace std;
 
 #ifdef NDEBUG
@@ -36,6 +38,10 @@ class RenderApplication{
 
 	//To store the flag bits specifying which queue types our application needs
 	static std::vector<VkQueueFlags> requiredQueueTypes;
+
+	//Struct to hold the queue family indices of all our required queue types
+	static QueueFamilyIndices useLater;	//use later
+
 
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;
@@ -119,6 +125,7 @@ class RenderApplication{
 
 	//Queue for graphics and compute operation
 	static VkQueue graphicsQueue;
+	static VkQueue transferQueue;
 
 
 public:

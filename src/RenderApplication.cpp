@@ -10,6 +10,7 @@ std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
 VkPhysicalDeviceFeatures RenderApplication::requiredDeviceFeatures = {};
 std::vector<VkQueueFlags> RenderApplication::requiredQueueTypes;
+QueueFamilyIndices RenderApplication::useLater;
 
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
@@ -49,7 +50,7 @@ VkCommandPool RenderApplication::graphicsCommandPool;
 VkCommandBuffer RenderApplication::mainCommandBuffer;
 uint32_t RenderApplication::graphicsQueueFamilyIndex;
 VkQueue RenderApplication::graphicsQueue;
-
+VkQueue RenderApplication::transferQueue;
 
 void RenderApplication::run() {
 
@@ -165,6 +166,10 @@ void RenderApplication::configureAllRequirements(){
 	//specify what capabilities we need from a queue	
 	requiredQueueTypes.push_back(VK_QUEUE_GRAPHICS_BIT);
 	requiredQueueTypes.push_back(VK_QUEUE_TRANSFER_BIT); 
+
+	useLater.addRequiredQueueType(VK_QUEUE_GRAPHICS_BIT);
+	useLater.addRequiredQueueType(VK_QUEUE_TRANSFER_BIT);
+	//useLater.addRequiredQueueType(ADDITIONAL_VK_QUEUE_PRESENT_BIT);
 }
 void RenderApplication::createInstance() {
 
@@ -289,6 +294,7 @@ void RenderApplication::findPhysicalDevice() {
 			return;
 		}
     }
+	
 
 	throw std::runtime_error("Error: Could not load find a valid physical device for our operations");
 }
@@ -1008,7 +1014,7 @@ void RenderApplication::createGraphicsPipeline(){
 	VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, &pipelineLayout));
 
 
-	//Info to create graphics pipeline
+	//Info to create graphics pipeline, Note: we can create more for multiple pipelines (shadow map + standard render)
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipelineInfo.stageCount = 4;
@@ -1027,7 +1033,7 @@ void RenderApplication::createGraphicsPipeline(){
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-	//Create Graphics Pipeline
+	//Create Graphics Pipeline 
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &graphicsPipeline));
 
 
