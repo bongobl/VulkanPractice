@@ -9,8 +9,9 @@ std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
 VkPhysicalDeviceFeatures RenderApplication::requiredDeviceFeatures = {};
-std::vector<VkQueueFlags> RenderApplication::requiredQueueTypes;
-QueueFamilyIndices RenderApplication::useLater;
+QueueFamilyIndices RenderApplication::requiedQueueTypes;
+VkQueue RenderApplication::graphicsQueue;
+VkQueue RenderApplication::transferQueue;
 
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
@@ -48,9 +49,7 @@ VkPipelineLayout RenderApplication::pipelineLayout;
 VkPipeline RenderApplication::graphicsPipeline;
 VkCommandPool RenderApplication::graphicsCommandPool;
 VkCommandBuffer RenderApplication::mainCommandBuffer;
-uint32_t RenderApplication::graphicsQueueFamilyIndex;
-VkQueue RenderApplication::graphicsQueue;
-VkQueue RenderApplication::transferQueue;
+
 
 void RenderApplication::run() {
 
@@ -163,12 +162,9 @@ void RenderApplication::configureAllRequirements(){
 	requiredDeviceFeatures.fillModeNonSolid = VK_TRUE;
 	requiredDeviceFeatures.wideLines = VK_TRUE;
 
-	//specify what capabilities we need from a queue	
-	requiredQueueTypes.push_back(VK_QUEUE_GRAPHICS_BIT);
-	requiredQueueTypes.push_back(VK_QUEUE_TRANSFER_BIT); 
-
-	useLater.addRequiredQueueType(VK_QUEUE_GRAPHICS_BIT);
-	useLater.addRequiredQueueType(VK_QUEUE_TRANSFER_BIT);
+	//specify what queue capabilities we need
+	requiedQueueTypes.addRequiredQueueType(VK_QUEUE_GRAPHICS_BIT);
+	requiedQueueTypes.addRequiredQueueType(VK_QUEUE_TRANSFER_BIT);
 	//useLater.addRequiredQueueType(ADDITIONAL_VK_QUEUE_PRESENT_BIT);
 }
 void RenderApplication::createInstance() {
@@ -289,20 +285,19 @@ void RenderApplication::findPhysicalDevice() {
 
     for (VkPhysicalDevice currPhysicalDevice : allPhysicalDevices) {
 
-		if (isValidPhysicalDevice(currPhysicalDevice, graphicsQueueFamilyIndex)) {
+		if (isValidPhysicalDevice(currPhysicalDevice)) {
 			physicalDevice = currPhysicalDevice;
 			return;
 		}
     }
-	
 
 	throw std::runtime_error("Error: Could not load find a valid physical device for our operations");
 }
 
-bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice, uint32_t &familyIndex) {
+bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice) {
 
 	//For this physical device to be valid, it needs to support our device features, device extensions and have
-	//a queue family for our operations
+	//queue families for all our operations
 
 	//Check for support of required device features
 	VkPhysicalDeviceFeatures supportedFeatures;
@@ -343,70 +338,42 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 		}
 	}
 
-
-	//lastly, we make sure there exists a queue family index that supports the operations we want
-	familyIndex = getQueueFamilyIndex(potentialPhysicalDevice);
-	return familyIndex != -1;
+	bool hasAllIndices = requiedQueueTypes.compute(potentialPhysicalDevice);
 
 
-}
-// Returns the index of a queue family that supports compute and graphics operations.
-uint32_t RenderApplication::getQueueFamilyIndex(VkPhysicalDevice currPhysicalDevice) {
-
-    uint32_t queueFamilyCount;
-
-	// Retrieve all queue families.
-    vkGetPhysicalDeviceQueueFamilyProperties(currPhysicalDevice, &queueFamilyCount, NULL);
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(currPhysicalDevice, &queueFamilyCount, queueFamilies.data());
-
-    // Now find a single queue family that supports all our required operations (not ideal way to do this)
-    uint32_t currFamilyIndex;
-    for (currFamilyIndex = 0; currFamilyIndex < queueFamilies.size(); ++currFamilyIndex) {
-        VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
+	return hasAllIndices;
 
 
-		if (currFamily.queueCount > 0) {
-
-			bool hasAllQueueTypes = true;
-			for (int i = 0; i < requiredQueueTypes.size(); ++i) {
-				if (! (currFamily.queueFlags & requiredQueueTypes[i])) {
-					hasAllQueueTypes = false;
-					break;
-				}
-			}
-			if (hasAllQueueTypes) {
-
-				// found a queue family with out required queue types, we're done
-				break;
-			}
-		}
-    }
-
-    if (currFamilyIndex == queueFamilies.size()) {
-		return -1;
-    }
-	
-    return currFamilyIndex;
 }
 
 void RenderApplication::createDevice() {
 
+	//only need unique queue families
+	std::set<uint32_t> uniqueQueueFamilies;
+	for (int i = 0; i < requiedQueueTypes.numRequired(); ++i) {
+		uniqueQueueFamilies.insert(requiedQueueTypes.getQueueFamilyIndexAt(i));
+	}
 
-    //When creating the device, we also specify what queues it has.
-    VkDeviceQueueCreateInfo queueCreateInfo = {};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
-    queueCreateInfo.queueCount = 1; // get one queue from this family. We don't need more.
-    float queuePriorities = 1.0;  // we only have one queue, so this is not that imporant.
-    queueCreateInfo.pQueuePriorities = &queuePriorities;
+	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+	
+	for (uint32_t currFamilyIndex : uniqueQueueFamilies) {
+		VkDeviceQueueCreateInfo queueCreateInfo = {};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = currFamilyIndex;
+		queueCreateInfo.queueCount = 1; // get one queue from this family. We don't need more.	
+		float queuePriorities = 1.0;
+		queueCreateInfo.pQueuePriorities = &queuePriorities;
+		queueCreateInfos.push_back(queueCreateInfo);
+	}
 
 
     //Now we create the logical device. The logical device allows us to interact with the physical device.
     VkDeviceCreateInfo deviceCreateInfo = {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo; // when creating the logical device, we also specify what queues it has.
-    deviceCreateInfo.queueCreateInfoCount = 1;
+
+	deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
+	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+	
     deviceCreateInfo.pEnabledFeatures = &requiredDeviceFeatures;
 
 	// need to specify instance layers here as well.
@@ -423,7 +390,8 @@ void RenderApplication::createDevice() {
     uint32_t particularQueueIndex = 0;
 
     // Get a handle to the first member of the queue family.
-    vkGetDeviceQueue(device, graphicsQueueFamilyIndex, particularQueueIndex, &graphicsQueue);
+    vkGetDeviceQueue(device, requiedQueueTypes.getQueueFamilyIndexAt(0), particularQueueIndex, &graphicsQueue);
+	vkGetDeviceQueue(device, requiedQueueTypes.getQueueFamilyIndexAt(1), particularQueueIndex, &transferQueue);
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
@@ -556,7 +524,7 @@ void RenderApplication::writeToUniformBuffers(){
 	uboFragmentData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
 	uboFragmentData.textureParam = 0.67f;
 	uboFragmentData.cameraPosition = cameraPosition;
-	uboFragmentData.matColor = glm::vec3(0, 1, 1);
+	uboFragmentData.matColor = glm::vec3(1, 1, 1);
 
 	vkMapMemory(device, fragmentUBOMemory, 0, sizeof(uboFragmentData), 0, &mappedMemory);
 	memcpy(mappedMemory, &uboFragmentData, sizeof(uboFragmentData));
@@ -819,7 +787,7 @@ void RenderApplication::createCommandPool(){
 
     // the queue family of this command pool. All command buffers allocated from this command pool,
     // must be submitted to queues of this family ONLY.
-    commandPoolCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
+    commandPoolCreateInfo.queueFamilyIndex = requiedQueueTypes.getQueueFamilyIndexAt(0);
     VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &graphicsCommandPool));
 }
 
@@ -1201,8 +1169,10 @@ void RenderApplication::cleanup() {
 }
 
 VkCommandPool& RenderApplication::getTransferCmdPool(){
+
+	//queues and pools which work for graphics also work for transfer
 	return graphicsCommandPool;
 }
 VkQueue& RenderApplication::getTransferQueue(){
-	return graphicsQueue;
+	return transferQueue;
 }

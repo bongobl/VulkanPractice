@@ -11,19 +11,23 @@ typedef enum AdditionalQueueFlagBits {
 class QueueFamilyIndices{
 
 	int doneCount;
+
+	//maps required queue type enums to their queue family index
 	std::vector< pair<uint32_t, int> > indexMap;
 public:
 	
 	bool compute(VkPhysicalDevice currPhysicalDevice);
 	void addRequiredQueueType(uint32_t queueType);
-	uint32_t getRequiredQueueTypeAt(unsigned int index) const;
-
+	int getQueueFamilyIndexAt(unsigned int index) const;
+	int numRequired() const;
+	
 private:
 
 	void resetIndices();
 	bool allHaveValues() const;
 	bool hasValue(unsigned int index) const;
 	void setQueueFamilyIndexAt(unsigned int index, int queueFamilyIndex);
-	int getQueueFamilyIndexAt(unsigned int index) const;
+	uint32_t getRequiredQueueTypeAt(unsigned int index) const;
+	
 	
 };

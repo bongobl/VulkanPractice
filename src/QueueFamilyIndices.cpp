@@ -4,6 +4,7 @@
 bool QueueFamilyIndices::compute(VkPhysicalDevice currPhysicalDevice){
 
 	resetIndices();
+
 	uint32_t queueFamilyCount;
 
 	// Retrieve all queue families.
@@ -16,7 +17,6 @@ bool QueueFamilyIndices::compute(VkPhysicalDevice currPhysicalDevice){
     uint32_t currFamilyIndex;
     for (currFamilyIndex = 0; currFamilyIndex < queueFamilies.size(); ++currFamilyIndex) {
         VkQueueFamilyProperties currFamily = queueFamilies[currFamilyIndex];
-
 
 		if (currFamily.queueCount > 0) {
 
@@ -47,6 +47,10 @@ uint32_t QueueFamilyIndices::getRequiredQueueTypeAt(unsigned int index) const{
 	return indexMap.at(index).first;
 }
 
+int QueueFamilyIndices::numRequired() const {
+	return (int)indexMap.size();
+}
+
 //Private Helpers for class QueueFamilyIndices
 void QueueFamilyIndices::resetIndices(){
 	doneCount = 0;
@@ -70,7 +74,7 @@ void QueueFamilyIndices::setQueueFamilyIndexAt(unsigned int index, int queueFami
 	++doneCount;
 }
 
-
 int QueueFamilyIndices::getQueueFamilyIndexAt(unsigned int index) const{
 	return indexMap.at(index).second;
 }
+

@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 #include <array>
+#include <set>
 #include <vector>
 #include <algorithm>
 #include <string.h>
@@ -35,13 +36,11 @@ class RenderApplication{
 	static std::vector<const char*> requiredInstanceExtensions;
 	static std::vector<const char*> requiredDeviceExtensions;
 	static VkPhysicalDeviceFeatures requiredDeviceFeatures;
+	static QueueFamilyIndices requiedQueueTypes;
 
-	//To store the flag bits specifying which queue types our application needs
-	static std::vector<VkQueueFlags> requiredQueueTypes;
-
-	//Struct to hold the queue family indices of all our required queue types
-	static QueueFamilyIndices useLater;	//use later
-
+	//Queue for graphics and compute operation
+	static VkQueue graphicsQueue;
+	static VkQueue transferQueue;
 
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;
@@ -120,14 +119,6 @@ class RenderApplication{
 	static VkCommandBuffer mainCommandBuffer;
 
 
-	//Index of queue family which supports our desired features, in our case, graphics
-	static uint32_t graphicsQueueFamilyIndex;
-
-	//Queue for graphics and compute operation
-	static VkQueue graphicsQueue;
-	static VkQueue transferQueue;
-
-
 public:
 
 	static void run();
@@ -147,10 +138,7 @@ private:
 
 	
 	//helper to find physical device
-	static bool isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice, uint32_t &familyIndex);
-
-    // Returns the index of a queue family that supports compute operations. 
-	static uint32_t getQueueFamilyIndex(VkPhysicalDevice currPhysicalDevice);
+	static bool isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice);
 
 	
     //layouts and pools
@@ -184,7 +172,6 @@ private:
 	static void createDepthAttachmentImageView();
 
 	
-
 	static void createDescriptorSet();
 
 	//to start rendering
