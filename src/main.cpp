@@ -10,6 +10,7 @@ int main() {
 	
     cout << "Running Render Application" << endl;
 
+
     try {
 		RenderApplication::run();
     }

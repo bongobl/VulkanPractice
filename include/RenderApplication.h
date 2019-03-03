@@ -1,7 +1,9 @@
 #pragma once
-#include <iostream>
+
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
+#include <iostream>
 #include <array>
 #include <set>
 #include <vector>
@@ -12,7 +14,8 @@
 #include <cmath>
 #include <string>
 #include <Utils.h>
-#include <QueueFamilyIndices.h>
+#include <QueueFamilyMap.h>
+#include <SwapChain.h>
 
 using namespace std;
 
@@ -36,11 +39,8 @@ class RenderApplication{
 	static std::vector<const char*> requiredInstanceExtensions;
 	static std::vector<const char*> requiredDeviceExtensions;
 	static VkPhysicalDeviceFeatures requiredDeviceFeatures;
-	static QueueFamilyIndices requiedQueueTypes;
+	static QueueFamilyMap queueFamilyIndices;
 
-	//Queue for graphics and compute operation
-	static VkQueue graphicsQueue;
-	static VkQueue transferQueue;
 
     //In order to use Vulkan, you must create an instance. 
 	static VkInstance instance;
@@ -55,6 +55,14 @@ class RenderApplication{
     //Then we have the logical device VkDevice, which basically allows 
     //us to interact with the physical device. 
 	static VkDevice device;
+
+	//Queue handles for our operations
+	static VkQueue graphicsQueue;
+	static VkQueue transferQueue;
+	static VkQueue presentQueue;
+
+	//handle to the window surface that we will present rendered images to
+	static VkSurfaceKHR surface;
 
 	//Used to store mesh data as they are loaded in from disk
 	static std::vector<Vertex> vertexArray;
@@ -133,9 +141,10 @@ private:
 
 	//app info
 	static void createInstance();
+	static void createSurface();
 	static void findPhysicalDevice();
 	static void createDevice();
-
+	
 	
 	//helper to find physical device
 	static bool isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice);

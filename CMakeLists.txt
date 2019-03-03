@@ -25,7 +25,8 @@ set (SRC_FILES
     "${SRC_DIRECTORY}/RenderApplication.cpp"
     "${SRC_DIRECTORY}/Utils.cpp"
     "${SRC_DIRECTORY}/Vertex.cpp"
-    "${SRC_DIRECTORY}/QueueFamilyIndices.cpp"
+    "${SRC_DIRECTORY}/QueueFamilyMap.cpp"
+    "${SRC_DIRECTORY}/SwapChain.cpp"
 )
 
 set(ALL_LIBS ${Vulkan_LIBRARY} glfw3)
@@ -34,10 +35,6 @@ include_directories(BasicVulkanRender ${ALL_INCLUDE_DIRECTORIES})
 link_directories(BasicVulkanRender ${EXTERNAL_LIB_DIRECTORY})
 
 add_executable(BasicVulkanRender "${SRC_FILES}")
-
-#sets the working director to the this directory
-#set_target_properties(BasicVulkanRender PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
-
 
 target_link_libraries(BasicVulkanRender ${ALL_LIBS} )
 

@@ -8,7 +8,7 @@ typedef enum AdditionalQueueFlagBits {
 	ADDITIONAL_VK_QUEUE_PRESENT_BIT = 0x00000020,
 }AdditionalQueueFlagBits;
 
-class QueueFamilyIndices{
+class QueueFamilyMap{
 
 	int doneCount;
 
@@ -16,7 +16,7 @@ class QueueFamilyIndices{
 	std::vector< pair<uint32_t, int> > indexMap;
 public:
 	
-	bool compute(VkPhysicalDevice currPhysicalDevice);
+	bool compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface);
 	void addRequiredQueueType(uint32_t queueType);
 	int getQueueFamilyIndexAt(unsigned int index) const;
 	int numRequired() const;

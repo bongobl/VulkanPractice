@@ -9,14 +9,17 @@ std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
 VkPhysicalDeviceFeatures RenderApplication::requiredDeviceFeatures = {};
-QueueFamilyIndices RenderApplication::requiedQueueTypes;
-VkQueue RenderApplication::graphicsQueue;
-VkQueue RenderApplication::transferQueue;
+QueueFamilyMap RenderApplication::queueFamilyIndices;
+
 
 VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
 VkDevice RenderApplication::device;
+VkQueue RenderApplication::graphicsQueue;
+VkQueue RenderApplication::transferQueue;
+VkQueue RenderApplication::presentQueue;
+VkSurfaceKHR RenderApplication:: surface;
 std::vector<Vertex> RenderApplication::vertexArray;
 std::vector<uint32_t> RenderApplication::indexArray;
 VkBuffer RenderApplication::vertexBuffer;
@@ -55,11 +58,13 @@ void RenderApplication::run() {
 
 	//test initing glfw window
 	initGLFWWindow();
+
 	//add all requirements that this app will need from the device and instance
 	configureAllRequirements();
 
     // Initialize vulkan
     createInstance();
+	createSurface();
     findPhysicalDevice();
     createDevice();
 
@@ -137,6 +142,7 @@ void RenderApplication::initGLFWWindow(){
 void RenderApplication::configureAllRequirements(){
 
 
+	//If validation layers enabled
 	if(enableValidationLayers){
 		cout << "<Debug Mode: Validation Layers Enabled>" << endl;
 
@@ -149,9 +155,7 @@ void RenderApplication::configureAllRequirements(){
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions;
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-	cout << "extension count " << glfwExtensionCount << endl;
 	for(unsigned int i = 0; i < glfwExtensionCount; ++i){
-		printf("%s\n", glfwExtensions[i]);
 		requiredInstanceExtensions.push_back(glfwExtensions[i]);
 	}
 
@@ -163,9 +167,12 @@ void RenderApplication::configureAllRequirements(){
 	requiredDeviceFeatures.wideLines = VK_TRUE;
 
 	//specify what queue capabilities we need
-	requiedQueueTypes.addRequiredQueueType(VK_QUEUE_GRAPHICS_BIT);
-	requiedQueueTypes.addRequiredQueueType(VK_QUEUE_TRANSFER_BIT);
-	//useLater.addRequiredQueueType(ADDITIONAL_VK_QUEUE_PRESENT_BIT);
+	queueFamilyIndices.addRequiredQueueType(VK_QUEUE_GRAPHICS_BIT);
+	queueFamilyIndices.addRequiredQueueType(VK_QUEUE_TRANSFER_BIT);
+	queueFamilyIndices.addRequiredQueueType(ADDITIONAL_VK_QUEUE_PRESENT_BIT);
+
+	//swap chain device extension
+	requiredDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 }
 void RenderApplication::createInstance() {
 
@@ -267,6 +274,10 @@ void RenderApplication::createInstance() {
 
 }
 
+void RenderApplication::createSurface(){
+
+	VK_CHECK_RESULT(glfwCreateWindowSurface(instance, window, nullptr, &surface));
+}
 void RenderApplication::findPhysicalDevice() {
 
     //In this function, we find a physical device that can be used with Vulkan.
@@ -338,7 +349,7 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 		}
 	}
 
-	bool hasAllIndices = requiedQueueTypes.compute(potentialPhysicalDevice);
+	bool hasAllIndices = queueFamilyIndices.compute(potentialPhysicalDevice, surface);
 
 
 	return hasAllIndices;
@@ -350,12 +361,14 @@ void RenderApplication::createDevice() {
 
 	//only need unique queue families
 	std::set<uint32_t> uniqueQueueFamilies;
-	for (int i = 0; i < requiedQueueTypes.numRequired(); ++i) {
-		uniqueQueueFamilies.insert(requiedQueueTypes.getQueueFamilyIndexAt(i));
+	for (int i = 0; i < queueFamilyIndices.numRequired(); ++i) {
+		uniqueQueueFamilies.insert(queueFamilyIndices.getQueueFamilyIndexAt(i));
 	}
 
+	//contains all the queue create info structs the device needs to know about
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	
+	//for each unique queue family, we need a VkDeviceQueueCreateInfo struct
 	for (uint32_t currFamilyIndex : uniqueQueueFamilies) {
 		VkDeviceQueueCreateInfo queueCreateInfo = {};
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -367,13 +380,15 @@ void RenderApplication::createDevice() {
 	}
 
 
-    //Now we create the logical device. The logical device allows us to interact with the physical device.
+    // Now we create the logical device. The logical device allows us to interact with the physical device.
     VkDeviceCreateInfo deviceCreateInfo = {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
+	// specify queue info
 	deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
 	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 	
+	// specify the required features
     deviceCreateInfo.pEnabledFeatures = &requiredDeviceFeatures;
 
 	// need to specify instance layers here as well.
@@ -390,8 +405,9 @@ void RenderApplication::createDevice() {
     uint32_t particularQueueIndex = 0;
 
     // Get a handle to the first member of the queue family.
-    vkGetDeviceQueue(device, requiedQueueTypes.getQueueFamilyIndexAt(0), particularQueueIndex, &graphicsQueue);
-	vkGetDeviceQueue(device, requiedQueueTypes.getQueueFamilyIndexAt(1), particularQueueIndex, &transferQueue);
+    vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(0), particularQueueIndex, &graphicsQueue);
+	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(1), particularQueueIndex, &transferQueue);
+	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(2), particularQueueIndex, &presentQueue);
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
@@ -506,28 +522,28 @@ void RenderApplication::writeToUniformBuffers(){
 	void* mappedMemory;
 
 	//Copy over Vertex Shader UBO
-    UniformDataTessShader uboVertexData;
+    UniformDataTessShader tessShaderUBO;
 
 	glm::vec3 cameraPosition(0, 8, 9);
-	uboVertexData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
-	uboVertexData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	uboVertexData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.1f, 100.0f);
-	uboVertexData.projection[1][1] *= -1;
+	tessShaderUBO.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	tessShaderUBO.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	tessShaderUBO.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.2f, 100.0f);
+	tessShaderUBO.projection[1][1] *= -1;
 	
 	
-	vkMapMemory(device, vertexUBOMemory, 0, sizeof(uboVertexData), 0, &mappedMemory);
-	memcpy(mappedMemory, &uboVertexData, sizeof(uboVertexData));
+	vkMapMemory(device, vertexUBOMemory, 0, sizeof(tessShaderUBO), 0, &mappedMemory);
+	memcpy(mappedMemory, &tessShaderUBO, sizeof(tessShaderUBO));
 	vkUnmapMemory(device, vertexUBOMemory);
 
 	//Copy over Fragment Shader UBO
-	UniformDataFragShader uboFragmentData;
-	uboFragmentData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
-	uboFragmentData.textureParam = 0.67f;
-	uboFragmentData.cameraPosition = cameraPosition;
-	uboFragmentData.matColor = glm::vec3(1, 1, 1);
+	UniformDataFragShader fragShaderUBO;
+	fragShaderUBO.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
+	fragShaderUBO.textureParam = 0.67f;
+	fragShaderUBO.cameraPosition = cameraPosition;
+	fragShaderUBO.matColor = glm::vec3(1, 1, 1);
 
-	vkMapMemory(device, fragmentUBOMemory, 0, sizeof(uboFragmentData), 0, &mappedMemory);
-	memcpy(mappedMemory, &uboFragmentData, sizeof(uboFragmentData));
+	vkMapMemory(device, fragmentUBOMemory, 0, sizeof(fragShaderUBO), 0, &mappedMemory);
+	memcpy(mappedMemory, &fragShaderUBO, sizeof(fragShaderUBO));
 	vkUnmapMemory(device, fragmentUBOMemory);
 
 
@@ -787,7 +803,7 @@ void RenderApplication::createCommandPool(){
 
     // the queue family of this command pool. All command buffers allocated from this command pool,
     // must be submitted to queues of this family ONLY.
-    commandPoolCreateInfo.queueFamilyIndex = requiedQueueTypes.getQueueFamilyIndexAt(0);
+    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndices.getQueueFamilyIndexAt(0);
     VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &graphicsCommandPool));
 }
 
@@ -842,7 +858,6 @@ void RenderApplication::createRenderPass() {
 void RenderApplication::createGraphicsPipeline(){
 
 	
-
 	//Vertex Shader Stage
 	VkShaderModule vertexShaderModule = Utils::createShaderModule("resources/shaders/vert.spv");
 
@@ -935,7 +950,7 @@ void RenderApplication::createGraphicsPipeline(){
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer.depthClampEnable = VK_FALSE;
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -1010,6 +1025,7 @@ void RenderApplication::createGraphicsPipeline(){
 	vkDestroyShaderModule(device, fragmentShaderModule, NULL);
 	vkDestroyShaderModule(device, tessContShaderModule, NULL);
 	vkDestroyShaderModule(device, tessEvalShaderModule, NULL);
+
 }
 void RenderApplication::createMainCommandBuffer() {
 
@@ -1161,6 +1177,7 @@ void RenderApplication::cleanup() {
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);
     vkDestroyCommandPool(device, graphicsCommandPool, NULL);
     vkDestroyDevice(device, NULL);
+	vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, NULL);
 
 	glfwDestroyWindow(window);
