@@ -16,6 +16,7 @@ VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
 VkDevice RenderApplication::device;
+SwapChain RenderApplication::swapChain;
 VkQueue RenderApplication::graphicsQueue;
 VkQueue RenderApplication::transferQueue;
 VkQueue RenderApplication::presentQueue;
@@ -26,10 +27,10 @@ VkBuffer RenderApplication::vertexBuffer;
 VkDeviceMemory RenderApplication::vertexBufferMemory;
 VkBuffer RenderApplication::indexBuffer;
 VkDeviceMemory RenderApplication::indexBufferMemory;
-VkBuffer RenderApplication::vertexUBO;
-VkDeviceMemory RenderApplication::vertexUBOMemory;
-VkBuffer RenderApplication::fragmentUBO;
-VkDeviceMemory RenderApplication::fragmentUBOMemory;
+VkBuffer RenderApplication::tessShaderUBO;
+VkDeviceMemory RenderApplication::tessShaderUBOMemory;
+VkBuffer RenderApplication::fragShaderUBO;
+VkDeviceMemory RenderApplication::fragShaderUBOMemory;
 VkImage RenderApplication::diffuseTexture;
 VkDeviceMemory RenderApplication::diffuseTextureMemory;
 VkImageView RenderApplication::diffuseTextureView;
@@ -67,7 +68,7 @@ void RenderApplication::run() {
 	createSurface();
     findPhysicalDevice();
     createDevice();
-
+	createSwapChain();
 
     //create descriptor and command resources
     createDescriptorSetLayout();
@@ -308,7 +309,7 @@ void RenderApplication::findPhysicalDevice() {
 bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice) {
 
 	//For this physical device to be valid, it needs to support our device features, device extensions and have
-	//queue families for all our operations
+	//queue families for all our operations (And if using swapchain, supports swapchain operations)
 
 	//Check for support of required device features
 	VkPhysicalDeviceFeatures supportedFeatures;
@@ -349,10 +350,16 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 		}
 	}
 
+	// Does this physical device support swapchain functions for our purposes
+	// Note: It is important that we only call querySupportDetails after we check 
+	// that this physical device supports our swapchain device extension
+	SwapChain::querySupportDetails(potentialPhysicalDevice, surface);
+	bool hasSwapChainSupport = SwapChain::hasAdequateSupport();
+
 	bool hasAllIndices = queueFamilyIndices.compute(potentialPhysicalDevice, surface);
 
 
-	return hasAllIndices;
+	return hasAllIndices && hasSwapChainSupport;
 
 
 }
@@ -408,6 +415,17 @@ void RenderApplication::createDevice() {
     vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(0), particularQueueIndex, &graphicsQueue);
 	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(1), particularQueueIndex, &transferQueue);
 	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(2), particularQueueIndex, &presentQueue);
+}
+
+void RenderApplication::createSwapChain(){
+	
+	swapChain.init(
+		window,			//GLFW window
+		device,			//App logical device
+		surface,		//Vulkan Surface object
+		queueFamilyIndices,		//map containing all queue family indices we need
+		resolution				//desired app extent
+	);
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
@@ -504,7 +522,7 @@ void RenderApplication::createUniformBuffers(){
 		sizeof(UniformDataTessShader),
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		vertexUBO, vertexUBOMemory
+		tessShaderUBO, tessShaderUBOMemory
 	);
 
 	//Create UBO for fragment shader data
@@ -512,7 +530,7 @@ void RenderApplication::createUniformBuffers(){
 		sizeof(UniformDataFragShader),
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		fragmentUBO, fragmentUBOMemory
+		fragShaderUBO, fragShaderUBOMemory
 	);
 
 }
@@ -522,29 +540,29 @@ void RenderApplication::writeToUniformBuffers(){
 	void* mappedMemory;
 
 	//Copy over Vertex Shader UBO
-    UniformDataTessShader tessShaderUBO;
+    UniformDataTessShader tessShaderData;
 
 	glm::vec3 cameraPosition(0, 8, 9);
-	tessShaderUBO.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
-	tessShaderUBO.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	tessShaderUBO.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.2f, 100.0f);
-	tessShaderUBO.projection[1][1] *= -1;
+	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.2f, 100.0f);
+	tessShaderData.projection[1][1] *= -1;
 	
 	
-	vkMapMemory(device, vertexUBOMemory, 0, sizeof(tessShaderUBO), 0, &mappedMemory);
-	memcpy(mappedMemory, &tessShaderUBO, sizeof(tessShaderUBO));
-	vkUnmapMemory(device, vertexUBOMemory);
+	vkMapMemory(device, tessShaderUBOMemory, 0, sizeof(tessShaderData), 0, &mappedMemory);
+	memcpy(mappedMemory, &tessShaderData, sizeof(tessShaderData));
+	vkUnmapMemory(device, tessShaderUBOMemory);
 
 	//Copy over Fragment Shader UBO
-	UniformDataFragShader fragShaderUBO;
-	fragShaderUBO.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
-	fragShaderUBO.textureParam = 0.67f;
-	fragShaderUBO.cameraPosition = cameraPosition;
-	fragShaderUBO.matColor = glm::vec3(1, 1, 1);
+	UniformDataFragShader fragShaderData;
+	fragShaderData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
+	fragShaderData.textureParam = 0.67f;
+	fragShaderData.cameraPosition = cameraPosition;
+	fragShaderData.matColor = glm::vec3(1, 0.5f, 0.5f);
 
-	vkMapMemory(device, fragmentUBOMemory, 0, sizeof(fragShaderUBO), 0, &mappedMemory);
-	memcpy(mappedMemory, &fragShaderUBO, sizeof(fragShaderUBO));
-	vkUnmapMemory(device, fragmentUBOMemory);
+	vkMapMemory(device, fragShaderUBOMemory, 0, sizeof(fragShaderData), 0, &mappedMemory);
+	memcpy(mappedMemory, &fragShaderData, sizeof(fragShaderData));
+	vkUnmapMemory(device, fragShaderUBOMemory);
 
 
 }
@@ -729,7 +747,7 @@ void RenderApplication::createDescriptorSet() {
 
     // Specify the vertex UBO info
     VkDescriptorBufferInfo descriptorVertexUBOInfo = {};
-	descriptorVertexUBOInfo.buffer = vertexUBO;
+	descriptorVertexUBOInfo.buffer = tessShaderUBO;
 	descriptorVertexUBOInfo.offset = 0;
 	descriptorVertexUBOInfo.range = sizeof(UniformDataTessShader);
 
@@ -747,7 +765,7 @@ void RenderApplication::createDescriptorSet() {
 
 	// Specify the fragment UBO info
 	VkDescriptorBufferInfo descriptorFragmentUBOInfo = {};
-	descriptorFragmentUBOInfo.buffer = fragmentUBO;
+	descriptorFragmentUBOInfo.buffer = fragShaderUBO;
 	descriptorFragmentUBOInfo.offset = 0;
 	descriptorFragmentUBOInfo.range = sizeof(UniformDataFragShader);
 
@@ -1139,10 +1157,10 @@ void RenderApplication::cleanup() {
 	vkFreeMemory(device, indexBufferMemory, NULL);
 
     //free uniform buffers
-    vkDestroyBuffer(device, vertexUBO, NULL);
-	vkFreeMemory(device, vertexUBOMemory, NULL);
-	vkDestroyBuffer(device, fragmentUBO, NULL);
-	vkFreeMemory(device, fragmentUBOMemory, NULL);
+    vkDestroyBuffer(device, tessShaderUBO, NULL);
+	vkFreeMemory(device, tessShaderUBOMemory, NULL);
+	vkDestroyBuffer(device, fragShaderUBO, NULL);
+	vkFreeMemory(device, fragShaderUBOMemory, NULL);
 
 	//free diffuse texture
 	vkDestroyImageView(device, diffuseTextureView, NULL);

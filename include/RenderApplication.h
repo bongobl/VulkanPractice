@@ -52,9 +52,13 @@ class RenderApplication{
     //Often, it is simply a graphics card that supports Vulkan. 
 	static VkPhysicalDevice physicalDevice;
 
+
     //Then we have the logical device VkDevice, which basically allows 
     //us to interact with the physical device. 
 	static VkDevice device;
+
+	//To present our rendered images to the window surface
+	static SwapChain swapChain;
 
 	//Queue handles for our operations
 	static VkQueue graphicsQueue;
@@ -76,11 +80,11 @@ class RenderApplication{
 	static VkBuffer indexBuffer;
 	static VkDeviceMemory indexBufferMemory;
 
-    //Uniform buffers used to pass simple parameters to compute shader
-	static VkBuffer vertexUBO;
-	static VkDeviceMemory vertexUBOMemory;
-	static VkBuffer fragmentUBO;
-	static VkDeviceMemory fragmentUBOMemory;
+    //Uniform buffers used to pass simple parameters shaders
+	static VkBuffer tessShaderUBO;
+	static VkDeviceMemory tessShaderUBOMemory;
+	static VkBuffer fragShaderUBO;
+	static VkDeviceMemory fragShaderUBOMemory;
 
 	//for our diffuse image
 	static VkImage diffuseTexture;
@@ -144,6 +148,7 @@ private:
 	static void createSurface();
 	static void findPhysicalDevice();
 	static void createDevice();
+	static void createSwapChain();
 	
 	
 	//helper to find physical device
