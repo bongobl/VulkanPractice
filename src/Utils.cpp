@@ -105,23 +105,23 @@ void Utils::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size
 void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat format, 
 	VkImageAspectFlags aspectFlags, bool cubeMapFlag) {
 
-	VkImageViewCreateInfo imageViewCreateInfo = {};
-	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	imageViewCreateInfo.image = image;
-	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	imageViewCreateInfo.format = format;
-	imageViewCreateInfo.subresourceRange.aspectMask = aspectFlags;
-	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-	imageViewCreateInfo.subresourceRange.levelCount = 1;
-	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-	imageViewCreateInfo.subresourceRange.layerCount = 1;
+	VkImageViewCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	createInfo.image = image;
+	createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	createInfo.format = format;
+	createInfo.subresourceRange.aspectMask = aspectFlags;
+	createInfo.subresourceRange.baseMipLevel = 0;
+	createInfo.subresourceRange.levelCount = 1;
+	createInfo.subresourceRange.baseArrayLayer = 0;
+	createInfo.subresourceRange.layerCount = 1;
 
 	if (cubeMapFlag) {
-		imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-		imageViewCreateInfo.subresourceRange.layerCount = 6;
+		createInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+		createInfo.subresourceRange.layerCount = 6;
 	}
 
-	VK_CHECK_RESULT(vkCreateImageView(RenderApplication::device, &imageViewCreateInfo, NULL, &imageView));
+	VK_CHECK_RESULT(vkCreateImageView(RenderApplication::device, &createInfo, NULL, &imageView));
 }
 
 void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions, bool cubeMapFlag) {
@@ -538,7 +538,6 @@ void Utils::createCubeMapImageFromFile(const std::vector<string> imageNames, VkI
 	//copy image data over to staging buffer
 	void* mappedStagingBuffer;
 	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, cubeMapSize, 0, &mappedStagingBuffer);
-
 
 	for (int i = 0; i < 6; ++i) {
 		memcpy((unsigned char*)mappedStagingBuffer + (faceSize * i), imageData[i], faceSize);

@@ -57,8 +57,6 @@ class RenderApplication{
     //us to interact with the physical device. 
 	static VkDevice device;
 
-	//To present our rendered images to the window surface
-	static SwapChain swapChain;
 
 	//Queue handles for our operations
 	static VkQueue graphicsQueue;
@@ -137,8 +135,11 @@ public:
 
 private:
 
-	//test
+	//high level functions
 	static void initGLFWWindow();
+	static void createAllVulkanResources();
+	static void renderOutputImage();
+	static void mainLoop();
 
     //specify all required instance layers, instance extensions and device extensions here
     static void configureAllRequirements();
@@ -196,8 +197,6 @@ private:
 	static void createMainCommandBuffer();
 
 	static void runMainCommandBuffer();
-
-	static void exportAsImage();
 
 	static void cleanup();
 

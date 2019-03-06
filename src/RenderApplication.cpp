@@ -16,7 +16,6 @@ VkInstance RenderApplication::instance;
 VkDebugReportCallbackEXT RenderApplication::debugReportCallback;
 VkPhysicalDevice RenderApplication::physicalDevice;
 VkDevice RenderApplication::device;
-SwapChain RenderApplication::swapChain;
 VkQueue RenderApplication::graphicsQueue;
 VkQueue RenderApplication::transferQueue;
 VkQueue RenderApplication::presentQueue;
@@ -57,34 +56,60 @@ VkCommandBuffer RenderApplication::mainCommandBuffer;
 
 void RenderApplication::run() {
 
-	//test initing glfw window
+	//init glfw window
 	initGLFWWindow();
+
+	//create all vulkan resources we will need in the app
+	createAllVulkanResources();
+
+	//perform render to create output image
+	renderOutputImage();
+
+	//play around with window as long as we want
+	while(!glfwWindowShouldClose(window)){
+		glfwPollEvents();
+		mainLoop();
+	}
+
+    // Clean up all resources.
+    cleanup();
+}
+
+void RenderApplication::initGLFWWindow(){
+
+	glfwInit();
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	window = glfwCreateWindow(resolution.width,resolution.height, "Test Window", NULL, NULL);
+}
+
+void RenderApplication::createAllVulkanResources() {
 
 	//add all requirements that this app will need from the device and instance
 	configureAllRequirements();
 
-    // Initialize vulkan
-    createInstance();
+	// Initialize vulkan
+	createInstance();
 	createSurface();
-    findPhysicalDevice();
-    createDevice();
+	findPhysicalDevice();
+	createDevice();
 	createSwapChain();
 
-    //create descriptor and command resources
-    createDescriptorSetLayout();
-    createDescriptorPool();
-    createCommandPool();
+	//create descriptor and command resources
+	createDescriptorSetLayout();
+	createDescriptorPool();
+	createCommandPool();
 
-    //create all device data
-    loadVertexAndIndexArrays();
-    createVertexBuffer();
-    writeToVertexBuffer();
+	//create all device data
+	loadVertexAndIndexArrays();
+	createVertexBuffer();
+	writeToVertexBuffer();
 
-    createIndexBuffer();
-    writeToIndexBuffer();
+	createIndexBuffer();
+	writeToIndexBuffer();
 
-    createUniformBuffers();
-    writeToUniformBuffers();
+	createUniformBuffers();
+	writeToUniformBuffers();
 
 	createDiffuseTexture();
 	createDiffuseTextureView();
@@ -100,46 +125,107 @@ void RenderApplication::run() {
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
 
-
 	//create descriptors
-    createDescriptorSet();
+	createDescriptorSet();
 
-    //create rendering utils
+	//create rendering utils
 	createRenderPass();
 	createFrameBuffer();
-    createGraphicsPipeline();
+	createGraphicsPipeline();
 
-    //record command buffer
-    createMainCommandBuffer();
+	//record command buffer
+	createMainCommandBuffer();
 
-    cout << "Rendering Scene" << endl;
+}
 
-    // Finally, run the recorded command buffer.
-    runMainCommandBuffer();
+void RenderApplication::renderOutputImage() {
 
-    cout << "Exporting Image to Disk" << endl;
-    //export the contents of the color attachment to disk
-	exportAsImage();
+	cout << "Rendering Scene" << endl;
 
+	// Finally, run the recorded command buffer.
+	runMainCommandBuffer();
+
+	cout << "Exporting Image to Disk" << endl;
+
+	//export the contents of the color attachment to disk
+	Utils::exportImageAsPNG(colorAttachmentImage, resolution, "Rendered Image.png", 4);
 
 	//open image
 	system("\"Rendered Image.png\"");
 
-	//play around with window as long as we want
-	while(!glfwWindowShouldClose(window)){
-		glfwPollEvents();
+}
+void RenderApplication::mainLoop() {
+
+
+}
+
+void RenderApplication::cleanup() {
+
+	//clean up all Vulkan resources
+	if (enableValidationLayers) {
+		// destroy callback.
+		auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+		if (func == nullptr) {
+			throw std::runtime_error("Error: Could not load vkDestroyDebugReportCallbackEXT");
+		}
+		func(instance, debugReportCallback, NULL);
 	}
-    // Clean up all Vulkan resources.
-    cleanup();
+
+	//free vertex buffer
+	vkDestroyBuffer(device, vertexBuffer, NULL);
+	vkFreeMemory(device, vertexBufferMemory, NULL);
+
+	//free index buffer
+	vkDestroyBuffer(device, indexBuffer, NULL);
+	vkFreeMemory(device, indexBufferMemory, NULL);
+
+	//free uniform buffers
+	vkDestroyBuffer(device, tessShaderUBO, NULL);
+	vkFreeMemory(device, tessShaderUBOMemory, NULL);
+	vkDestroyBuffer(device, fragShaderUBO, NULL);
+	vkFreeMemory(device, fragShaderUBOMemory, NULL);
+
+	//free diffuse texture
+	vkDestroyImageView(device, diffuseTextureView, NULL);
+	vkDestroyImage(device, diffuseTexture, NULL);
+	vkFreeMemory(device, diffuseTextureMemory, NULL);
+
+	//free environment map texture
+	vkDestroyImageView(device, environmentMapView, NULL);
+	vkDestroyImage(device, environmentMap, NULL);
+	vkFreeMemory(device, environmentMapMemory, NULL);
+
+	//free sampler
+	vkDestroySampler(device, textureSampler, NULL);
+
+	//free color attachment image
+	vkDestroyImageView(device, colorAttachmentImageView, NULL);
+	vkDestroyImage(device, colorAttachmentImage, NULL);
+	vkFreeMemory(device, colorAttachmentImageMemory, NULL);
+
+	//free depth attachment image
+	vkDestroyImageView(device, depthAttachmentImageView, NULL);
+	vkDestroyImage(device, depthAttachmentImage, NULL);
+	vkFreeMemory(device, depthAttachmentImageMemory, NULL);
+
+	vkDestroyFramebuffer(device, frameBuffer, NULL);
+	vkDestroyRenderPass(device, renderPass, NULL);
+	vkDestroyDescriptorPool(device, descriptorPool, NULL);
+	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
+
+	SwapChain::cleanUp(device);
+	vkDestroyPipeline(device, graphicsPipeline, NULL);
+	vkDestroyPipelineLayout(device, pipelineLayout, NULL);
+	vkDestroyCommandPool(device, graphicsCommandPool, NULL);
+	vkDestroyDevice(device, NULL);
+	vkDestroySurfaceKHR(instance, surface, nullptr);
+	vkDestroyInstance(instance, NULL);
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
+
 }
 
-void RenderApplication::initGLFWWindow(){
-
-	glfwInit();
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-	window = glfwCreateWindow(resolution.width,resolution.height, "Test Window", NULL, NULL);
-}
 void RenderApplication::configureAllRequirements(){
 
 
@@ -417,19 +503,20 @@ void RenderApplication::createDevice() {
 	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(2), particularQueueIndex, &presentQueue);
 }
 
-void RenderApplication::createSwapChain(){
-	
-	swapChain.init(
+void RenderApplication::createSwapChain() {
+
+	SwapChain::init(
 		window,			//GLFW window
 		device,			//App logical device
 		surface,		//Vulkan Surface object
-		queueFamilyIndices,		//map containing all queue family indices we need
+		queueFamilyIndices.getQueueFamilyIndexAt(0),	//graphics queue family index
+		queueFamilyIndices.getQueueFamilyIndexAt(1),	//present queue family index
 		resolution				//desired app extent
 	);
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/Turtle.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -542,8 +629,8 @@ void RenderApplication::writeToUniformBuffers(){
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;
 
-	glm::vec3 cameraPosition(0, 8, 9);
-	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	glm::vec3 cameraPosition(-4.3, 5, 6);
+	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.7f,0,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.2f, 100.0f);
 	tessShaderData.projection[1][1] *= -1;
@@ -556,9 +643,9 @@ void RenderApplication::writeToUniformBuffers(){
 	//Copy over Fragment Shader UBO
 	UniformDataFragShader fragShaderData;
 	fragShaderData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
-	fragShaderData.textureParam = 0.67f;
+	fragShaderData.textureParam = 0.7f;
 	fragShaderData.cameraPosition = cameraPosition;
-	fragShaderData.matColor = glm::vec3(1, 0.5f, 0.5f);
+	fragShaderData.matColor = glm::vec3(1, 1, 1);
 
 	vkMapMemory(device, fragShaderUBOMemory, 0, sizeof(fragShaderData), 0, &mappedMemory);
 	memcpy(mappedMemory, &fragShaderData, sizeof(fragShaderData));
@@ -570,7 +657,7 @@ void RenderApplication::writeToUniformBuffers(){
 void RenderApplication::createDiffuseTexture(){
 
 	Utils::createImageFromFile(
-		"resources/images/steel.jpg",	//File name on Disk
+		"resources/images/rock.jpg",	//File name on Disk
 		diffuseTexture,					//image
 		diffuseTextureMemory,			//image memory
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL	//Layout of image
@@ -1127,79 +1214,6 @@ void RenderApplication::runMainCommandBuffer() {
 
     //no longer need fence
     vkDestroyFence(device, fence, NULL);
-
-}
-
-void RenderApplication::exportAsImage(){
-
-	//NOTE: We don't need to transition the color attachment layout image to VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL since the render pass already did for us
-
-	Utils::exportImageAsPNG(colorAttachmentImage, resolution, "Rendered Image.png",4);
-}
-void RenderApplication::cleanup() {
-
-	//clean up all Vulkan resources
-	if (enableValidationLayers) {
-		// destroy callback.
-		auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
-		if (func == nullptr) {
-			throw std::runtime_error("Error: Could not load vkDestroyDebugReportCallbackEXT");
-		}
-		func(instance, debugReportCallback, NULL);
-	}
-
-	//free vertex buffer
-	vkDestroyBuffer(device, vertexBuffer, NULL);
-	vkFreeMemory(device, vertexBufferMemory, NULL);
-
-	//free index buffer
-	vkDestroyBuffer(device, indexBuffer, NULL);
-	vkFreeMemory(device, indexBufferMemory, NULL);
-
-    //free uniform buffers
-    vkDestroyBuffer(device, tessShaderUBO, NULL);
-	vkFreeMemory(device, tessShaderUBOMemory, NULL);
-	vkDestroyBuffer(device, fragShaderUBO, NULL);
-	vkFreeMemory(device, fragShaderUBOMemory, NULL);
-
-	//free diffuse texture
-	vkDestroyImageView(device, diffuseTextureView, NULL);
-	vkDestroyImage(device, diffuseTexture, NULL);
-	vkFreeMemory(device, diffuseTextureMemory, NULL);
-
-	//free environment map texture
-	vkDestroyImageView(device, environmentMapView, NULL);
-	vkDestroyImage(device, environmentMap, NULL);
-	vkFreeMemory(device, environmentMapMemory, NULL);
-
-	//free sampler
-	vkDestroySampler(device, textureSampler, nullptr);
-
-	//free color attachment image
-	vkDestroyImageView(device, colorAttachmentImageView, NULL);
-	vkDestroyImage(device, colorAttachmentImage, NULL);
-	vkFreeMemory(device, colorAttachmentImageMemory, NULL);
-
-	//free depth attachment image
-	vkDestroyImageView(device, depthAttachmentImageView, NULL);
-	vkDestroyImage(device, depthAttachmentImage, NULL);
-	vkFreeMemory(device, depthAttachmentImageMemory, NULL);
-
-	vkDestroyFramebuffer(device, frameBuffer, NULL);
-	vkDestroyRenderPass(device,renderPass, NULL);
-    vkDestroyDescriptorPool(device, descriptorPool, NULL);
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
-
-
-	vkDestroyPipeline(device, graphicsPipeline, NULL);
-    vkDestroyPipelineLayout(device, pipelineLayout, NULL);
-    vkDestroyCommandPool(device, graphicsCommandPool, NULL);
-    vkDestroyDevice(device, NULL);
-	vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, NULL);
-
-	glfwDestroyWindow(window);
-	glfwTerminate();
 
 }
 
