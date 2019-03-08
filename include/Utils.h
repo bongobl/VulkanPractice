@@ -38,8 +38,6 @@ struct UniformDataFragShader {
 
 class Utils{
 
-public:
-
 	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 		VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 
@@ -72,7 +70,8 @@ public:
 
 	static void exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels);
 
-
+	friend class RenderApplication;
+	friend class SwapChain;
 };
 
 // Used for validating return values of Vulkan API calls.

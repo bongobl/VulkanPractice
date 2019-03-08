@@ -247,6 +247,16 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	}
+
+	//new swapchain image to present source
+	else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = 0;
+
+		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		destinationStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	}
+
 	
 
 	//no other layout combo options
@@ -298,7 +308,7 @@ void Utils::endSingleTimeCommandBuffer(VkCommandBuffer singleTimeCmdBuffer) {
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &singleTimeCmdBuffer;
 
-	//NEED A GRAPHICS QUEUE
+	//NEED A TRNASFER QUEUE
 	vkQueueSubmit(RenderApplication::getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
 	vkQueueWaitIdle(RenderApplication::getTransferQueue());
 	vkFreeCommandBuffers(RenderApplication::device, RenderApplication::getTransferCmdPool(), 1, &singleTimeCmdBuffer);

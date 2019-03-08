@@ -121,13 +121,15 @@ class RenderApplication{
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
 	static VkPipelineLayout pipelineLayout;
 	static VkPipeline graphicsPipeline;
-	
+	static VkFence presentFence;
     
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
 	static VkCommandPool graphicsCommandPool;
 	static VkCommandBuffer mainCommandBuffer;
 
+
+	
 
 public:
 
@@ -193,6 +195,7 @@ private:
 	static void createRenderPass();
 	static void createFrameBuffer();
 	static void createGraphicsPipeline();
+	static void createPresentFence();
 
 	static void createMainCommandBuffer();
 

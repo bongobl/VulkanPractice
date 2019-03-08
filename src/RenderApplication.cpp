@@ -51,6 +51,7 @@ VkRenderPass RenderApplication::renderPass;
 VkPipelineLayout RenderApplication::pipelineLayout;
 VkPipeline RenderApplication::graphicsPipeline;
 VkCommandPool RenderApplication::graphicsCommandPool;
+VkFence RenderApplication::presentFence;
 VkCommandBuffer RenderApplication::mainCommandBuffer;
 
 
@@ -66,6 +67,7 @@ void RenderApplication::run() {
 	renderOutputImage();
 
 	//play around with window as long as we want
+	cout << "in main loop" << endl;
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
 		mainLoop();
@@ -100,6 +102,11 @@ void RenderApplication::createAllVulkanResources() {
 	createDescriptorPool();
 	createCommandPool();
 
+	//temp: prepare images to present
+	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
+		Utils::transitionImageLayout(SwapChain::images[i], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+	}
+
 	//create all device data
 	loadVertexAndIndexArrays();
 	createVertexBuffer();
@@ -132,6 +139,7 @@ void RenderApplication::createAllVulkanResources() {
 	createRenderPass();
 	createFrameBuffer();
 	createGraphicsPipeline();
+	createPresentFence();
 
 	//record command buffer
 	createMainCommandBuffer();
@@ -156,6 +164,35 @@ void RenderApplication::renderOutputImage() {
 }
 void RenderApplication::mainLoop() {
 
+	uint64_t MAXVAL = std::numeric_limits<uint64_t>::max();
+	VkResult result;
+	uint32_t imageIndex;
+	result = vkAcquireNextImageKHR(device, SwapChain::vulkanHandle, MAXVAL, VK_NULL_HANDLE, presentFence, &imageIndex);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		throw std::runtime_error("Have to recreate swapchain\n");
+	}
+	VK_CHECK_RESULT(result);
+
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 0;
+
+	VkSwapchainKHR swapChains[] = {SwapChain::vulkanHandle};
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = swapChains;
+	presentInfo.pImageIndices = &imageIndex;
+
+	vkQueuePresentKHR(presentQueue, &presentInfo);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		throw std::runtime_error("Have to recreate swapchain\n");
+	}
+	VK_CHECK_RESULT(result);
+
+	vkWaitForFences(device, 1, &presentFence, VK_TRUE, MAXVAL);
+
+	vkResetFences(device, 1, &presentFence);
 
 }
 
@@ -214,6 +251,7 @@ void RenderApplication::cleanup() {
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
 
 	SwapChain::cleanUp(device);
+	vkDestroyFence(device, presentFence, NULL);
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
 	vkDestroyPipelineLayout(device, pipelineLayout, NULL);
 	vkDestroyCommandPool(device, graphicsCommandPool, NULL);
@@ -513,10 +551,11 @@ void RenderApplication::createSwapChain() {
 		queueFamilyIndices.getQueueFamilyIndexAt(1),	//present queue family index
 		resolution				//desired app extent
 	);
+
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/Turtle.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -1131,6 +1170,14 @@ void RenderApplication::createGraphicsPipeline(){
 	vkDestroyShaderModule(device, tessContShaderModule, NULL);
 	vkDestroyShaderModule(device, tessEvalShaderModule, NULL);
 
+}
+
+void RenderApplication::createPresentFence(){
+	
+	VkFenceCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	createInfo.flags = 0;
+	VK_CHECK_RESULT(vkCreateFence(device, &createInfo, NULL, &presentFence)); 
 }
 void RenderApplication::createMainCommandBuffer() {
 
