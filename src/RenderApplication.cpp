@@ -4,7 +4,7 @@
 
 //Initialize static members
 GLFWwindow* RenderApplication::window;
-VkExtent2D RenderApplication::resolution = {1280,980};
+VkExtent2D RenderApplication::resolution = {1920,1470};
 std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
@@ -66,8 +66,11 @@ void RenderApplication::run() {
 	//perform render to create output image
 	renderOutputImage();
 
+
+	copyOutputToSwapChainImages();
+
 	//play around with window as long as we want
-	cout << "in main loop" << endl;
+	cout << "In main loop" << endl;
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
 		mainLoop();
@@ -102,10 +105,6 @@ void RenderApplication::createAllVulkanResources() {
 	createDescriptorPool();
 	createCommandPool();
 
-	//temp: prepare images to present
-	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
-		Utils::transitionImageLayout(SwapChain::images[i], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-	}
 
 	//create all device data
 	loadVertexAndIndexArrays();
@@ -144,6 +143,7 @@ void RenderApplication::createAllVulkanResources() {
 	//record command buffer
 	createMainCommandBuffer();
 
+	
 }
 
 void RenderApplication::renderOutputImage() {
@@ -153,6 +153,7 @@ void RenderApplication::renderOutputImage() {
 	// Finally, run the recorded command buffer.
 	runMainCommandBuffer();
 
+	/*
 	cout << "Exporting Image to Disk" << endl;
 
 	//export the contents of the color attachment to disk
@@ -160,7 +161,16 @@ void RenderApplication::renderOutputImage() {
 
 	//open image
 	system("\"Rendered Image.png\"");
+	*/
+}
 
+void RenderApplication::copyOutputToSwapChainImages(){
+
+	for (unsigned int i = 0; i < SwapChain::images.size(); ++i) {
+		Utils::transitionImageLayout(SwapChain::images[i], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		Utils::copyImage(colorAttachmentImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, SwapChain::images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, resolution);
+		Utils::transitionImageLayout(SwapChain::images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+	}
 }
 void RenderApplication::mainLoop() {
 
@@ -668,8 +678,8 @@ void RenderApplication::writeToUniformBuffers(){
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;
 
-	glm::vec3 cameraPosition(-4.3, 5, 6);
-	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.7f,0,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	glm::vec3 cameraPosition(0, 8, 9);
+	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.2f, 100.0f);
 	tessShaderData.projection[1][1] *= -1;

@@ -102,6 +102,32 @@ void Utils::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size
 	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
 }
 
+void Utils::copyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, VkExtent2D imageExtent) {
+
+	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
+
+	VkImageCopy imageCopyInfo = {};
+
+	VkImageSubresourceLayers layers = {};
+	layers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	layers.mipLevel = 0;
+	layers.baseArrayLayer = 0;
+	layers.layerCount = 1;
+	
+	imageCopyInfo.srcSubresource = layers;
+	imageCopyInfo.srcOffset = { 0,0,0 };
+	imageCopyInfo.dstSubresource = layers;
+	imageCopyInfo.dstOffset = { 0,0,0 };
+	imageCopyInfo.extent = {
+		imageExtent.width,
+		imageExtent.height,
+		1
+	};
+
+	vkCmdCopyImage(singleTimeCommandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout, 1, &imageCopyInfo);
+
+	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
+}
 void Utils::createImageView(VkImage image, VkImageView &imageView, VkFormat format, 
 	VkImageAspectFlags aspectFlags, bool cubeMapFlag) {
 
@@ -248,12 +274,12 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 		destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	}
 
-	//new swapchain image to present source
-	else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
-		barrier.srcAccessMask = 0;
+	//copied dest to present source
+	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 		barrier.dstAccessMask = 0;
 
-		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		destinationStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 	}
 

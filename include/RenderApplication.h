@@ -141,6 +141,7 @@ private:
 	static void initGLFWWindow();
 	static void createAllVulkanResources();
 	static void renderOutputImage();
+	static void copyOutputToSwapChainImages();
 	static void mainLoop();
 
     //specify all required instance layers, instance extensions and device extensions here
