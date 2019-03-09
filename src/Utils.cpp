@@ -479,7 +479,7 @@ void Utils::createImageFromFile(const string imageName, VkImage &image, VkDevice
 
 	unsigned char* imageData = stbi_load(imageName.c_str(), (int*)&imageExtent.width, (int*)&imageExtent.height, &numChannels, STBI_rgb_alpha);
 	if (numChannels == -1) {
-        std::string error =  "Render Application::loadImage: failed to load image " + imageName + "\n";
+        std::string error =  "Render Application::loadImage: failed to load image " + imageName;
         throw std::runtime_error(error.c_str());
     }
 
@@ -545,7 +545,7 @@ void Utils::createCubeMapImageFromFile(const std::vector<string> imageNames, VkI
 		
 		imageData[i] = stbi_load(imageNames[i].c_str(), (int*)&imageExtent.width, (int*)&imageExtent.height, &numChannels, STBI_rgb_alpha);
 		if (numChannels == -1) {
-			std::string error = "Render Application::loadImage: failed to load image " + imageNames[i] + "\n";
+			std::string error = "Render Application::loadImage: failed to load image " + imageNames[i];
 			throw std::runtime_error(error.c_str());
 		}
 		//debug output
@@ -631,6 +631,15 @@ void Utils::exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::st
 	//map staging buffer memory and export it
 	void* mappedStagingBuffer;
 	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, bufferByteSize, 0, &mappedStagingBuffer);
+
+	//Swapchain images will most likely be in VK_FORMAT_B8G8R8A8_UNORM, so we will need to swap the red and the blue channels
+	unsigned char* pixels = (unsigned char*) mappedStagingBuffer;
+	for(int i = 0; i < dimensions.width * dimensions.height; ++i){
+		unsigned char blue = pixels[numChannels * i + 0];
+		pixels[numChannels * i + 0] = pixels[numChannels * i + 2];
+		pixels[numChannels * i + 2] = blue;
+	}
+
 	stbi_write_png(fileName.c_str(), dimensions.width, dimensions.height, numChannels, mappedStagingBuffer, dimensions.width * numChannels);
 	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
 

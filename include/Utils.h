@@ -69,6 +69,7 @@ class Utils{
 	static void createCubeMapImageFromFile(const std::vector<string> imageNames, 
 		VkImage &image, VkDeviceMemory &imageMemory, VkImageLayout finalLayout);
 
+	//Note: Images expected to be in transfer src layout with VK_FORMAT_B8G8R8A8_UNORM format
 	static void exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels);
 
 	friend class RenderApplication;

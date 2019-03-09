@@ -15,7 +15,7 @@ int main() {
 		RenderApplication::run();
     }
     catch (const std::runtime_error& e) {
-        printf("Exception thrown: %s\n", e.what());
+        cout << "Exception Thrown: " << e.what() << endl;
         return EXIT_FAILURE;
     }
     

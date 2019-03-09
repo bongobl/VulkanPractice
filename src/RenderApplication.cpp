@@ -70,7 +70,7 @@ void RenderApplication::run() {
 	copyOutputToSwapChainImages();
 
 	//play around with window as long as we want
-	cout << "In main loop" << endl;
+	cout << "In Main Loop" << endl;
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
 		mainLoop();
@@ -78,6 +78,8 @@ void RenderApplication::run() {
 
     // Clean up all resources.
     cleanup();
+
+	cout << "Successful Close" << endl;
 }
 
 void RenderApplication::initGLFWWindow(){
@@ -162,6 +164,7 @@ void RenderApplication::renderOutputImage() {
 	//open image
 	system("\"Rendered Image.png\"");
 	*/
+	
 }
 
 void RenderApplication::copyOutputToSwapChainImages(){
@@ -180,7 +183,7 @@ void RenderApplication::mainLoop() {
 	result = vkAcquireNextImageKHR(device, SwapChain::vulkanHandle, MAXVAL, VK_NULL_HANDLE, presentFence, &imageIndex);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-		throw std::runtime_error("Have to recreate swapchain\n");
+		throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
 	}
 	VK_CHECK_RESULT(result);
 
@@ -195,8 +198,8 @@ void RenderApplication::mainLoop() {
 
 	vkQueuePresentKHR(presentQueue, &presentInfo);
 
-	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-		throw std::runtime_error("Have to recreate swapchain\n");
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+		throw std::runtime_error("Swapchain reported out of date or suboptimal after present queue submit, need to recreate");
 	}
 	VK_CHECK_RESULT(result);
 
@@ -329,7 +332,7 @@ void RenderApplication::createInstance() {
 			}
 		}
 		if (!foundRequiredLayer) {
-			string errorMessage = "Instance Layer " + string(currRequiredLayer) + " not supported\n";
+			string errorMessage = "Instance Layer " + string(currRequiredLayer) + " not supported";
 			throw std::runtime_error(errorMessage);
 		}
 	}
@@ -353,7 +356,7 @@ void RenderApplication::createInstance() {
 			}
 		}
 		if (!foundRequiredExtension) {
-			string errorMessage = "Instance Extension " + string(currRequiredExtension) + " not supported\n";
+			string errorMessage = "Instance Extension " + string(currRequiredExtension) + " not supported";
 			throw std::runtime_error(errorMessage);
 		}
 	}
@@ -743,7 +746,7 @@ void RenderApplication::createColorAttachmentImage() {
 
 	Utils::createImage(
 		resolution,
-		VK_FORMAT_R8G8B8A8_UNORM,	//format
+		VK_FORMAT_B8G8R8A8_UNORM,	//format
 		VK_IMAGE_TILING_OPTIMAL,	//tiling
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,	//usage
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//memory properties
@@ -753,7 +756,7 @@ void RenderApplication::createColorAttachmentImage() {
 	//Note: no need to transition to layout VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, render pass will do that for us
 }
 void RenderApplication::createColorAttachmentImageView() {
-	Utils::createImageView(colorAttachmentImage, colorAttachmentImageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+	Utils::createImageView(colorAttachmentImage, colorAttachmentImageView, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void RenderApplication::createDepthAttachmentImage(){
@@ -964,7 +967,7 @@ void RenderApplication::createCommandPool(){
 void RenderApplication::createRenderPass() {
 
 	VkAttachmentDescription colorAttachment = {};
-	colorAttachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+	colorAttachment.format = VK_FORMAT_B8G8R8A8_UNORM;
 	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
