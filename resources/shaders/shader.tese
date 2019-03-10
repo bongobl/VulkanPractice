@@ -37,5 +37,22 @@ void main()
  	//innerPosition.y += displacement;
 
     gl_Position = ubo.projection * ubo.view * ubo.model * vec4(innerPosition, 1.0f);
-    modelMatrix = ubo.model;
+
+
+
 }
+
+
+/* CODE FOR DUAL PARABOLOID MAPPING
+gl_Position = ubo.view * ubo.model * vec4(innerPosition, 1.0f);
+    
+float zDist = -gl_Position.z;
+
+float dist = length(gl_Position.xyz);
+
+vec3 final = gl_Position.xyz + vec3(0,0,-dist);
+
+gl_Position.x = final.x / -final.z;
+gl_Position.y = final.y / final.z;
+gl_Position.z = zDist / 1000;
+*/

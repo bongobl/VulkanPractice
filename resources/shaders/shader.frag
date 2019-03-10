@@ -24,8 +24,6 @@ layout(binding = 3) uniform UniformBufferObject{
 
 
 
-
-
 //output to color attachment
 layout(location = 0) out vec4 outColor;
 
@@ -58,10 +56,9 @@ void main() {
 	//ambient
 	vec3 ambient = 0.04f * ubo.matColor;
 
-
 	//final color
 	outColor.rgb = diffuse + specular + ambient; 
-	
+
     outColor.a = 1.0f;
 
 }

@@ -682,9 +682,9 @@ void RenderApplication::writeToUniformBuffers(){
     UniformDataTessShader tessShaderData;
 
 	glm::vec3 cameraPosition(0, 8, 9);
-	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.2f, 100.0f);
+	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.2f, 300.0f);
 	tessShaderData.projection[1][1] *= -1;
 	
 	
@@ -694,7 +694,7 @@ void RenderApplication::writeToUniformBuffers(){
 
 	//Copy over Fragment Shader UBO
 	UniformDataFragShader fragShaderData;
-	fragShaderData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
+	fragShaderData.lightDirection = glm::normalize(glm::vec3(-2.5f, -2, -3.5));
 	fragShaderData.textureParam = 0.7f;
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
