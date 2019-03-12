@@ -54,6 +54,7 @@ void SwapChain::init(GLFWwindow* window, VkDevice device, VkSurfaceKHR surface, 
 	presentMode = choosePresentMode();
 	extent = chooseExtent(appExtent);
 
+	//choose minimum number of images 
 	uint32_t imageCount = availableSurfaceCapabilities.minImageCount + 1;
 	if (availableSurfaceCapabilities.maxImageCount > 0 && imageCount > availableSurfaceCapabilities.maxImageCount) {
 		imageCount = availableSurfaceCapabilities.maxImageCount;

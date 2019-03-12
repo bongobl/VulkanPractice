@@ -19,7 +19,6 @@
 #include <map>
 
 
-
 ///////////////////////////////Utils//////////////////////////////////
 
 void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
@@ -277,10 +276,10 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 	//copied dest to present source
 	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
 		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier.dstAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT ;
 
 		sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		destinationStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	}
 
 	

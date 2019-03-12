@@ -57,6 +57,7 @@ VkCommandBuffer RenderApplication::mainCommandBuffer;
 
 void RenderApplication::run() {
 
+
 	//init glfw window
 	initGLFWWindow();
 
@@ -145,6 +146,7 @@ void RenderApplication::createAllVulkanResources() {
 	//record command buffer
 	createMainCommandBuffer();
 
+
 	
 }
 
@@ -180,12 +182,22 @@ void RenderApplication::mainLoop() {
 	uint64_t MAXVAL = std::numeric_limits<uint64_t>::max();
 	VkResult result;
 	uint32_t imageIndex;
+
+	//Acquire next image from swapchain, image may still be in process of presenting for a previous frame so we will
+	//tell this function to signal our presentFence when it is done
 	result = vkAcquireNextImageKHR(device, SwapChain::vulkanHandle, MAXVAL, VK_NULL_HANDLE, presentFence, &imageIndex);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
 	}
 	VK_CHECK_RESULT(result);
+
+	//wait for this frame to finish presenting its previous frame
+	vkWaitForFences(device, 1, &presentFence, VK_TRUE, MAXVAL);
+
+	//lock fence so next frame/image can use it
+	vkResetFences(device, 1, &presentFence);
+
 
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -203,9 +215,8 @@ void RenderApplication::mainLoop() {
 	}
 	VK_CHECK_RESULT(result);
 
-	vkWaitForFences(device, 1, &presentFence, VK_TRUE, MAXVAL);
-
-	vkResetFences(device, 1, &presentFence);
+	
+	
 
 }
 
@@ -994,19 +1005,31 @@ void RenderApplication::createRenderPass() {
 	depthAttachmentRef.attachment = 1;
 	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+	
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachmentRef;
 	subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
+	VkSubpassDependency dependency = {};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
 	std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+
 	VkRenderPassCreateInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());;
+	renderPassInfo.attachmentCount = (uint32_t)attachments.size();
 	renderPassInfo.pAttachments = attachments.data();
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 1;
+	renderPassInfo.pDependencies = &dependency;
 
 	VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
 
