@@ -633,7 +633,7 @@ void Utils::exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::st
 
 	//Swapchain images will most likely be in VK_FORMAT_B8G8R8A8_UNORM, so we will need to swap the red and the blue channels
 	unsigned char* pixels = (unsigned char*) mappedStagingBuffer;
-	for(int i = 0; i < dimensions.width * dimensions.height; ++i){
+	for(unsigned int i = 0; i < dimensions.width * dimensions.height; ++i){
 		unsigned char blue = pixels[numChannels * i + 0];
 		pixels[numChannels * i + 0] = pixels[numChannels * i + 2];
 		pixels[numChannels * i + 2] = blue;
