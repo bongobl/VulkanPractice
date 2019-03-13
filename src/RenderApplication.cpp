@@ -4,7 +4,7 @@
 
 //Initialize static members
 GLFWwindow* RenderApplication::window;
-VkExtent2D RenderApplication::resolution = {1920,1470};
+VkExtent2D RenderApplication::desiredExtent = {1920,1470};
 std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
@@ -37,13 +37,10 @@ VkImage RenderApplication::environmentMap;
 VkDeviceMemory RenderApplication::environmentMapMemory;
 VkImageView RenderApplication::environmentMapView;
 VkSampler RenderApplication::textureSampler;
-VkImage RenderApplication::colorAttachmentImage;
-VkDeviceMemory RenderApplication::colorAttachmentImageMemory;
-VkImageView RenderApplication::colorAttachmentImageView;
 VkImage RenderApplication::depthAttachmentImage;
 VkDeviceMemory RenderApplication::depthAttachmentImageMemory;
 VkImageView RenderApplication::depthAttachmentImageView;
-VkFramebuffer RenderApplication::frameBuffer;
+std::vector<VkFramebuffer> RenderApplication::swapChainFrameBuffers;
 VkDescriptorPool RenderApplication::descriptorPool;
 VkDescriptorSet RenderApplication::descriptorSet;
 VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
@@ -52,7 +49,7 @@ VkPipelineLayout RenderApplication::pipelineLayout;
 VkPipeline RenderApplication::graphicsPipeline;
 VkCommandPool RenderApplication::graphicsCommandPool;
 VkFence RenderApplication::presentFence;
-VkCommandBuffer RenderApplication::mainCommandBuffer;
+std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
 
 
 void RenderApplication::run() {
@@ -68,7 +65,7 @@ void RenderApplication::run() {
 	renderOutputImage();
 
 
-	copyOutputToSwapChainImages();
+	//copyOutputToSwapChainImages();
 
 	//play around with window as long as we want
 	cout << "In Main Loop" << endl;
@@ -88,7 +85,7 @@ void RenderApplication::initGLFWWindow(){
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-	window = glfwCreateWindow(resolution.width,resolution.height, "Test Window", NULL, NULL);
+	window = glfwCreateWindow(desiredExtent.width,desiredExtent.height, "Test Window", NULL, NULL);
 }
 
 void RenderApplication::createAllVulkanResources() {
@@ -128,9 +125,6 @@ void RenderApplication::createAllVulkanResources() {
 
 	createTextureSampler();
 
-	createColorAttachmentImage();
-	createColorAttachmentImageView();
-
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
 
@@ -138,16 +132,15 @@ void RenderApplication::createAllVulkanResources() {
 	createDescriptorSet();
 
 	//create rendering utils
-	createRenderPass();
-	createFrameBuffer();
+	createRenderPass();	//will rename
+	createSwapChainFrameBuffers();
 	createGraphicsPipeline();
 	createPresentFence();
 
 	//record command buffer
-	createMainCommandBuffer();
+	createRenderCommandBuffers();
 
 
-	
 }
 
 void RenderApplication::renderOutputImage() {
@@ -155,28 +148,10 @@ void RenderApplication::renderOutputImage() {
 	cout << "Rendering Scene" << endl;
 
 	// Finally, run the recorded command buffer.
-	runMainCommandBuffer();
-
-	/*
-	cout << "Exporting Image to Disk" << endl;
-
-	//export the contents of the color attachment to disk
-	Utils::exportImageAsPNG(colorAttachmentImage, resolution, "Rendered Image.png", 4);
-
-	//open image
-	system("\"Rendered Image.png\"");
-	*/
+	runRenderCommandBuffers();
 	
 }
 
-void RenderApplication::copyOutputToSwapChainImages(){
-
-	for (unsigned int i = 0; i < SwapChain::images.size(); ++i) {
-		Utils::transitionImageLayout(SwapChain::images[i], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-		Utils::copyImage(colorAttachmentImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, SwapChain::images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, resolution);
-		Utils::transitionImageLayout(SwapChain::images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-	}
-}
 void RenderApplication::mainLoop() {
 
 	uint64_t MAXVAL = std::numeric_limits<uint64_t>::max();
@@ -214,9 +189,6 @@ void RenderApplication::mainLoop() {
 		throw std::runtime_error("Swapchain reported out of date or suboptimal after present queue submit, need to recreate");
 	}
 	VK_CHECK_RESULT(result);
-
-	
-	
 
 }
 
@@ -259,17 +231,16 @@ void RenderApplication::cleanup() {
 	//free sampler
 	vkDestroySampler(device, textureSampler, NULL);
 
-	//free color attachment image
-	vkDestroyImageView(device, colorAttachmentImageView, NULL);
-	vkDestroyImage(device, colorAttachmentImage, NULL);
-	vkFreeMemory(device, colorAttachmentImageMemory, NULL);
 
 	//free depth attachment image
 	vkDestroyImageView(device, depthAttachmentImageView, NULL);
 	vkDestroyImage(device, depthAttachmentImage, NULL);
 	vkFreeMemory(device, depthAttachmentImageMemory, NULL);
 
-	vkDestroyFramebuffer(device, frameBuffer, NULL);
+	for (unsigned int i = 0; i < SwapChain::images.size(); ++i) {
+		vkDestroyFramebuffer(device, swapChainFrameBuffers[i], NULL);
+	}
+
 	vkDestroyRenderPass(device, renderPass, NULL);
 	vkDestroyDescriptorPool(device, descriptorPool, NULL);
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
@@ -568,12 +539,11 @@ void RenderApplication::createDevice() {
 void RenderApplication::createSwapChain() {
 
 	SwapChain::init(
-		window,			//GLFW window
 		device,			//App logical device
 		surface,		//Vulkan Surface object
 		queueFamilyIndices.getQueueFamilyIndexAt(0),	//graphics queue family index
 		queueFamilyIndices.getQueueFamilyIndexAt(1),	//present queue family index
-		resolution				//desired app extent
+		desiredExtent				//desired app extent
 	);
 
 }
@@ -695,7 +665,7 @@ void RenderApplication::writeToUniformBuffers(){
 	glm::vec3 cameraPosition(0, 8, 9);
 	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(resolution.width) / resolution.height, 0.2f, 300.0f);
+	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
 	tessShaderData.projection[1][1] *= -1;
 	
 	
@@ -753,27 +723,11 @@ void RenderApplication::createTextureSampler(){
 	Utils::createImageSampler(textureSampler);
 }
 
-void RenderApplication::createColorAttachmentImage() {
-
-	Utils::createImage(
-		resolution,
-		VK_FORMAT_B8G8R8A8_UNORM,	//format
-		VK_IMAGE_TILING_OPTIMAL,	//tiling
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,	//usage
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,	//memory properties
-		colorAttachmentImage,			//image
-		colorAttachmentImageMemory	//image memory
-	);
-	//Note: no need to transition to layout VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, render pass will do that for us
-}
-void RenderApplication::createColorAttachmentImageView() {
-	Utils::createImageView(colorAttachmentImage, colorAttachmentImageView, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-}
 
 void RenderApplication::createDepthAttachmentImage(){
 
 	Utils::createImage(
-		resolution,
+		SwapChain::extent,
 		VK_FORMAT_D32_SFLOAT,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -790,24 +744,32 @@ void RenderApplication::createDepthAttachmentImageView(){
 	Utils::createImageView(depthAttachmentImage, depthAttachmentImageView, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
-void RenderApplication::createFrameBuffer() {
 
-	std::array<VkImageView, 2> attachments = {
-		colorAttachmentImageView,
-		depthAttachmentImageView
-	};
+void RenderApplication::createSwapChainFrameBuffers() {
+
+	//create swapchain frame buffers
+	swapChainFrameBuffers.resize(SwapChain::images.size());
+
+	for (unsigned int i = 0; i < swapChainFrameBuffers.size(); ++i) {
+
+		//define attachments for this frame buffer
+		std::array<VkImageView, 2> imageAttachments = {
+			SwapChain::imageViews[i],	//color attachment
+			depthAttachmentImageView	//depth attachment
+		};
 
 
-	VkFramebufferCreateInfo frameBufferInfo = {};
-	frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	frameBufferInfo.renderPass = renderPass;
-	frameBufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	frameBufferInfo.pAttachments = attachments.data();
-	frameBufferInfo.width = resolution.width;
-	frameBufferInfo.height = resolution.height;
-	frameBufferInfo.layers = 1;
+		VkFramebufferCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		createInfo.renderPass = renderPass;
+		createInfo.attachmentCount = (uint32_t)imageAttachments.size();
+		createInfo.pAttachments = imageAttachments.data();
+		createInfo.width = SwapChain::extent.width;
+		createInfo.height = SwapChain::extent.height;
+		createInfo.layers = 1;
 
-	VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferInfo, NULL, &frameBuffer));
+		VK_CHECK_RESULT(vkCreateFramebuffer(device, &createInfo, NULL, &swapChainFrameBuffers[i]));
+	}
 }
 void RenderApplication::createDescriptorSetLayout() {
 
@@ -971,9 +933,10 @@ void RenderApplication::createCommandPool(){
 
     // the queue family of this command pool. All command buffers allocated from this command pool,
     // must be submitted to queues of this family ONLY.
-    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndices.getQueueFamilyIndexAt(0);
+    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndices.getQueueFamilyIndexAt(0);	//graphics QFI
     VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &graphicsCommandPool));
 }
+
 
 void RenderApplication::createRenderPass() {
 
@@ -985,7 +948,7 @@ void RenderApplication::createRenderPass() {
 	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;		//we don't care what the inital layout of the image is
-	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;	//we want to copy it to a staging buffer and export it after rendering
+	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	//want to present the swapchain images after we render to them
 
 	VkAttachmentDescription depthAttachment = {};
 	depthAttachment.format = VK_FORMAT_D32_SFLOAT;
@@ -1005,7 +968,7 @@ void RenderApplication::createRenderPass() {
 	depthAttachmentRef.attachment = 1;
 	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-	
+
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
@@ -1032,9 +995,7 @@ void RenderApplication::createRenderPass() {
 	renderPassInfo.pDependencies = &dependency;
 
 	VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
-
 }
-
 void RenderApplication::createGraphicsPipeline(){
 
 	
@@ -1107,15 +1068,15 @@ void RenderApplication::createGraphicsPipeline(){
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0;
-    viewport.width = (float)resolution.width;
-    viewport.height = (float)resolution.height;
+	viewport.width = (float)SwapChain::extent.width;
+    viewport.height = (float)SwapChain::extent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     //Scissors
     VkRect2D scissor = {};
     scissor.offset = {0,0};
-    scissor.extent = resolution;
+    scissor.extent = SwapChain::extent;
 
     //Viewport State
     VkPipelineViewportStateCreateInfo viewportState = {};
@@ -1215,91 +1176,93 @@ void RenderApplication::createPresentFence(){
 	createInfo.flags = 0;
 	VK_CHECK_RESULT(vkCreateFence(device, &createInfo, NULL, &presentFence)); 
 }
-void RenderApplication::createMainCommandBuffer() {
+
+void RenderApplication::createRenderCommandBuffers() {
+
+	//we want each of our command buffers to draw to a swapchain image
+	renderCommandBuffers.resize(SwapChain::images.size());
 
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = graphicsCommandPool;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = 1;	//no swap chain, so just need one command buffer
+	allocInfo.commandBufferCount = (uint32_t)renderCommandBuffers.size();
 
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &allocInfo, &mainCommandBuffer));
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &allocInfo, renderCommandBuffers.data()));
 
-	VkCommandBufferBeginInfo beginInfo = {};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	beginInfo.pInheritanceInfo = NULL;
+	for (unsigned int i = 0; i < renderCommandBuffers.size(); ++i) {
 
-	//main command buffer scope
-	VK_CHECK_RESULT(vkBeginCommandBuffer(mainCommandBuffer, &beginInfo));
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		beginInfo.pInheritanceInfo = NULL;
 
-		VkRenderPassBeginInfo renderPassInfo = {};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = renderPass;
-		renderPassInfo.framebuffer = frameBuffer;
-		renderPassInfo.renderArea.offset = { 0,0 };
-		renderPassInfo.renderArea.extent = resolution;
+		//main command buffer scope
+		VK_CHECK_RESULT(vkBeginCommandBuffer(renderCommandBuffers[i], &beginInfo));
 
-		std::array<VkClearValue, 2> clearValues = {};
-		clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-		clearValues[1].depthStencil = { 1, 0 };
+			VkRenderPassBeginInfo renderPassInfo = {};
+			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassInfo.renderPass = renderPass;
+			renderPassInfo.framebuffer = swapChainFrameBuffers[i];
+			renderPassInfo.renderArea.offset = { 0,0 };
+			renderPassInfo.renderArea.extent = SwapChain::extent;
 
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-		renderPassInfo.pClearValues = clearValues.data();
+			std::array<VkClearValue, 2> clearValues = {};
+			clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+			clearValues[1].depthStencil = { 1, 0 };
 
-		//render pass scope
-		vkCmdBeginRenderPass(mainCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+			renderPassInfo.clearValueCount = (uint32_t)clearValues.size();
+			renderPassInfo.pClearValues = clearValues.data();
 
-			//bind our graphics pipeline
-			vkCmdBindPipeline(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+			//render pass scope
+			vkCmdBeginRenderPass(renderCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			//bind vertex buffer
-			VkBuffer vertexBuffers[] = { vertexBuffer };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(mainCommandBuffer, 0, 1, vertexBuffers, offsets);
+				//bind our graphics pipeline
+				vkCmdBindPipeline(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-			//bind index buffer
-			vkCmdBindIndexBuffer(mainCommandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+				//bind vertex buffer
+				VkBuffer vertexBuffers[] = { vertexBuffer };
+				VkDeviceSize offsets[] = { 0 };
+				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, vertexBuffers, offsets);
 
-			//bind descriptor set
-			vkCmdBindDescriptorSets(mainCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+				//bind index buffer
+				vkCmdBindIndexBuffer(renderCommandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-			//invoke graphics pipeline and draw
-			vkCmdDrawIndexed(mainCommandBuffer, (uint32_t)indexArray.size(), 1, 0, 0, 0);
+				//bind descriptor set
+				vkCmdBindDescriptorSets(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
-		vkCmdEndRenderPass(mainCommandBuffer);
+				//invoke graphics pipeline and draw
+				vkCmdDrawIndexed(renderCommandBuffers[i], (uint32_t)indexArray.size(), 1, 0, 0, 0);
 
-	VK_CHECK_RESULT(vkEndCommandBuffer(mainCommandBuffer));
+			vkCmdEndRenderPass(renderCommandBuffers[i]);
 
-
+		VK_CHECK_RESULT(vkEndCommandBuffer(renderCommandBuffers[i]));
+	}
+	
 }
 
-void RenderApplication::runMainCommandBuffer() {
+void RenderApplication::runRenderCommandBuffers() {
+	//Now we shall finally submit the recorded command buffer to our graphics queue.
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = (uint32_t)renderCommandBuffers.size(); // submit 3 command buffers
+	submitInfo.pCommandBuffers = renderCommandBuffers.data(); // the command buffers to submit.
 
+	//Create a fence to make the CPU wait for the GPU to finish before proceeding
+	VkFence fence;
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.flags = 0;
+	VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &fence));
 
-    //Now we shall finally submit the recorded command buffer to our graphics queue.
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1; // submit a single command buffer
-    submitInfo.pCommandBuffers = &mainCommandBuffer; // the command buffer to submit.
+	//We submit the command buffer on the graphics queue, at the same time giving a fence.
+	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence));
 
-    //Create a fence to make the CPU wait for the GPU to finish before proceeding
-    VkFence fence;
-    VkFenceCreateInfo fenceCreateInfo = {};
-    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceCreateInfo.flags = 0;
-    VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &fence));
+	VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
 
-    //We submit the command buffer on the graphics queue, at the same time giving a fence.
-    VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence));
-
-    VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
-
-    //no longer need fence
-    vkDestroyFence(device, fence, NULL);
-
+	//no longer need fence
+	vkDestroyFence(device, fence, NULL);
 }
-
 VkCommandPool& RenderApplication::getTransferCmdPool(){
 
 	//queues and pools which work for graphics also work for transfer

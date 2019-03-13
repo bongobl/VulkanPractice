@@ -34,7 +34,7 @@ public:
 
     
 
-    static void init(GLFWwindow* window, VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI, uint32_t presentQFI, VkExtent2D appExtent);
+    static void init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI, uint32_t presentQFI, VkExtent2D appExtent);
 	static void cleanUp(VkDevice device);
 	
 private:

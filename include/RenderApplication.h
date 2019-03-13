@@ -32,7 +32,7 @@ class RenderApplication{
 	static GLFWwindow* window;
 
 	//width and height of render area
-	static VkExtent2D resolution;
+	static VkExtent2D desiredExtent;
 
 	//Structures to hold all of our app's requirements
 	static std::vector<const char*> requiredInstanceLayers;
@@ -97,11 +97,6 @@ class RenderApplication{
 	//to sample image textures
 	static VkSampler textureSampler;
 
-	//Color attachment image to render to
-	static VkImage colorAttachmentImage;
-	static VkDeviceMemory colorAttachmentImageMemory;
-	static VkImageView colorAttachmentImageView;
-
 	//Depth attachment image to use
 	static VkImage depthAttachmentImage;
 	static VkDeviceMemory depthAttachmentImageMemory;
@@ -115,21 +110,21 @@ class RenderApplication{
 	//our render pass with one color attachment
 	static VkRenderPass renderPass;
 
-	//frame buffer to reference our color attachment image
-	static VkFramebuffer frameBuffer;
+	//frame buffers to reference our swapchain images
+	static std::vector<VkFramebuffer> swapChainFrameBuffers;
 
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
 	static VkPipelineLayout pipelineLayout;
 	static VkPipeline graphicsPipeline;
 	static VkFence presentFence;
     
+
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
 	static VkCommandPool graphicsCommandPool;
-	static VkCommandBuffer mainCommandBuffer;
 
+	static std::vector<VkCommandBuffer> renderCommandBuffers;
 
-	
 
 public:
 
@@ -141,7 +136,6 @@ private:
 	static void initGLFWWindow();
 	static void createAllVulkanResources();
 	static void renderOutputImage();
-	static void copyOutputToSwapChainImages();
 	static void mainLoop();
 
     //specify all required instance layers, instance extensions and device extensions here
@@ -182,9 +176,6 @@ private:
 	static void createEnvironmentMapView();
 
 	static void createTextureSampler();
-	
-	static void createColorAttachmentImage();
-	static void createColorAttachmentImageView();
 
 	static void createDepthAttachmentImage();
 	static void createDepthAttachmentImageView();
@@ -193,14 +184,15 @@ private:
 	static void createDescriptorSet();
 
 	//to start rendering
-	static void createRenderPass();
-	static void createFrameBuffer();
+	static void createRenderPass();	//will rename
+	static void createSwapChainFrameBuffers();
 	static void createGraphicsPipeline();
 	static void createPresentFence();
 
-	static void createMainCommandBuffer();
+	//the command buffer that will render the scene to our swapchain images
+	static void createRenderCommandBuffers();
 
-	static void runMainCommandBuffer();
+	static void runRenderCommandBuffers();
 
 	static void cleanup();
 

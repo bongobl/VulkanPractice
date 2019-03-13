@@ -43,7 +43,7 @@ bool SwapChain::hasAdequateSupport() {
 	return !availableSurfaceFormats.empty() && !availableSurfacePresentModes.empty();
 }
 
-void SwapChain::init(GLFWwindow* window, VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI, uint32_t presentQFI, VkExtent2D appExtent){
+void SwapChain::init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI, uint32_t presentQFI, VkExtent2D appExtent){
     
 	//make sure we have swapchain support
 	if(!hasAdequateSupport()){
