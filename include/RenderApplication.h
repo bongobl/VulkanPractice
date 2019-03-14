@@ -79,10 +79,10 @@ class RenderApplication{
 	static VkDeviceMemory indexBufferMemory;
 
     //Uniform buffers used to pass simple parameters shaders
-	static VkBuffer tessShaderUBO;
-	static VkDeviceMemory tessShaderUBOMemory;
-	static VkBuffer fragShaderUBO;
-	static VkDeviceMemory fragShaderUBOMemory;
+	static std::vector<VkBuffer> tessShaderUBOs;
+	static std::vector<VkDeviceMemory> tessShaderUBOMemories;
+	static std::vector<VkBuffer> fragShaderUBOs;
+	static std::vector<VkDeviceMemory> fragShaderUBOMemories;
 
 	//for our diffuse image
 	static VkImage diffuseTexture;
@@ -103,10 +103,10 @@ class RenderApplication{
 	static VkImageView depthAttachmentImageView;
 
     //Structures for Descriptor creation
-	static VkDescriptorPool descriptorPool;
-	static VkDescriptorSet descriptorSet;
+	static VkDescriptorPool descriptorPool;	
 	static VkDescriptorSetLayout descriptorSetLayout;
-    
+    static std::vector<VkDescriptorSet> descriptorSets;
+
 	//our render pass with one color attachment
 	static VkRenderPass renderPass;
 
@@ -167,7 +167,7 @@ private:
     static void writeToIndexBuffer();
 
 	static void createUniformBuffers();
-	static void writeToUniformBuffers();
+	static void writeToUniformBuffer(uint32_t imageIndex);
 
 	static void createDiffuseTexture();
 	static void createDiffuseTextureView();
@@ -181,7 +181,7 @@ private:
 	static void createDepthAttachmentImageView();
 
 	
-	static void createDescriptorSet();
+	static void createDescriptorSets();
 
 	//to start rendering
 	static void createRenderPass();	//will rename

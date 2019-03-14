@@ -26,10 +26,10 @@ VkBuffer RenderApplication::vertexBuffer;
 VkDeviceMemory RenderApplication::vertexBufferMemory;
 VkBuffer RenderApplication::indexBuffer;
 VkDeviceMemory RenderApplication::indexBufferMemory;
-VkBuffer RenderApplication::tessShaderUBO;
-VkDeviceMemory RenderApplication::tessShaderUBOMemory;
-VkBuffer RenderApplication::fragShaderUBO;
-VkDeviceMemory RenderApplication::fragShaderUBOMemory;
+std::vector<VkBuffer> RenderApplication::tessShaderUBOs;
+std::vector<VkDeviceMemory> RenderApplication::tessShaderUBOMemories;
+std::vector<VkBuffer> RenderApplication::fragShaderUBOs;
+std::vector<VkDeviceMemory> RenderApplication::fragShaderUBOMemories;
 VkImage RenderApplication::diffuseTexture;
 VkDeviceMemory RenderApplication::diffuseTextureMemory;
 VkImageView RenderApplication::diffuseTextureView;
@@ -42,7 +42,7 @@ VkDeviceMemory RenderApplication::depthAttachmentImageMemory;
 VkImageView RenderApplication::depthAttachmentImageView;
 std::vector<VkFramebuffer> RenderApplication::swapChainFrameBuffers;
 VkDescriptorPool RenderApplication::descriptorPool;
-VkDescriptorSet RenderApplication::descriptorSet;
+std::vector<VkDescriptorSet> RenderApplication::descriptorSets;
 VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
 VkRenderPass RenderApplication::renderPass;
 VkPipelineLayout RenderApplication::pipelineLayout;
@@ -115,7 +115,10 @@ void RenderApplication::createAllVulkanResources() {
 	writeToIndexBuffer();
 
 	createUniformBuffers();
-	writeToUniformBuffers();
+
+	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
+		writeToUniformBuffer(i);
+	}
 
 	createDiffuseTexture();
 	createDiffuseTextureView();
@@ -129,7 +132,7 @@ void RenderApplication::createAllVulkanResources() {
 	createDepthAttachmentImageView();
 
 	//create descriptors
-	createDescriptorSet();
+	createDescriptorSets();
 
 	//create rendering utils
 	createRenderPass();	//will rename
@@ -154,13 +157,13 @@ void RenderApplication::renderOutputImage() {
 
 void RenderApplication::mainLoop() {
 
-	uint64_t MAXVAL = std::numeric_limits<uint64_t>::max();
+	uint64_t MAX_INT_VAL = std::numeric_limits<uint64_t>::max();
 	VkResult result;
 	uint32_t imageIndex;
 
 	//Acquire next image from swapchain, image may still be in process of presenting for a previous frame so we will
 	//tell this function to signal our presentFence when it is done
-	result = vkAcquireNextImageKHR(device, SwapChain::vulkanHandle, MAXVAL, VK_NULL_HANDLE, presentFence, &imageIndex);
+	result = vkAcquireNextImageKHR(device, SwapChain::vulkanHandle, MAX_INT_VAL, VK_NULL_HANDLE, presentFence, &imageIndex);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
@@ -168,12 +171,12 @@ void RenderApplication::mainLoop() {
 	VK_CHECK_RESULT(result);
 
 	//wait for this frame to finish presenting its previous frame
-	vkWaitForFences(device, 1, &presentFence, VK_TRUE, MAXVAL);
+	vkWaitForFences(device, 1, &presentFence, VK_TRUE, MAX_INT_VAL);
 
 	//lock fence so next frame/image can use it
 	vkResetFences(device, 1, &presentFence);
 
-
+	//submit present workload to present queue
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 0;
@@ -213,10 +216,13 @@ void RenderApplication::cleanup() {
 	vkFreeMemory(device, indexBufferMemory, NULL);
 
 	//free uniform buffers
-	vkDestroyBuffer(device, tessShaderUBO, NULL);
-	vkFreeMemory(device, tessShaderUBOMemory, NULL);
-	vkDestroyBuffer(device, fragShaderUBO, NULL);
-	vkFreeMemory(device, fragShaderUBOMemory, NULL);
+
+	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
+		vkDestroyBuffer(device, tessShaderUBOs[i], NULL);
+		vkFreeMemory(device, tessShaderUBOMemories[i], NULL);
+		vkDestroyBuffer(device, fragShaderUBOs[i], NULL);
+		vkFreeMemory(device, fragShaderUBOMemories[i], NULL);
+	}
 
 	//free diffuse texture
 	vkDestroyImageView(device, diffuseTextureView, NULL);
@@ -480,7 +486,6 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 
 	return hasAllIndices && hasSwapChainSupport;
 
-
 }
 
 void RenderApplication::createDevice() {
@@ -549,7 +554,7 @@ void RenderApplication::createSwapChain() {
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/Turtle.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -637,52 +642,63 @@ void RenderApplication::writeToIndexBuffer(){
 
 void RenderApplication::createUniformBuffers(){
 
-	//Create UBO for vertex shader data
-	Utils::createBuffer(
-		sizeof(UniformDataTessShader),
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		tessShaderUBO, tessShaderUBOMemory
-	);
+	
+	tessShaderUBOs.resize(SwapChain::images.size());
+	tessShaderUBOMemories.resize(SwapChain::images.size());
+	fragShaderUBOs.resize(SwapChain::images.size());
+	fragShaderUBOMemories.resize(SwapChain::images.size());
 
-	//Create UBO for fragment shader data
-	Utils::createBuffer(
-		sizeof(UniformDataFragShader),
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		fragShaderUBO, fragShaderUBOMemory
-	);
+	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
+		//Create UBO for the tess shader data
+		Utils::createBuffer(
+			sizeof(UniformDataTessShader),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+			tessShaderUBOs[i], tessShaderUBOMemories[i]
+		);
+
+		//Create UBO for the fragment shader data
+		Utils::createBuffer(
+			sizeof(UniformDataFragShader),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+			fragShaderUBOs[i], fragShaderUBOMemories[i]
+		);
+	}
 
 }
 
-void RenderApplication::writeToUniformBuffers(){
+void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 
-	void* mappedMemory;
 
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;
 
-	glm::vec3 cameraPosition(0, 8, 9);
-	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.7f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	glm::vec3 cameraPosition(-4.5f, 4.5, 4.5);
+	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(1,0,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
 	tessShaderData.projection[1][1] *= -1;
 	
 	
-	vkMapMemory(device, tessShaderUBOMemory, 0, sizeof(tessShaderData), 0, &mappedMemory);
-	memcpy(mappedMemory, &tessShaderData, sizeof(tessShaderData));
-	vkUnmapMemory(device, tessShaderUBOMemory);
-
 	//Copy over Fragment Shader UBO
 	UniformDataFragShader fragShaderData;
-	fragShaderData.lightDirection = glm::normalize(glm::vec3(-2.5f, -2, -3.5));
+	fragShaderData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
 	fragShaderData.textureParam = 0.7f;
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
 
-	vkMapMemory(device, fragShaderUBOMemory, 0, sizeof(fragShaderData), 0, &mappedMemory);
+	void* mappedMemory;
+
+	
+	vkMapMemory(device, tessShaderUBOMemories[imageIndex], 0, sizeof(tessShaderData), 0, &mappedMemory);
+	memcpy(mappedMemory, &tessShaderData, sizeof(tessShaderData));
+	vkUnmapMemory(device, tessShaderUBOMemories[imageIndex]);
+
+	vkMapMemory(device, fragShaderUBOMemories[imageIndex], 0, sizeof(fragShaderData), 0, &mappedMemory);
 	memcpy(mappedMemory, &fragShaderData, sizeof(fragShaderData));
-	vkUnmapMemory(device, fragShaderUBOMemory);
+	vkUnmapMemory(device, fragShaderUBOMemories[imageIndex]);
+
 
 
 }
@@ -773,7 +789,7 @@ void RenderApplication::createSwapChainFrameBuffers() {
 }
 void RenderApplication::createDescriptorSetLayout() {
 
-    //define a binding for our vertex UBO
+    //define a binding for our tesselation shader UBO
     VkDescriptorSetLayoutBinding vertexUBOBinding = {};
 	vertexUBOBinding.binding = 0;	//binding = 0
 	vertexUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -782,7 +798,7 @@ void RenderApplication::createDescriptorSetLayout() {
 
 	//define a binding for our diffuse texture
 	VkDescriptorSetLayoutBinding diffuseTextureBinding = {};
-	diffuseTextureBinding.binding = 1;
+	diffuseTextureBinding.binding = 1;	//binding = 1
 	diffuseTextureBinding.descriptorCount = 1;
 	diffuseTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	diffuseTextureBinding.pImmutableSamplers = NULL;
@@ -790,13 +806,13 @@ void RenderApplication::createDescriptorSetLayout() {
 
 	//define a binding for our environment map
 	VkDescriptorSetLayoutBinding environmentMapBinding = {};
-	environmentMapBinding.binding = 2;
+	environmentMapBinding.binding = 2;	//binding 2
 	environmentMapBinding.descriptorCount = 1;
 	environmentMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	environmentMapBinding.pImmutableSamplers = NULL;
 	environmentMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	//define a binding for our fragment UBO
+	//define a binding for our fragment shader UBO
 	VkDescriptorSetLayoutBinding fragmentUBOBinding = {};
 	fragmentUBOBinding.binding = 3;	//binding = 3
 	fragmentUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -823,17 +839,17 @@ void RenderApplication::createDescriptorPool(){
 
     std::array<VkDescriptorPoolSize, 4> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = 1;
+    poolSizes[0].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = 1;
+	poolSizes[1].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[2].descriptorCount = 1;
+	poolSizes[2].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[3].descriptorCount = 1;
+	poolSizes[3].descriptorCount = (uint32_t)SwapChain::images.size();
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolCreateInfo.maxSets = 1; // we only need to allocate one descriptor set from the pool.
+	descriptorPoolCreateInfo.maxSets = (uint32_t)SwapChain::images.size();
 	descriptorPoolCreateInfo.poolSizeCount = (uint32_t)poolSizes.size();
     descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
@@ -842,82 +858,87 @@ void RenderApplication::createDescriptorPool(){
 
 
 }
-void RenderApplication::createDescriptorSet() {
+void RenderApplication::createDescriptorSets() {
 
 
+	descriptorSets.resize(SwapChain::images.size());
+	std::vector<VkDescriptorSetLayout> allLayouts = { SwapChain::images.size(), descriptorSetLayout };
     //With the pool allocated, we can now allocate the descriptor set.
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     descriptorSetAllocateInfo.descriptorPool = descriptorPool; // pool to allocate from.
-    descriptorSetAllocateInfo.descriptorSetCount = 1; // allocate a single descriptor set.
-    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
+    descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)SwapChain::images.size(); // one descriptor set per swapchain image
+    descriptorSetAllocateInfo.pSetLayouts = allLayouts.data();
 
 
     // allocate descriptor set.
-    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet));
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, descriptorSets.data()));
+
+	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
+
+		// Specify the vertex UBO info
+		VkDescriptorBufferInfo descriptorVertexUBOInfo = {};
+		descriptorVertexUBOInfo.buffer = tessShaderUBOs[i];		//hard coded for now
+		descriptorVertexUBOInfo.offset = 0;
+		descriptorVertexUBOInfo.range = sizeof(UniformDataTessShader);
+
+		// Specify the diffuse texture info
+		VkDescriptorImageInfo descriptorDiffuseTextureInfo = {};
+		descriptorDiffuseTextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		descriptorDiffuseTextureInfo.imageView = diffuseTextureView;
+		descriptorDiffuseTextureInfo.sampler = textureSampler;
+
+		// Specify the envirmnemt map info
+		VkDescriptorImageInfo descriptorEnvironmentMapInfo = {};
+		descriptorEnvironmentMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		descriptorEnvironmentMapInfo.imageView = environmentMapView;
+		descriptorEnvironmentMapInfo.sampler = textureSampler;
+
+		// Specify the fragment UBO info
+		VkDescriptorBufferInfo descriptorFragmentUBOInfo = {};
+		descriptorFragmentUBOInfo.buffer = fragShaderUBOs[i]; 	//hard coded for now
+		descriptorFragmentUBOInfo.offset = 0;
+		descriptorFragmentUBOInfo.range = sizeof(UniformDataFragShader);
 
 
-    // Specify the vertex UBO info
-    VkDescriptorBufferInfo descriptorVertexUBOInfo = {};
-	descriptorVertexUBOInfo.buffer = tessShaderUBO;
-	descriptorVertexUBOInfo.offset = 0;
-	descriptorVertexUBOInfo.range = sizeof(UniformDataTessShader);
+		std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
 
-	// Specify the diffuse texture info
-	VkDescriptorImageInfo descriptorDiffuseTextureInfo = {};
-	descriptorDiffuseTextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	descriptorDiffuseTextureInfo.imageView = diffuseTextureView;
-	descriptorDiffuseTextureInfo.sampler = textureSampler;
+		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[0].dstSet = descriptorSets[i];
+		descriptorWrites[0].dstBinding = 0;		//binding = 0
+		descriptorWrites[0].dstArrayElement = 0;
+		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[0].descriptorCount = 1;
+		descriptorWrites[0].pBufferInfo = &descriptorVertexUBOInfo;
 
-	// Specify the envirmnemt map info
-	VkDescriptorImageInfo descriptorEnvironmentMapInfo = {};
-	descriptorEnvironmentMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	descriptorEnvironmentMapInfo.imageView = environmentMapView;
-	descriptorEnvironmentMapInfo.sampler = textureSampler;
+		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[1].dstSet = descriptorSets[i];
+		descriptorWrites[1].dstBinding = 1;		//binding = 1
+		descriptorWrites[1].dstArrayElement = 0;
+		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[1].descriptorCount = 1;
+		descriptorWrites[1].pImageInfo = &descriptorDiffuseTextureInfo;
 
-	// Specify the fragment UBO info
-	VkDescriptorBufferInfo descriptorFragmentUBOInfo = {};
-	descriptorFragmentUBOInfo.buffer = fragShaderUBO;
-	descriptorFragmentUBOInfo.offset = 0;
-	descriptorFragmentUBOInfo.range = sizeof(UniformDataFragShader);
+		descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[2].dstSet = descriptorSets[i];
+		descriptorWrites[2].dstBinding = 2;		//binding = 2
+		descriptorWrites[2].dstArrayElement = 0;
+		descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[2].descriptorCount = 1;
+		descriptorWrites[2].pImageInfo = &descriptorEnvironmentMapInfo;
 
+		descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[3].dstSet = descriptorSets[i];
+		descriptorWrites[3].dstBinding = 3;		//binding = 3
+		descriptorWrites[3].dstArrayElement = 0;
+		descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[3].descriptorCount = 1;
+		descriptorWrites[3].pBufferInfo = &descriptorFragmentUBOInfo;
 
-    std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
+		// perform the update of the descriptor set.
+		vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
 
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = descriptorSet;
-    descriptorWrites[0].dstBinding = 0;		//binding = 0
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &descriptorVertexUBOInfo;
-
-	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[1].dstSet = descriptorSet;
-	descriptorWrites[1].dstBinding = 1;		//binding = 1
-	descriptorWrites[1].dstArrayElement = 0;
-	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrites[1].descriptorCount = 1;
-	descriptorWrites[1].pImageInfo = &descriptorDiffuseTextureInfo;
-
-	descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[2].dstSet = descriptorSet;
-	descriptorWrites[2].dstBinding = 2;		//binding = 2
-	descriptorWrites[2].dstArrayElement = 0;
-	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrites[2].descriptorCount = 1;
-	descriptorWrites[2].pImageInfo = &descriptorEnvironmentMapInfo;
-
-	descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[3].dstSet = descriptorSet;
-	descriptorWrites[3].dstBinding = 3;		//binding = 3
-	descriptorWrites[3].dstArrayElement = 0;
-	descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorWrites[3].descriptorCount = 1;
-	descriptorWrites[3].pBufferInfo = &descriptorFragmentUBOInfo;
-
-    // perform the update of the descriptor set.
-    vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
+	}
 
 }
 
@@ -1229,7 +1250,7 @@ void RenderApplication::createRenderCommandBuffers() {
 				vkCmdBindIndexBuffer(renderCommandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 				//bind descriptor set
-				vkCmdBindDescriptorSets(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+				vkCmdBindDescriptorSets(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, NULL);
 
 				//invoke graphics pipeline and draw
 				vkCmdDrawIndexed(renderCommandBuffers[i], (uint32_t)indexArray.size(), 1, 0, 0, 0);

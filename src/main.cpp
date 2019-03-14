@@ -7,9 +7,9 @@ using namespace std;
 //On BasicRender branch
 int main() {
 
-	
+
     cout << "Running Render Application" << endl;
-    
+
 
     try {
 		RenderApplication::run();
@@ -18,7 +18,7 @@ int main() {
         cout << "Exception Thrown: " << e.what() << endl;
         return EXIT_FAILURE;
     }
-    
+
 
     return EXIT_SUCCESS;
 }
