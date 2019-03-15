@@ -118,6 +118,11 @@ class RenderApplication{
 	static VkPipeline graphicsPipeline;
 	static VkFence presentFence;
     
+	//use later
+	static std::vector<VkFence> inFlightFences;
+	static std::vector<VkSemaphore> imageAvailableSemaphores;
+	static std::vector<VkSemaphore> renderFinishedSemaphores;
+	static int currentFrame;
 
     //The command buffer is used to record commands, that will be submitted to a queue.
     //To allocate such command buffers, we use a command pool.
@@ -188,6 +193,7 @@ private:
 	static void createSwapChainFrameBuffers();
 	static void createGraphicsPipeline();
 	static void createPresentFence();
+	static void createSyncObjects();
 
 	//the command buffer that will render the scene to our swapchain images
 	static void createRenderCommandBuffers();
@@ -202,4 +208,3 @@ private:
 	
 	friend class Utils;
 };
-

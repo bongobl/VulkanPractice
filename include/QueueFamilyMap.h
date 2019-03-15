@@ -15,8 +15,9 @@ class QueueFamilyMap{
 	//maps required queue type enums to their queue family index
 	std::vector< pair<uint32_t, int> > indexMap;
 public:
-	
-	bool compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface);
+
+	//Note: Surface only needed if using present queue
+	bool compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface);	
 	void addRequiredQueueType(uint32_t queueType);
 	int getQueueFamilyIndexAt(unsigned int index) const;
 	int numRequired() const;
@@ -28,6 +29,5 @@ private:
 	bool hasValue(unsigned int index) const;
 	void setQueueFamilyIndexAt(unsigned int index, int queueFamilyIndex);
 	uint32_t getRequiredQueueTypeAt(unsigned int index) const;
-	
-	
+		
 };

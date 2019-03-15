@@ -1,6 +1,6 @@
 #include <RenderApplication.h>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-
+#define MAX_FRAMES_IN_FLIGHT 2
 
 //Initialize static members
 GLFWwindow* RenderApplication::window;
@@ -47,8 +47,12 @@ VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
 VkRenderPass RenderApplication::renderPass;
 VkPipelineLayout RenderApplication::pipelineLayout;
 VkPipeline RenderApplication::graphicsPipeline;
-VkCommandPool RenderApplication::graphicsCommandPool;
 VkFence RenderApplication::presentFence;
+std::vector<VkFence> RenderApplication::inFlightFences;
+std::vector<VkSemaphore> RenderApplication::imageAvailableSemaphores;
+std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
+int RenderApplication::currentFrame;
+VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
 
 
@@ -69,6 +73,7 @@ void RenderApplication::run() {
 
 	//play around with window as long as we want
 	cout << "In Main Loop" << endl;
+	currentFrame = 0;	//set beginning frame to work with
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
 		mainLoop();
@@ -139,6 +144,7 @@ void RenderApplication::createAllVulkanResources() {
 	createSwapChainFrameBuffers();
 	createGraphicsPipeline();
 	createPresentFence();
+	createSyncObjects();
 
 	//record command buffer
 	createRenderCommandBuffers();
@@ -152,18 +158,26 @@ void RenderApplication::renderOutputImage() {
 
 	// Finally, run the recorded command buffer.
 	runRenderCommandBuffers();
-	
+
 }
 
 void RenderApplication::mainLoop() {
 
-	uint64_t MAX_INT_VAL = std::numeric_limits<uint64_t>::max();
+
+	uint64_t MAX_UNSIGNED_64_BIT_VAL = std::numeric_limits<uint64_t>::max();
 	VkResult result;
 	uint32_t imageIndex;
 
 	//Acquire next image from swapchain, image may still be in process of presenting for a previous frame so we will
 	//tell this function to signal our presentFence when it is done
-	result = vkAcquireNextImageKHR(device, SwapChain::vulkanHandle, MAX_INT_VAL, VK_NULL_HANDLE, presentFence, &imageIndex);
+	result = vkAcquireNextImageKHR(
+		device, 	//device
+		SwapChain::vulkanHandle, //swapchain
+		MAX_UNSIGNED_64_BIT_VAL, 	//time to wait to acquire image
+		VK_NULL_HANDLE, 		//semaphore
+		presentFence, 			//fence to signal when presenting to image is complete
+		&imageIndex				//index of required image
+	);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
@@ -171,7 +185,7 @@ void RenderApplication::mainLoop() {
 	VK_CHECK_RESULT(result);
 
 	//wait for this frame to finish presenting its previous frame
-	vkWaitForFences(device, 1, &presentFence, VK_TRUE, MAX_INT_VAL);
+	vkWaitForFences(device, 1, &presentFence, VK_TRUE, MAX_UNSIGNED_64_BIT_VAL);
 
 	//lock fence so next frame/image can use it
 	vkResetFences(device, 1, &presentFence);
@@ -253,6 +267,11 @@ void RenderApplication::cleanup() {
 
 	SwapChain::cleanUp(device);
 	vkDestroyFence(device, presentFence, NULL);
+	for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i){
+		vkDestroyFence(device, inFlightFences[i], NULL);
+		vkDestroySemaphore(device, imageAvailableSemaphores[i], NULL);
+		vkDestroySemaphore(device, renderFinishedSemaphores[i], NULL);
+	}
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
 	vkDestroyPipelineLayout(device, pipelineLayout, NULL);
 	vkDestroyCommandPool(device, graphicsCommandPool, NULL);
@@ -554,7 +573,7 @@ void RenderApplication::createSwapChain() {
 }
 
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/Turtle.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -674,9 +693,9 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;
 
-	glm::vec3 cameraPosition(-4.5f, 4.5, 4.5);
-	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(1,0,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
-	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::vec3 cameraPosition(0,8,9);
+	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.75f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
 	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
 	tessShaderData.projection[1][1] *= -1;
 	
@@ -862,7 +881,10 @@ void RenderApplication::createDescriptorSets() {
 
 
 	descriptorSets.resize(SwapChain::images.size());
+
+	//All descriptor sets use same layout
 	std::vector<VkDescriptorSetLayout> allLayouts = { SwapChain::images.size(), descriptorSetLayout };
+
     //With the pool allocated, we can now allocate the descriptor set.
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1198,6 +1220,28 @@ void RenderApplication::createPresentFence(){
 	VK_CHECK_RESULT(vkCreateFence(device, &createInfo, NULL, &presentFence)); 
 }
 
+void RenderApplication::createSyncObjects(){
+
+	//Each frame in flight will have each of these sync objects
+	inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i){
+		VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &inFlightFences[i]));
+		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &imageAvailableSemaphores[i]));
+		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &renderFinishedSemaphores[i]));
+	}
+
+
+}
 void RenderApplication::createRenderCommandBuffers() {
 
 	//we want each of our command buffers to draw to a swapchain image
@@ -1215,7 +1259,7 @@ void RenderApplication::createRenderCommandBuffers() {
 
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 		beginInfo.pInheritanceInfo = NULL;
 
 		//main command buffer scope
@@ -1242,9 +1286,8 @@ void RenderApplication::createRenderCommandBuffers() {
 				vkCmdBindPipeline(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
 				//bind vertex buffer
-				VkBuffer vertexBuffers[] = { vertexBuffer };
 				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, vertexBuffers, offsets);
+				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, &vertexBuffer, offsets);
 
 				//bind index buffer
 				vkCmdBindIndexBuffer(renderCommandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
