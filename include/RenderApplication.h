@@ -130,6 +130,7 @@ class RenderApplication{
 
 	static std::vector<VkCommandBuffer> renderCommandBuffers;
 
+	static float modelRotation;
 
 public:
 
@@ -142,6 +143,7 @@ private:
 	static void createAllVulkanResources();
 	static void renderOutputImage();
 	static void mainLoop();
+	static void mainLoop2();
 
     //specify all required instance layers, instance extensions and device extensions here
     static void configureAllRequirements();

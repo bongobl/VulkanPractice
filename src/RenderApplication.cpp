@@ -54,7 +54,7 @@ std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
 int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
-
+float RenderApplication::modelRotation = 0;
 
 void RenderApplication::run() {
 
@@ -76,8 +76,12 @@ void RenderApplication::run() {
 	currentFrame = 0;	//set beginning frame to work with
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
-		mainLoop();
+		//mainLoop();
+		mainLoop2();
 	}
+
+	//wait for remaining images to finish rendering and presenting
+	vkDeviceWaitIdle(device);
 
     // Clean up all resources.
     cleanup();
@@ -149,7 +153,6 @@ void RenderApplication::createAllVulkanResources() {
 	//record command buffer
 	createRenderCommandBuffers();
 
-
 }
 
 void RenderApplication::renderOutputImage() {
@@ -200,7 +203,7 @@ void RenderApplication::mainLoop() {
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &imageIndex;
 
-	vkQueuePresentKHR(presentQueue, &presentInfo);
+	result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 		throw std::runtime_error("Swapchain reported out of date or suboptimal after present queue submit, need to recreate");
@@ -209,6 +212,68 @@ void RenderApplication::mainLoop() {
 
 }
 
+void RenderApplication::mainLoop2(){
+	
+	uint64_t MAX_UNSIGNED_64_BIT_VAL = std::numeric_limits<uint64_t>::max();
+	VkResult result;
+	uint32_t imageIndex;
+
+	//wait for image at current frame to finish rendering
+	vkWaitForFences(device,1, &inFlightFences[currentFrame], VK_TRUE, MAX_UNSIGNED_64_BIT_VAL);
+
+	//acquire next image from swapchain, which may currently still be presenting
+	result = vkAcquireNextImageKHR(
+		device, 
+		SwapChain::vulkanHandle, 
+		MAX_UNSIGNED_64_BIT_VAL,
+		imageAvailableSemaphores[currentFrame],
+		VK_NULL_HANDLE,
+		&imageIndex
+	);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
+	}
+	VK_CHECK_RESULT(result);
+
+	//update uniform data for this frame
+	writeToUniformBuffer(imageIndex);
+
+	//Enqueue render to this image
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = &imageAvailableSemaphores[currentFrame];
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &renderCommandBuffers[imageIndex];
+
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &renderFinishedSemaphores[currentFrame];
+
+	vkResetFences(device, 1, &inFlightFences[currentFrame]);
+
+	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]));
+
+	//Enqueue presenting this image
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = &renderFinishedSemaphores[currentFrame];
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &SwapChain::vulkanHandle;
+	presentInfo.pImageIndices = &imageIndex;
+
+	result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+		throw std::runtime_error("Swapchain reported out of date or suboptimal after present queue submit, need to recreate");
+	}
+	VK_CHECK_RESULT(result);
+	
+}
 void RenderApplication::cleanup() {
 
 	//clean up all Vulkan resources
@@ -230,7 +295,6 @@ void RenderApplication::cleanup() {
 	vkFreeMemory(device, indexBufferMemory, NULL);
 
 	//free uniform buffers
-
 	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
 		vkDestroyBuffer(device, tessShaderUBOs[i], NULL);
 		vkFreeMemory(device, tessShaderUBOMemories[i], NULL);
@@ -689,12 +753,16 @@ void RenderApplication::createUniformBuffers(){
 
 void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 
+	modelRotation += 0.2f;
 
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;
 
-	glm::vec3 cameraPosition(0,8,9);
-	tessShaderData.model = glm::translate(glm::mat4(1.0f), glm::vec3(0,0.75f,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
+	tessShaderData.model = 
+		glm::translate(glm::mat4(1.0f), glm::vec3(0,0.75f,0)) * 
+		glm::rotate(glm::mat4(1.0f), glm::radians(modelRotation), glm::vec3(0,1,0)) * 
+		glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
 	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
 	tessShaderData.projection[1][1] *= -1;
@@ -702,7 +770,7 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	
 	//Copy over Fragment Shader UBO
 	UniformDataFragShader fragShaderData;
-	fragShaderData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5));
+	fragShaderData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5f));
 	fragShaderData.textureParam = 0.7f;
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
