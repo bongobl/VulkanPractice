@@ -32,7 +32,7 @@ class RenderApplication{
 	static GLFWwindow* window;
 
 	//width and height of render area
-	static VkExtent2D desiredExtent;
+	static VkExtent2D desiredIntialExtent;
 
 	//Structures to hold all of our app's requirements
 	static std::vector<const char*> requiredInstanceLayers;

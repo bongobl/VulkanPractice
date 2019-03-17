@@ -4,7 +4,7 @@
 
 //Initialize static members
 GLFWwindow* RenderApplication::window;
-VkExtent2D RenderApplication::desiredExtent = {1920,1470};
+VkExtent2D RenderApplication::desiredIntialExtent = {1920,1470};
 std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
@@ -87,12 +87,14 @@ void RenderApplication::initGLFWWindow(){
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	window = glfwCreateWindow(desiredExtent.width,desiredExtent.height, "Test Window", NULL, NULL);
+	window = glfwCreateWindow(desiredIntialExtent.width,desiredIntialExtent.height, "Test Window", NULL, NULL);
 	glfwSetFramebufferSizeCallback(window, &frameBufferResizeCallback);
 }
 
 void RenderApplication::frameBufferResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight){
 	cout << "Window resized" << endl;
+
+	
 }
 
 void RenderApplication::createAllVulkanResources() {
@@ -565,12 +567,20 @@ void RenderApplication::createDevice() {
 
 void RenderApplication::createSwapChain() {
 
+	int actualWidth, actualHeight;
+	glfwGetFramebufferSize(window, &actualWidth, &actualHeight);
+
+	VkExtent2D actualWindowExtent = {
+		(uint32_t)actualWidth,
+		(uint32_t)actualHeight
+	};
+
 	SwapChain::init(
 		device,			//App logical device
 		surface,		//Vulkan Surface object
 		queueFamilyIndices.getQueueFamilyIndexAt(0),	//graphics queue family index
 		queueFamilyIndices.getQueueFamilyIndexAt(1),	//present queue family index
-		desiredExtent				//desired app extent
+		actualWindowExtent								//actual extent of the window
 	);
 
 }

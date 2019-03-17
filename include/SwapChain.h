@@ -33,8 +33,7 @@ public:
     static std::vector<VkImageView> imageViews;
 
     
-
-    static void init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI, uint32_t presentQFI, VkExtent2D appExtent);
+    static void init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI, uint32_t presentQFI, VkExtent2D actualExtent);
 	static void cleanUp(VkDevice device);
 	
 private:
@@ -42,7 +41,7 @@ private:
 	
     static VkSurfaceFormatKHR chooseSurfaceFormat();
     static VkPresentModeKHR choosePresentMode();
-	static VkExtent2D chooseExtent(VkExtent2D appExtent);
+	static VkExtent2D chooseExtent(VkExtent2D actualExtent);
 	static void createImageViews(VkDevice device);
 	
 };

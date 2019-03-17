@@ -43,7 +43,7 @@ bool SwapChain::hasAdequateSupport() {
 	return !availableSurfaceFormats.empty() && !availableSurfacePresentModes.empty();
 }
 
-void SwapChain::init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI, uint32_t presentQFI, VkExtent2D appExtent){
+void SwapChain::init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI, uint32_t presentQFI, VkExtent2D actualExtent){
     
 	//make sure we have swapchain support
 	if(!hasAdequateSupport()){
@@ -52,7 +52,7 @@ void SwapChain::init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI
 	
 	surfaceFormat = chooseSurfaceFormat();
 	presentMode = choosePresentMode();
-	extent = chooseExtent(appExtent);
+	extent = chooseExtent(actualExtent);
 
 	//choose minimum number of images 
 	uint32_t imageCount = availableSurfaceCapabilities.minImageCount + 1;
@@ -140,18 +140,18 @@ VkPresentModeKHR SwapChain::choosePresentMode() {
 	return bestAvailableMode;
 }
 
-VkExtent2D SwapChain::chooseExtent(VkExtent2D appExtent){
+VkExtent2D SwapChain::chooseExtent(VkExtent2D actualExtent){
 
 	if (availableSurfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
 		return availableSurfaceCapabilities.currentExtent;
 	}
+	
 
 	VkExtent2D minExtent = availableSurfaceCapabilities.minImageExtent;
 	VkExtent2D maxExtent = availableSurfaceCapabilities.maxImageExtent;
 
-	VkExtent2D actualExtent;
-	actualExtent.width = std::max(minExtent.width, std::min(maxExtent.width, appExtent.width));
-	actualExtent.height = std::max(minExtent.height, std::min(maxExtent.height, appExtent.height));
+	actualExtent.width = std::max(minExtent.width, std::min(maxExtent.width, actualExtent.width));
+	actualExtent.height = std::max(minExtent.height, std::min(maxExtent.height, actualExtent.height));
 
 	return actualExtent;
 }
