@@ -504,7 +504,7 @@ void Utils::createImageFromFile(const string imageName, VkImage &image, VkDevice
 	//copy image data over to staging buffer
 	void* mappedStagingBuffer;
 	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, imageSize, 0, &mappedStagingBuffer);
-	memcpy(mappedStagingBuffer, imageData, imageSize);
+	memcpy(mappedStagingBuffer, imageData, (size_t)imageSize);
 	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
 
 	//create output image
@@ -575,7 +575,7 @@ void Utils::createCubeMapImageFromFile(const std::vector<string> imageNames, VkI
 	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, cubeMapSize, 0, &mappedStagingBuffer);
 
 	for (int i = 0; i < 6; ++i) {
-		memcpy((unsigned char*)mappedStagingBuffer + (faceSize * i), imageData[i], faceSize);
+		memcpy((unsigned char*)mappedStagingBuffer + (faceSize * i), imageData[i], (size_t)faceSize);
 	}
 	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
 	

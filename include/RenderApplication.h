@@ -116,7 +116,6 @@ class RenderApplication{
     //The pipeline specifies the pipeline that all graphics and compute commands pass though in Vulkan.
 	static VkPipelineLayout pipelineLayout;
 	static VkPipeline graphicsPipeline;
-	static VkFence presentFence;
     
 	//use later
 	static std::vector<VkFence> inFlightFences;
@@ -132,6 +131,7 @@ class RenderApplication{
 
 	static float modelRotation;
 
+
 public:
 
 	static void run();
@@ -140,10 +140,11 @@ private:
 
 	//high level functions
 	static void initGLFWWindow();
+	static void frameBufferResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight);
+
+
 	static void createAllVulkanResources();
-	static void renderOutputImage();
 	static void mainLoop();
-	static void mainLoop2();
 
     //specify all required instance layers, instance extensions and device extensions here
     static void configureAllRequirements();
@@ -191,16 +192,13 @@ private:
 	static void createDescriptorSets();
 
 	//to start rendering
-	static void createRenderPass();	//will rename
+	static void createRenderPass();	
 	static void createSwapChainFrameBuffers();
 	static void createGraphicsPipeline();
-	static void createPresentFence();
 	static void createSyncObjects();
 
 	//the command buffer that will render the scene to our swapchain images
 	static void createRenderCommandBuffers();
-
-	static void runRenderCommandBuffers();
 
 	static void cleanup();
 

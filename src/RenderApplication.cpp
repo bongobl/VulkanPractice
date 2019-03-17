@@ -47,7 +47,6 @@ VkDescriptorSetLayout RenderApplication::descriptorSetLayout;
 VkRenderPass RenderApplication::renderPass;
 VkPipelineLayout RenderApplication::pipelineLayout;
 VkPipeline RenderApplication::graphicsPipeline;
-VkFence RenderApplication::presentFence;
 std::vector<VkFence> RenderApplication::inFlightFences;
 std::vector<VkSemaphore> RenderApplication::imageAvailableSemaphores;
 std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
@@ -65,10 +64,6 @@ void RenderApplication::run() {
 	//create all vulkan resources we will need in the app
 	createAllVulkanResources();
 
-	//perform render to create output image
-	renderOutputImage();
-
-
 	//copyOutputToSwapChainImages();
 
 	//play around with window as long as we want
@@ -76,8 +71,7 @@ void RenderApplication::run() {
 	currentFrame = 0;	//set beginning frame to work with
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
-		//mainLoop();
-		mainLoop2();
+		mainLoop();
 	}
 
 	//wait for remaining images to finish rendering and presenting
@@ -93,8 +87,12 @@ void RenderApplication::initGLFWWindow(){
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	window = glfwCreateWindow(desiredExtent.width,desiredExtent.height, "Test Window", NULL, NULL);
+	glfwSetFramebufferSizeCallback(window, &frameBufferResizeCallback);
+}
+
+void RenderApplication::frameBufferResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight){
+	cout << "Window resized" << endl;
 }
 
 void RenderApplication::createAllVulkanResources() {
@@ -147,7 +145,6 @@ void RenderApplication::createAllVulkanResources() {
 	createRenderPass();	//will rename
 	createSwapChainFrameBuffers();
 	createGraphicsPipeline();
-	createPresentFence();
 	createSyncObjects();
 
 	//record command buffer
@@ -155,66 +152,10 @@ void RenderApplication::createAllVulkanResources() {
 
 }
 
-void RenderApplication::renderOutputImage() {
-
-	cout << "Rendering Scene" << endl;
-
-	// Finally, run the recorded command buffer.
-	runRenderCommandBuffers();
-
-}
-
-void RenderApplication::mainLoop() {
-
-
-	uint64_t MAX_UNSIGNED_64_BIT_VAL = std::numeric_limits<uint64_t>::max();
-	VkResult result;
-	uint32_t imageIndex;
-
-	//Acquire next image from swapchain, image may still be in process of presenting for a previous frame so we will
-	//tell this function to signal our presentFence when it is done
-	result = vkAcquireNextImageKHR(
-		device, 	//device
-		SwapChain::vulkanHandle, //swapchain
-		MAX_UNSIGNED_64_BIT_VAL, 	//time to wait to acquire image
-		VK_NULL_HANDLE, 		//semaphore
-		presentFence, 			//fence to signal when presenting to image is complete
-		&imageIndex				//index of required image
-	);
-
-	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-		throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
-	}
-	VK_CHECK_RESULT(result);
-
-	//wait for this frame to finish presenting its previous frame
-	vkWaitForFences(device, 1, &presentFence, VK_TRUE, MAX_UNSIGNED_64_BIT_VAL);
-
-	//lock fence so next frame/image can use it
-	vkResetFences(device, 1, &presentFence);
-
-	//submit present workload to present queue
-	VkPresentInfoKHR presentInfo = {};
-	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.waitSemaphoreCount = 0;
-
-	VkSwapchainKHR swapChains[] = {SwapChain::vulkanHandle};
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = swapChains;
-	presentInfo.pImageIndices = &imageIndex;
-
-	result = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-		throw std::runtime_error("Swapchain reported out of date or suboptimal after present queue submit, need to recreate");
-	}
-	VK_CHECK_RESULT(result);
-
-}
-
-void RenderApplication::mainLoop2(){
+void RenderApplication::mainLoop(){
 	
 	uint64_t MAX_UNSIGNED_64_BIT_VAL = std::numeric_limits<uint64_t>::max();
+
 	VkResult result;
 	uint32_t imageIndex;
 
@@ -249,7 +190,6 @@ void RenderApplication::mainLoop2(){
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &renderCommandBuffers[imageIndex];
-
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = &renderFinishedSemaphores[currentFrame];
 
@@ -330,7 +270,6 @@ void RenderApplication::cleanup() {
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
 
 	SwapChain::cleanUp(device);
-	vkDestroyFence(device, presentFence, NULL);
 	for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i){
 		vkDestroyFence(device, inFlightFences[i], NULL);
 		vkDestroySemaphore(device, imageAvailableSemaphores[i], NULL);
@@ -670,7 +609,7 @@ void RenderApplication::writeToVertexBuffer(){
 	//copy contents of our hard coded triangle into the staging buffer
 	void* mappedMemory;
 	vkMapMemory(device, stagingBufferMemory, 0, vertexArraySize, 0, &mappedMemory);
-	memcpy(mappedMemory, vertexArray.data(), vertexArraySize);
+	memcpy(mappedMemory, vertexArray.data(), (size_t)vertexArraySize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
 	//copy contents of staging buffer to vertex buffer
@@ -712,7 +651,7 @@ void RenderApplication::writeToIndexBuffer(){
 	//copy contents of our hard coded triangle indices into the staging buffer
 	void* mappedMemory;
 	vkMapMemory(device, stagingBufferMemory, 0, indexArraySize, 0, &mappedMemory);
-	memcpy(mappedMemory, indexArray.data(), indexArraySize);
+	memcpy(mappedMemory, indexArray.data(), (size_t)indexArraySize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
 	//copy contents of staging buffer to index buffer
@@ -951,7 +890,7 @@ void RenderApplication::createDescriptorSets() {
 	descriptorSets.resize(SwapChain::images.size());
 
 	//All descriptor sets use same layout
-	std::vector<VkDescriptorSetLayout> allLayouts = { SwapChain::images.size(), descriptorSetLayout };
+	std::vector<VkDescriptorSetLayout> allLayouts(SwapChain::images.size(), descriptorSetLayout);
 
     //With the pool allocated, we can now allocate the descriptor set.
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
@@ -1280,13 +1219,6 @@ void RenderApplication::createGraphicsPipeline(){
 
 }
 
-void RenderApplication::createPresentFence(){
-	
-	VkFenceCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	createInfo.flags = 0;
-	VK_CHECK_RESULT(vkCreateFence(device, &createInfo, NULL, &presentFence)); 
-}
 
 void RenderApplication::createSyncObjects(){
 
@@ -1373,28 +1305,7 @@ void RenderApplication::createRenderCommandBuffers() {
 	
 }
 
-void RenderApplication::runRenderCommandBuffers() {
-	//Now we shall finally submit the recorded command buffer to our graphics queue.
-	VkSubmitInfo submitInfo = {};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = (uint32_t)renderCommandBuffers.size(); // submit 3 command buffers
-	submitInfo.pCommandBuffers = renderCommandBuffers.data(); // the command buffers to submit.
 
-	//Create a fence to make the CPU wait for the GPU to finish before proceeding
-	VkFence fence;
-	VkFenceCreateInfo fenceCreateInfo = {};
-	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fenceCreateInfo.flags = 0;
-	VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &fence));
-
-	//We submit the command buffer on the graphics queue, at the same time giving a fence.
-	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence));
-
-	VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
-
-	//no longer need fence
-	vkDestroyFence(device, fence, NULL);
-}
 VkCommandPool& RenderApplication::getTransferCmdPool(){
 
 	//queues and pools which work for graphics also work for transfer

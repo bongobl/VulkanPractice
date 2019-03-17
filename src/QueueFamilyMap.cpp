@@ -20,7 +20,7 @@ bool QueueFamilyMap::compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR s
 
 		if (currFamily.queueCount > 0) {
 
-			for (int currMapIndex = 0; currMapIndex < indexMap.size(); ++currMapIndex) {
+			for (unsigned int currMapIndex = 0; currMapIndex < indexMap.size(); ++currMapIndex) {
 				if (!hasValue(currMapIndex)) {
 
 					//Special way to check if queue family has present support

@@ -10,7 +10,7 @@ typedef enum AdditionalQueueFlagBits {
 
 class QueueFamilyMap{
 
-	int doneCount;
+	unsigned int doneCount;
 
 	//maps required queue type enums to their queue family index
 	std::vector< pair<uint32_t, int> > indexMap;
