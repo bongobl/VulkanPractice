@@ -36,7 +36,6 @@ void SwapChain::querySupportDetails(VkPhysicalDevice physicalDevice, VkSurfaceKH
 		vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, availableSurfacePresentModes.data());
 	}
 
-
 }
 
 bool SwapChain::hasAdequateSupport() {
@@ -107,6 +106,10 @@ void SwapChain::cleanUp(VkDevice device) {
 	}
 
 	vkDestroySwapchainKHR(device, vulkanHandle, NULL);
+
+	availableSurfaceCapabilities = {};
+	availableSurfaceFormats.clear();
+	availableSurfacePresentModes.clear();
 }
 
 VkSurfaceFormatKHR SwapChain::chooseSurfaceFormat() {

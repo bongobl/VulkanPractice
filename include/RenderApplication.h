@@ -30,10 +30,12 @@ class RenderApplication{
 
 	//test glfw window
 	static GLFWwindow* window;
+	static bool windowResized;
+
 
 	//width and height of render area
 	static VkExtent2D desiredIntialExtent;
-
+	
 	//Structures to hold all of our app's requirements
 	static std::vector<const char*> requiredInstanceLayers;
 	static std::vector<const char*> requiredInstanceExtensions;
@@ -155,7 +157,7 @@ private:
 	static void findPhysicalDevice();
 	static void createDevice();
 	static void createSwapChain();
-	
+	static void recreateSwapChain();
 	
 	//helper to find physical device
 	static bool isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice);

@@ -4,6 +4,7 @@
 
 //Initialize static members
 GLFWwindow* RenderApplication::window;
+bool RenderApplication::windowResized = false;
 VkExtent2D RenderApplication::desiredIntialExtent = {1920,1470};
 std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
@@ -92,9 +93,8 @@ void RenderApplication::initGLFWWindow(){
 }
 
 void RenderApplication::frameBufferResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight){
-	cout << "Window resized" << endl;
 
-	
+	windowResized = true;
 }
 
 void RenderApplication::createAllVulkanResources() {
@@ -107,6 +107,7 @@ void RenderApplication::createAllVulkanResources() {
 	createSurface();
 	findPhysicalDevice();
 	createDevice();
+
 	createSwapChain();
 
 	//create descriptor and command resources
@@ -155,7 +156,7 @@ void RenderApplication::createAllVulkanResources() {
 }
 
 void RenderApplication::mainLoop(){
-	
+
 	uint64_t MAX_UNSIGNED_64_BIT_VAL = std::numeric_limits<uint64_t>::max();
 
 	VkResult result;
@@ -175,9 +176,13 @@ void RenderApplication::mainLoop(){
 	);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-		throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
+		//throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
+		recreateSwapChain();
 	}
-	VK_CHECK_RESULT(result);
+	else {
+		VK_CHECK_RESULT(result);
+	}
+	
 
 	//update uniform data for this frame
 	writeToUniformBuffer(imageIndex);
@@ -210,10 +215,14 @@ void RenderApplication::mainLoop(){
 
 	result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-		throw std::runtime_error("Swapchain reported out of date or suboptimal after present queue submit, need to recreate");
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || windowResized) {
+		//throw std::runtime_error("Swapchain reported out of date or suboptimal after present queue submit, need to recreate");
+		windowResized = false;
+		recreateSwapChain();
 	}
-	VK_CHECK_RESULT(result);
+	else {
+		VK_CHECK_RESULT(result);
+	}
 	
 }
 void RenderApplication::cleanup() {
@@ -585,6 +594,46 @@ void RenderApplication::createSwapChain() {
 
 }
 
+void RenderApplication::recreateSwapChain(){
+
+
+	vkDeviceWaitIdle(device);
+
+	//destroy depth image objects
+	vkDestroyImageView(device, depthAttachmentImageView, NULL);
+	vkDestroyImage(device, depthAttachmentImage, NULL);
+	vkFreeMemory(device, depthAttachmentImageMemory, NULL);
+
+	//destroy framebuffers
+	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
+		vkDestroyFramebuffer(device, swapChainFrameBuffers[i], NULL);
+	}
+
+	//free command buffers (while keeping command pool)
+	vkFreeCommandBuffers(device, graphicsCommandPool, (uint32_t)SwapChain::images.size(), renderCommandBuffers.data());
+
+	//destroy graphics pipeline
+	vkDestroyPipeline(device, graphicsPipeline, NULL);
+	vkDestroyPipelineLayout(device, pipelineLayout, NULL);
+
+	//destroy render pass
+	vkDestroyRenderPass(device, renderPass, NULL);
+
+	//destroy swapchain
+	SwapChain::cleanUp(device);
+
+	
+	//Init SwapChain
+	SwapChain::querySupportDetails(physicalDevice, surface);
+	createSwapChain();
+	createRenderPass();
+	createGraphicsPipeline();
+	createDepthAttachmentImage();
+	createDepthAttachmentImageView();
+	createSwapChainFrameBuffers();
+	createRenderCommandBuffers();
+
+}
 void RenderApplication::loadVertexAndIndexArrays(){
 	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
 }
