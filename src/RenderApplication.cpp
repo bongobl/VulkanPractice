@@ -54,6 +54,9 @@ std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
 int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
+float RenderApplication::currTime;
+float RenderApplication::prevTime;
+float RenderApplication::deltaTime;
 float RenderApplication::modelRotation = 0;
 
 void RenderApplication::run() {
@@ -70,6 +73,9 @@ void RenderApplication::run() {
 	//play around with window as long as we want
 	cout << "In Main Loop" << endl;
 	currentFrame = 0;	//set beginning frame to work with
+	currTime = (float)glfwGetTime();
+	prevTime = (float)glfwGetTime();
+	deltaTime = 0;
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
 		mainLoop();
@@ -176,12 +182,12 @@ void RenderApplication::mainLoop(){
 	);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-		//throw std::runtime_error("Swapchain reported out of date after acquiring next image, need to recreate");
 		recreateSwapChain();
 	}
 	else {
 		VK_CHECK_RESULT(result);
 	}
+	
 	
 
 	//update uniform data for this frame
@@ -216,14 +222,23 @@ void RenderApplication::mainLoop(){
 	result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || windowResized) {
-		//throw std::runtime_error("Swapchain reported out of date or suboptimal after present queue submit, need to recreate");
 		windowResized = false;
 		recreateSwapChain();
 	}
 	else {
 		VK_CHECK_RESULT(result);
 	}
+
+	//limit frame rate
+	do{
+		currTime = (float)glfwGetTime();
+	}while( currTime - prevTime < (1.0f / FRAMERATE));
 	
+	//update deltaTime
+	deltaTime = currTime - prevTime;
+	prevTime = currTime;
+
+	modelRotation -= 50.0f * deltaTime;
 }
 void RenderApplication::cleanup() {
 
@@ -635,7 +650,7 @@ void RenderApplication::recreateSwapChain(){
 
 }
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/dragon.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -750,8 +765,6 @@ void RenderApplication::createUniformBuffers(){
 }
 
 void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
-
-	modelRotation += 0.2f;
 
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;

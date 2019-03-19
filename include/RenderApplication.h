@@ -25,6 +25,7 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
+#define FRAMERATE 60
 
 class RenderApplication{
 
@@ -131,6 +132,10 @@ class RenderApplication{
 
 	static std::vector<VkCommandBuffer> renderCommandBuffers;
 
+	//scene variables
+	static float currTime;
+	static float prevTime;
+	static float deltaTime;
 	static float modelRotation;
 
 

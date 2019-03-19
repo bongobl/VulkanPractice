@@ -33,7 +33,6 @@ void main() {
 	vec3 worldPosition = vec3(modelMatrix * vec4(modelSpacePosition,1));
 	mat3 toWorldMat3 = transpose(inverse(mat3(modelMatrix)));
 	vec3 worldNormal = normalize(toWorldMat3 * modelSpaceNormal);
-	
 
 	//environment map reflection
 	vec3 reflectedCam = reflect(worldPosition - ubo.cameraPosition, worldNormal);
