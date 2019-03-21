@@ -244,7 +244,7 @@ void RenderApplication::mainLoop(){
 	deltaTime = currTime - prevTime;
 	prevTime = currTime;
 
-	modelRotation -= 50.0f * deltaTime;
+	modelRotation += 50.0f * deltaTime;
 }
 void RenderApplication::cleanup() {
 
@@ -793,8 +793,9 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	//Copy over Fragment Shader UBO
 	UniformDataFragShader fragShaderData;
 	fragShaderData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5f));
-	fragShaderData.textureParam = 0.7f;
+	fragShaderData.textureParam = 0.65f;
 	fragShaderData.cameraPosition = cameraPosition;
+	fragShaderData.normalMapStrength = 0.5f;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
 
 	void* mappedMemory;
@@ -911,11 +912,11 @@ void RenderApplication::createSwapChainFrameBuffers() {
 void RenderApplication::createDescriptorSetLayout() {
 
     //define a binding for our tesselation shader UBO
-    VkDescriptorSetLayoutBinding vertexUBOBinding = {};
-	vertexUBOBinding.binding = 0;	//binding = 0
-	vertexUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	vertexUBOBinding.descriptorCount = 1;
-	vertexUBOBinding.stageFlags = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+    VkDescriptorSetLayoutBinding tessShaderUBOBinding = {};
+	tessShaderUBOBinding.binding = 0;	//binding = 0
+	tessShaderUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	tessShaderUBOBinding.descriptorCount = 1;
+	tessShaderUBOBinding.stageFlags = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
 
 	//define a binding for our diffuse texture
 	VkDescriptorSetLayoutBinding diffuseTextureBinding = {};
@@ -934,15 +935,28 @@ void RenderApplication::createDescriptorSetLayout() {
 	environmentMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	//define a binding for our fragment shader UBO
-	VkDescriptorSetLayoutBinding fragmentUBOBinding = {};
-	fragmentUBOBinding.binding = 3;	//binding = 3
-	fragmentUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	fragmentUBOBinding.descriptorCount = 1;
-	fragmentUBOBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	VkDescriptorSetLayoutBinding fragShaderUBOBinding = {};
+	fragShaderUBOBinding.binding = 3;	//binding = 3
+	fragShaderUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	fragShaderUBOBinding.descriptorCount = 1;
+	fragShaderUBOBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+	//define a binding for our diffuse texture
+	VkDescriptorSetLayoutBinding normalTextureBinding = {};
+	normalTextureBinding.binding = 4;	//binding = 4
+	normalTextureBinding.descriptorCount = 1;
+	normalTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	normalTextureBinding.pImmutableSamplers = NULL;
+	normalTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 4> allBindings = { vertexUBOBinding, diffuseTextureBinding, environmentMapBinding, fragmentUBOBinding };
+    std::array<VkDescriptorSetLayoutBinding, 5> allBindings = { 
+		tessShaderUBOBinding, 
+		diffuseTextureBinding, 
+		environmentMapBinding, 
+		fragShaderUBOBinding, 
+		normalTextureBinding 
+	};
 
     //create descriptor set layout for binding to a UBO
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
@@ -958,7 +972,7 @@ void RenderApplication::createDescriptorSetLayout() {
 void RenderApplication::createDescriptorPool(){
 
 
-    std::array<VkDescriptorPoolSize, 4> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 5> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -967,6 +981,8 @@ void RenderApplication::createDescriptorPool(){
 	poolSizes[2].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[3].descriptorCount = (uint32_t)SwapChain::images.size();
+	poolSizes[4].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[4].descriptorCount = (uint32_t)SwapChain::images.size();
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -977,14 +993,13 @@ void RenderApplication::createDescriptorPool(){
     //Create descriptor pool.
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
 
-
 }
 void RenderApplication::createDescriptorSets() {
 
 
 	descriptorSets.resize(SwapChain::images.size());
 
-	//All descriptor sets use same layout
+	//All descriptor sets use same layout, we need one descriptor set per swapchain image
 	std::vector<VkDescriptorSetLayout> allLayouts(SwapChain::images.size(), descriptorSetLayout);
 
     //With the pool allocated, we can now allocate the descriptor set.
@@ -1000,69 +1015,100 @@ void RenderApplication::createDescriptorSets() {
 
 	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
 
-		// Specify the vertex UBO info
-		VkDescriptorBufferInfo descriptorVertexUBOInfo = {};
-		descriptorVertexUBOInfo.buffer = tessShaderUBOs[i];		//hard coded for now
-		descriptorVertexUBOInfo.offset = 0;
-		descriptorVertexUBOInfo.range = sizeof(UniformDataTessShader);
+		// Descriptor for our tesselation shader Uniform Buffer
+		VkWriteDescriptorSet tessUBODescriptorWrite = {};
+		tessUBODescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		tessUBODescriptorWrite.dstSet = descriptorSets[i];
+		tessUBODescriptorWrite.dstBinding = 0;		//binding = 0
+		tessUBODescriptorWrite.dstArrayElement = 0;	
+			// Descriptor info
+			VkDescriptorBufferInfo tessUBODescriptorInfo = {};
+			tessUBODescriptorInfo.buffer = tessShaderUBOs[i];		
+			tessUBODescriptorInfo.offset = 0;
+			tessUBODescriptorInfo.range = sizeof(UniformDataTessShader);
 
-		// Specify the diffuse texture info
-		VkDescriptorImageInfo descriptorDiffuseTextureInfo = {};
-		descriptorDiffuseTextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		descriptorDiffuseTextureInfo.imageView = diffuseTextureView;
-		descriptorDiffuseTextureInfo.sampler = textureSampler;
+		tessUBODescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		tessUBODescriptorWrite.descriptorCount = 1;
+		tessUBODescriptorWrite.pBufferInfo = &tessUBODescriptorInfo;
 
-		// Specify the envirmnemt map info
-		VkDescriptorImageInfo descriptorEnvironmentMapInfo = {};
-		descriptorEnvironmentMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		descriptorEnvironmentMapInfo.imageView = environmentMapView;
-		descriptorEnvironmentMapInfo.sampler = textureSampler;
+		// Descriptor for our diffuse texture
+		VkWriteDescriptorSet diffuseTextureDescriptorWrite = {};
+		diffuseTextureDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		diffuseTextureDescriptorWrite.dstSet = descriptorSets[i];
+		diffuseTextureDescriptorWrite.dstBinding = 1;	//binding = 1
+		diffuseTextureDescriptorWrite.dstArrayElement = 0;
+			// Descriptor info
+			VkDescriptorImageInfo diffuseTextureDescriptorInfo = {};
+			diffuseTextureDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			diffuseTextureDescriptorInfo.imageView = diffuseTextureView;
+			diffuseTextureDescriptorInfo.sampler = textureSampler;
 
-		// Specify the fragment UBO info
-		VkDescriptorBufferInfo descriptorFragmentUBOInfo = {};
-		descriptorFragmentUBOInfo.buffer = fragShaderUBOs[i]; 	//hard coded for now
-		descriptorFragmentUBOInfo.offset = 0;
-		descriptorFragmentUBOInfo.range = sizeof(UniformDataFragShader);
+		diffuseTextureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		diffuseTextureDescriptorWrite.descriptorCount = 1;
+		diffuseTextureDescriptorWrite.pImageInfo = &diffuseTextureDescriptorInfo;
+
+		// Descriptor for our environment map texture
+		VkWriteDescriptorSet environmentMapDescriptorWrite = {};
+		environmentMapDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		environmentMapDescriptorWrite.dstSet = descriptorSets[i];
+		environmentMapDescriptorWrite.dstBinding = 2;	//binding = 2
+		environmentMapDescriptorWrite.dstArrayElement = 0;
+			// Descriptor info
+			VkDescriptorImageInfo environmentMapDescriptorInfo = {};
+			environmentMapDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			environmentMapDescriptorInfo.imageView = environmentMapView;
+			environmentMapDescriptorInfo.sampler = textureSampler;
+
+		environmentMapDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		environmentMapDescriptorWrite.descriptorCount = 1;
+		environmentMapDescriptorWrite.pImageInfo = &environmentMapDescriptorInfo;
+
+		// Descriptor for our fragment shader Uniform Buffer
+		VkWriteDescriptorSet fragmentUBODescriptorWrite = {};
+		fragmentUBODescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		fragmentUBODescriptorWrite.dstSet = descriptorSets[i];
+		fragmentUBODescriptorWrite.dstBinding = 3;		//binding = 3
+		fragmentUBODescriptorWrite.dstArrayElement = 0;
+			// Descriptor info
+			VkDescriptorBufferInfo fragmentUBODescriptorInfo = {};
+			fragmentUBODescriptorInfo.buffer = fragShaderUBOs[i];
+			fragmentUBODescriptorInfo.offset = 0;
+			fragmentUBODescriptorInfo.range = sizeof(UniformDataFragShader);
+
+		fragmentUBODescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		fragmentUBODescriptorWrite.descriptorCount = 1;
+		fragmentUBODescriptorWrite.pBufferInfo = &fragmentUBODescriptorInfo;
+
+		// Descriptor for our normal texture
+		VkWriteDescriptorSet normalTextureDescriptorWrite = {};
+		normalTextureDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		normalTextureDescriptorWrite.dstSet = descriptorSets[i];
+		normalTextureDescriptorWrite.dstBinding = 4;	//binding = 4
+		normalTextureDescriptorWrite.dstArrayElement = 0;
+			// Descriptor info
+			VkDescriptorImageInfo normalTextureDescriptorInfo = {};
+			normalTextureDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			normalTextureDescriptorInfo.imageView = normalTextureView;
+			normalTextureDescriptorInfo.sampler = textureSampler;
+
+		normalTextureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		normalTextureDescriptorWrite.descriptorCount = 1;
+		normalTextureDescriptorWrite.pImageInfo = &normalTextureDescriptorInfo;
 
 
-		std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
+		//put all descriptor write info in an array
+		std::array<VkWriteDescriptorSet, 5> descriptorWrites = { 
+			tessUBODescriptorWrite,
+			diffuseTextureDescriptorWrite,
+			environmentMapDescriptorWrite,
+			fragmentUBODescriptorWrite,
+			normalTextureDescriptorWrite
+		};
 
-		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[0].dstSet = descriptorSets[i];
-		descriptorWrites[0].dstBinding = 0;		//binding = 0
-		descriptorWrites[0].dstArrayElement = 0;
-		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[0].descriptorCount = 1;
-		descriptorWrites[0].pBufferInfo = &descriptorVertexUBOInfo;
-
-		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[1].dstSet = descriptorSets[i];
-		descriptorWrites[1].dstBinding = 1;		//binding = 1
-		descriptorWrites[1].dstArrayElement = 0;
-		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrites[1].descriptorCount = 1;
-		descriptorWrites[1].pImageInfo = &descriptorDiffuseTextureInfo;
-
-		descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[2].dstSet = descriptorSets[i];
-		descriptorWrites[2].dstBinding = 2;		//binding = 2
-		descriptorWrites[2].dstArrayElement = 0;
-		descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrites[2].descriptorCount = 1;
-		descriptorWrites[2].pImageInfo = &descriptorEnvironmentMapInfo;
-
-		descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[3].dstSet = descriptorSets[i];
-		descriptorWrites[3].dstBinding = 3;		//binding = 3
-		descriptorWrites[3].dstArrayElement = 0;
-		descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[3].descriptorCount = 1;
-		descriptorWrites[3].pBufferInfo = &descriptorFragmentUBOInfo;
-
-		// perform the update of the descriptor set.
+		// perform the update of the descriptor sets
 		vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
 
-	}
+	}//End for each swap chain image
 
 }
 

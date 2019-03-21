@@ -29,9 +29,9 @@ struct UniformDataFragShader {
 	glm::vec3 lightDirection;
 	float textureParam;
 	glm::vec3 cameraPosition;
-	float padding2;
+	float normalMapStrength;
 	glm::vec3 matColor;
-	float padding3;
+	float padding;
 };
 
 

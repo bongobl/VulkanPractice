@@ -16,11 +16,12 @@ layout(binding = 3) uniform UniformBufferObject{
 	vec3 lightDirection;
     float textureParam;
     vec3 cameraPosition;
-    float padding2;
+    float normalMapStrength;
     vec3 matColor;
     float padding3;
 
 } ubo;
+layout(binding = 4) uniform sampler2D normalTexture;
 
 
 
@@ -35,8 +36,8 @@ void main() {
 	vec3 worldNormal = normalize(toWorldMat3 * modelSpaceNormal);
 
 
-	//test normal mapping
-	//worldNormal = normalize(worldNormal + (texture(diffuseTexture, texCoord).xyz * 2.0f - 1.0f));
+	//apply normal texture offsets
+	worldNormal = normalize(worldNormal + ubo.normalMapStrength * (texture(normalTexture, texCoord).xyz * 2.0f - 1.0f));
 
 	//environment map reflection
 	vec3 reflectedCam = reflect(worldPosition - ubo.cameraPosition, worldNormal);
@@ -63,5 +64,6 @@ void main() {
 	outColor.rgb = diffuse + specular + ambient; 
 
     outColor.a = 1.0f;
+
 
 }
