@@ -34,6 +34,9 @@ std::vector<VkDeviceMemory> RenderApplication::fragShaderUBOMemories;
 VkImage RenderApplication::diffuseTexture;
 VkDeviceMemory RenderApplication::diffuseTextureMemory;
 VkImageView RenderApplication::diffuseTextureView;
+VkImage RenderApplication::normalTexture;
+VkDeviceMemory RenderApplication::normalTextureMemory;
+VkImageView RenderApplication::normalTextureView;
 VkImage RenderApplication::environmentMap;
 VkDeviceMemory RenderApplication::environmentMapMemory;
 VkImageView RenderApplication::environmentMapView;
@@ -139,6 +142,9 @@ void RenderApplication::createAllVulkanResources() {
 	createDiffuseTexture();
 	createDiffuseTextureView();
 
+	createNormalTexture();
+	createNormalTextureView();
+
 	createEnvironmentMap();
 	createEnvironmentMapView();
 
@@ -232,7 +238,7 @@ void RenderApplication::mainLoop(){
 	//limit frame rate
 	do{
 		currTime = (float)glfwGetTime();
-	}while( currTime - prevTime < (1.0f / FRAMERATE));
+	}while( currTime - prevTime < (1.0f / MAX_FRAME_RATE));
 	
 	//update deltaTime
 	deltaTime = currTime - prevTime;
@@ -272,6 +278,11 @@ void RenderApplication::cleanup() {
 	vkDestroyImageView(device, diffuseTextureView, NULL);
 	vkDestroyImage(device, diffuseTexture, NULL);
 	vkFreeMemory(device, diffuseTextureMemory, NULL);
+
+	//free normal texture
+	vkDestroyImageView(device, normalTextureView, NULL);
+	vkDestroyImage(device, normalTexture, NULL);
+	vkFreeMemory(device, normalTextureMemory, NULL);
 
 	//free environment map texture
 	vkDestroyImageView(device, environmentMapView, NULL);
@@ -614,18 +625,18 @@ void RenderApplication::recreateSwapChain(){
 
 	vkDeviceWaitIdle(device);
 
-	//destroy depth image objects
-	vkDestroyImageView(device, depthAttachmentImageView, NULL);
-	vkDestroyImage(device, depthAttachmentImage, NULL);
-	vkFreeMemory(device, depthAttachmentImageMemory, NULL);
+	//free command buffers (while keeping command pool)
+	vkFreeCommandBuffers(device, graphicsCommandPool, (uint32_t)SwapChain::images.size(), renderCommandBuffers.data());
 
 	//destroy framebuffers
 	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
 		vkDestroyFramebuffer(device, swapChainFrameBuffers[i], NULL);
 	}
 
-	//free command buffers (while keeping command pool)
-	vkFreeCommandBuffers(device, graphicsCommandPool, (uint32_t)SwapChain::images.size(), renderCommandBuffers.data());
+	//destroy depth image objects
+	vkDestroyImageView(device, depthAttachmentImageView, NULL);
+	vkDestroyImage(device, depthAttachmentImage, NULL);
+	vkFreeMemory(device, depthAttachmentImageMemory, NULL);
 
 	//destroy graphics pipeline
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
@@ -638,7 +649,7 @@ void RenderApplication::recreateSwapChain(){
 	SwapChain::cleanUp(device);
 
 	
-	//Init SwapChain
+	//Recreate previously destroyed objects
 	SwapChain::querySupportDetails(physicalDevice, surface);
 	createSwapChain();
 	createRenderPass();
@@ -650,7 +661,7 @@ void RenderApplication::recreateSwapChain(){
 
 }
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/dragon.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -804,7 +815,7 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 void RenderApplication::createDiffuseTexture(){
 
 	Utils::createImageFromFile(
-		"resources/images/rock.jpg",	//File name on Disk
+		"resources/images/rock/rock_diff.jpg",	//File name on Disk
 		diffuseTexture,					//image
 		diffuseTextureMemory,			//image memory
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL	//Layout of image
@@ -816,6 +827,18 @@ void RenderApplication::createDiffuseTextureView(){
 	Utils::createImageView(diffuseTexture, diffuseTextureView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
+void RenderApplication::createNormalTexture(){
+	Utils::createImageFromFile(
+		"resources/images/rock/rock_norm.png",	//File name on Disk
+		normalTexture,					//image
+		normalTextureMemory,			//image memory
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL	//Layout of image
+	);
+}
+
+void RenderApplication::createNormalTextureView(){
+	Utils::createImageView(normalTexture, normalTextureView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+}
 void RenderApplication::createEnvironmentMap() {
 
 	std::vector<string> faceNames;
@@ -1249,7 +1272,7 @@ void RenderApplication::createGraphicsPipeline(){
 	colorBlending.attachmentCount = 1;
 	colorBlending.pAttachments = &colorBlendAttachment;
 
-	//Pipeline Layout
+	//Pipeline Layout, need to know about descriptor set layout
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
@@ -1314,6 +1337,7 @@ void RenderApplication::createSyncObjects(){
 
 
 }
+
 void RenderApplication::createRenderCommandBuffers() {
 
 	//we want each of our command buffers to draw to a swapchain image
@@ -1376,7 +1400,6 @@ void RenderApplication::createRenderCommandBuffers() {
 	}
 	
 }
-
 
 VkCommandPool& RenderApplication::getTransferCmdPool(){
 

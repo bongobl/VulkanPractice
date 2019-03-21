@@ -55,6 +55,8 @@ void SwapChain::init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI
 
 	//choose minimum number of images 
 	uint32_t imageCount = availableSurfaceCapabilities.minImageCount + 1;
+
+	//Translation: if there exists a max image count and our imageCount exceeds it
 	if (availableSurfaceCapabilities.maxImageCount > 0 && imageCount > availableSurfaceCapabilities.maxImageCount) {
 		imageCount = availableSurfaceCapabilities.maxImageCount;
 	}
@@ -67,7 +69,7 @@ void SwapChain::init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI
 	createInfo.imageColorSpace = surfaceFormat.colorSpace;
 	createInfo.imageExtent = extent;
 	createInfo.imageArrayLayers = 1;
-	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
 
 	if (graphicsQFI != presentQFI) {
@@ -101,12 +103,15 @@ void SwapChain::init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI
 }
 void SwapChain::cleanUp(VkDevice device) {
 
+	//destroy image views
 	for (unsigned int i = 0; i < imageViews.size(); ++i) {
 		vkDestroyImageView(device, imageViews[i], NULL);
 	}
 
+	//destroy swapchain
 	vkDestroySwapchainKHR(device, vulkanHandle, NULL);
 
+	//clean up support details
 	availableSurfaceCapabilities = {};
 	availableSurfaceFormats.clear();
 	availableSurfacePresentModes.clear();

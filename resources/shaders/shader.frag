@@ -34,6 +34,10 @@ void main() {
 	mat3 toWorldMat3 = transpose(inverse(mat3(modelMatrix)));
 	vec3 worldNormal = normalize(toWorldMat3 * modelSpaceNormal);
 
+
+	//test normal mapping
+	//worldNormal = normalize(worldNormal + (texture(diffuseTexture, texCoord).xyz * 2.0f - 1.0f));
+
 	//environment map reflection
 	vec3 reflectedCam = reflect(worldPosition - ubo.cameraPosition, worldNormal);
 	vec3 reflectiveColor = texture(envMap,reflectedCam).rgb;

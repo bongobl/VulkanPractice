@@ -25,7 +25,7 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
-#define FRAMERATE 60
+#define MAX_FRAME_RATE 60
 
 class RenderApplication{
 
@@ -87,10 +87,15 @@ class RenderApplication{
 	static std::vector<VkBuffer> fragShaderUBOs;
 	static std::vector<VkDeviceMemory> fragShaderUBOMemories;
 
-	//for our diffuse image
+	//for our diffuse texture
 	static VkImage diffuseTexture;
 	static VkDeviceMemory diffuseTextureMemory;
 	static VkImageView diffuseTextureView;
+
+	//for our normal texture
+	static VkImage normalTexture;
+	static VkDeviceMemory normalTextureMemory;
+	static VkImageView normalTextureView;
 
 	//for our environment map
 	static VkImage environmentMap;
@@ -186,6 +191,9 @@ private:
 
 	static void createDiffuseTexture();
 	static void createDiffuseTextureView();
+
+	static void createNormalTexture();
+	static void createNormalTextureView();
 
 	static void createEnvironmentMap();
 	static void createEnvironmentMapView();
