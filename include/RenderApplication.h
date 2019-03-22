@@ -33,9 +33,8 @@ class RenderApplication{
 	static GLFWwindow* window;
 	static bool windowResized;
 
-
 	//width and height of render area
-	static VkExtent2D desiredIntialExtent;
+	static VkExtent2D desiredInitialExtent;
 	
 	//Structures to hold all of our app's requirements
 	static std::vector<const char*> requiredInstanceLayers;
@@ -153,6 +152,7 @@ private:
 	//high level functions
 	static void initGLFWWindow();
 	static void frameBufferResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight);
+	static VkExtent2D waitToGetNonZeroExtent();
 
 
 	static void createAllVulkanResources();
@@ -166,7 +166,7 @@ private:
 	static void createSurface();
 	static void findPhysicalDevice();
 	static void createDevice();
-	static void createSwapChain();
+	static void createSwapChain(const VkExtent2D extent);
 	static void recreateSwapChain();
 	
 	//helper to find physical device

@@ -5,7 +5,7 @@
 //Initialize static members
 GLFWwindow* RenderApplication::window;
 bool RenderApplication::windowResized = false;
-VkExtent2D RenderApplication::desiredIntialExtent = {1920,1470};
+VkExtent2D RenderApplication::desiredInitialExtent = {1920,1470};
 std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
@@ -97,7 +97,7 @@ void RenderApplication::initGLFWWindow(){
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	window = glfwCreateWindow(desiredIntialExtent.width,desiredIntialExtent.height, "Test Window", NULL, NULL);
+	window = glfwCreateWindow(desiredInitialExtent.width,desiredInitialExtent.height, "Test Window", NULL, NULL);
 	glfwSetFramebufferSizeCallback(window, &frameBufferResizeCallback);
 }
 
@@ -106,6 +106,24 @@ void RenderApplication::frameBufferResizeCallback(GLFWwindow* resizedWindow, int
 	windowResized = true;
 }
 
+VkExtent2D RenderApplication::waitToGetNonZeroExtent() {
+
+	int width = 0, height = 0;
+
+	// we don't want to create the swapchain with width/height values of 0
+	while (width == 0 || height == 0) {
+		glfwGetFramebufferSize(window, &width, &height);
+		glfwWaitEvents();
+	}
+
+
+	VkExtent2D actualWindowExtent = {
+		(uint32_t)width,
+		(uint32_t)height
+	};
+
+	return actualWindowExtent;
+}
 void RenderApplication::createAllVulkanResources() {
 
 	//add all requirements that this app will need from the device and instance
@@ -117,7 +135,9 @@ void RenderApplication::createAllVulkanResources() {
 	findPhysicalDevice();
 	createDevice();
 
-	createSwapChain();
+	//create swapchain with valid extent
+	VkExtent2D initialExtent = waitToGetNonZeroExtent();
+	createSwapChain(initialExtent);
 
 	//create descriptor and command resources
 	createDescriptorSetLayout();
@@ -600,28 +620,22 @@ void RenderApplication::createDevice() {
 	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(2), particularQueueIndex, &presentQueue);
 }
 
-void RenderApplication::createSwapChain() {
-
-	int actualWidth, actualHeight;
-	glfwGetFramebufferSize(window, &actualWidth, &actualHeight);
-
-	VkExtent2D actualWindowExtent = {
-		(uint32_t)actualWidth,
-		(uint32_t)actualHeight
-	};
+void RenderApplication::createSwapChain(const VkExtent2D extent) {
 
 	SwapChain::init(
 		device,			//App logical device
 		surface,		//Vulkan Surface object
 		queueFamilyIndices.getQueueFamilyIndexAt(0),	//graphics queue family index
 		queueFamilyIndices.getQueueFamilyIndexAt(1),	//present queue family index
-		actualWindowExtent								//actual extent of the window
+		extent								//actual extent of the window
 	);
 
 }
 
 void RenderApplication::recreateSwapChain(){
 
+	
+	VkExtent2D newExtent = waitToGetNonZeroExtent();
 
 	vkDeviceWaitIdle(device);
 
@@ -651,7 +665,7 @@ void RenderApplication::recreateSwapChain(){
 	
 	//Recreate previously destroyed objects
 	SwapChain::querySupportDetails(physicalDevice, surface);
-	createSwapChain();
+	createSwapChain(newExtent);
 	createRenderPass();
 	createGraphicsPipeline();
 	createDepthAttachmentImage();
@@ -926,9 +940,17 @@ void RenderApplication::createDescriptorSetLayout() {
 	diffuseTextureBinding.pImmutableSamplers = NULL;
 	diffuseTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+	//define a binding for our normal texture
+	VkDescriptorSetLayoutBinding normalTextureBinding = {};
+	normalTextureBinding.binding = 2;	//binding = 2
+	normalTextureBinding.descriptorCount = 1;
+	normalTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	normalTextureBinding.pImmutableSamplers = NULL;
+	normalTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
 	//define a binding for our environment map
 	VkDescriptorSetLayoutBinding environmentMapBinding = {};
-	environmentMapBinding.binding = 2;	//binding 2
+	environmentMapBinding.binding = 3;	//binding 3
 	environmentMapBinding.descriptorCount = 1;
 	environmentMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	environmentMapBinding.pImmutableSamplers = NULL;
@@ -936,26 +958,19 @@ void RenderApplication::createDescriptorSetLayout() {
 
 	//define a binding for our fragment shader UBO
 	VkDescriptorSetLayoutBinding fragShaderUBOBinding = {};
-	fragShaderUBOBinding.binding = 3;	//binding = 3
+	fragShaderUBOBinding.binding = 4;	//binding = 4
 	fragShaderUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	fragShaderUBOBinding.descriptorCount = 1;
 	fragShaderUBOBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	//define a binding for our diffuse texture
-	VkDescriptorSetLayoutBinding normalTextureBinding = {};
-	normalTextureBinding.binding = 4;	//binding = 4
-	normalTextureBinding.descriptorCount = 1;
-	normalTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	normalTextureBinding.pImmutableSamplers = NULL;
-	normalTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     //put all bindings in an array
     std::array<VkDescriptorSetLayoutBinding, 5> allBindings = { 
 		tessShaderUBOBinding, 
-		diffuseTextureBinding, 
+		diffuseTextureBinding,
+		normalTextureBinding, 
 		environmentMapBinding, 
-		fragShaderUBOBinding, 
-		normalTextureBinding 
+		fragShaderUBOBinding		
 	};
 
     //create descriptor set layout for binding to a UBO
@@ -979,10 +994,11 @@ void RenderApplication::createDescriptorPool(){
 	poolSizes[1].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[2].descriptorCount = (uint32_t)SwapChain::images.size();
-	poolSizes[3].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[3].descriptorCount = (uint32_t)SwapChain::images.size();
-	poolSizes[4].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[4].descriptorCount = (uint32_t)SwapChain::images.size();
+	
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1047,11 +1063,27 @@ void RenderApplication::createDescriptorSets() {
 		diffuseTextureDescriptorWrite.descriptorCount = 1;
 		diffuseTextureDescriptorWrite.pImageInfo = &diffuseTextureDescriptorInfo;
 
+		// Descriptor for our normal texture
+		VkWriteDescriptorSet normalTextureDescriptorWrite = {};
+		normalTextureDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		normalTextureDescriptorWrite.dstSet = descriptorSets[i];
+		normalTextureDescriptorWrite.dstBinding = 2;	//binding = 2
+		normalTextureDescriptorWrite.dstArrayElement = 0;
+			// Descriptor info
+			VkDescriptorImageInfo normalTextureDescriptorInfo = {};
+			normalTextureDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			normalTextureDescriptorInfo.imageView = normalTextureView;
+			normalTextureDescriptorInfo.sampler = textureSampler;
+
+		normalTextureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		normalTextureDescriptorWrite.descriptorCount = 1;
+		normalTextureDescriptorWrite.pImageInfo = &normalTextureDescriptorInfo;
+
 		// Descriptor for our environment map texture
 		VkWriteDescriptorSet environmentMapDescriptorWrite = {};
 		environmentMapDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		environmentMapDescriptorWrite.dstSet = descriptorSets[i];
-		environmentMapDescriptorWrite.dstBinding = 2;	//binding = 2
+		environmentMapDescriptorWrite.dstBinding = 3;	//binding = 3
 		environmentMapDescriptorWrite.dstArrayElement = 0;
 			// Descriptor info
 			VkDescriptorImageInfo environmentMapDescriptorInfo = {};
@@ -1067,7 +1099,7 @@ void RenderApplication::createDescriptorSets() {
 		VkWriteDescriptorSet fragmentUBODescriptorWrite = {};
 		fragmentUBODescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		fragmentUBODescriptorWrite.dstSet = descriptorSets[i];
-		fragmentUBODescriptorWrite.dstBinding = 3;		//binding = 3
+		fragmentUBODescriptorWrite.dstBinding = 4;		//binding = 4
 		fragmentUBODescriptorWrite.dstArrayElement = 0;
 			// Descriptor info
 			VkDescriptorBufferInfo fragmentUBODescriptorInfo = {};
@@ -1079,30 +1111,16 @@ void RenderApplication::createDescriptorSets() {
 		fragmentUBODescriptorWrite.descriptorCount = 1;
 		fragmentUBODescriptorWrite.pBufferInfo = &fragmentUBODescriptorInfo;
 
-		// Descriptor for our normal texture
-		VkWriteDescriptorSet normalTextureDescriptorWrite = {};
-		normalTextureDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		normalTextureDescriptorWrite.dstSet = descriptorSets[i];
-		normalTextureDescriptorWrite.dstBinding = 4;	//binding = 4
-		normalTextureDescriptorWrite.dstArrayElement = 0;
-			// Descriptor info
-			VkDescriptorImageInfo normalTextureDescriptorInfo = {};
-			normalTextureDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			normalTextureDescriptorInfo.imageView = normalTextureView;
-			normalTextureDescriptorInfo.sampler = textureSampler;
-
-		normalTextureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		normalTextureDescriptorWrite.descriptorCount = 1;
-		normalTextureDescriptorWrite.pImageInfo = &normalTextureDescriptorInfo;
 
 
 		//put all descriptor write info in an array
 		std::array<VkWriteDescriptorSet, 5> descriptorWrites = { 
 			tessUBODescriptorWrite,
 			diffuseTextureDescriptorWrite,
+			normalTextureDescriptorWrite,
 			environmentMapDescriptorWrite,
-			fragmentUBODescriptorWrite,
-			normalTextureDescriptorWrite
+			fragmentUBODescriptorWrite
+			
 		};
 
 		// perform the update of the descriptor sets
@@ -1341,7 +1359,7 @@ void RenderApplication::createGraphicsPipeline(){
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;
 	pipelineInfo.pDepthStencilState = &depthStencil;
-	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pColorBlendState = &colorBlending;	//can't be non-null if using color attachments
 	pipelineInfo.pDynamicState = NULL;
 	pipelineInfo.layout = pipelineLayout;
 	pipelineInfo.renderPass = renderPass;

@@ -10,8 +10,9 @@ layout(location = 3) in mat4 modelMatrix;
 
 //Descriptor Bindings
 layout(binding = 1) uniform sampler2D diffuseTexture;
-layout(binding = 2) uniform samplerCube envMap;
-layout(binding = 3) uniform UniformBufferObject{
+layout(binding = 2) uniform sampler2D normalTexture;
+layout(binding = 3) uniform samplerCube envMap;
+layout(binding = 4) uniform UniformBufferObject{
 
 	vec3 lightDirection;
     float textureParam;
@@ -21,7 +22,7 @@ layout(binding = 3) uniform UniformBufferObject{
     float padding3;
 
 } ubo;
-layout(binding = 4) uniform sampler2D normalTexture;
+
 
 
 
