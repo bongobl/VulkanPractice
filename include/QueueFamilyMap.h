@@ -17,15 +17,16 @@ class QueueFamilyMap{
 public:
 
 	//Note: Surface only needed if using present queue
-	bool compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface);	
+	void compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface);	
 	void addRequiredQueueType(uint32_t queueType);
 	int getQueueFamilyIndexAt(unsigned int index) const;
 	int numRequired() const;
+	bool allHaveValues() const;
 	
 private:
 
 	void resetIndices();
-	bool allHaveValues() const;
+	
 	bool hasValue(unsigned int index) const;
 	void setQueueFamilyIndexAt(unsigned int index, int queueFamilyIndex);
 	uint32_t getRequiredQueueTypeAt(unsigned int index) const;

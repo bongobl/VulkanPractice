@@ -1,7 +1,7 @@
 #include <QueueFamilyMap.h>
 
 
-bool QueueFamilyMap::compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface){
+void QueueFamilyMap::compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface){
 
 	resetIndices();
 
@@ -38,14 +38,14 @@ bool QueueFamilyMap::compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR s
 						setQueueFamilyIndexAt(currMapIndex, currFamilyIndex);
 					}
 					if (allHaveValues()) {
-						return true;
+						return;
 					}
 				}
 			}
 		}
     }
 
-	return allHaveValues(); 
+	return;
 }
 
 void QueueFamilyMap::addRequiredQueueType(uint32_t queueType){

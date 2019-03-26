@@ -124,7 +124,7 @@ class RenderApplication{
 	static VkPipelineLayout pipelineLayout;
 	static VkPipeline graphicsPipeline;
     
-	//use later
+	//realtime rendering and presenting
 	static std::vector<VkFence> inFlightFences;
 	static std::vector<VkSemaphore> imageAvailableSemaphores;
 	static std::vector<VkSemaphore> renderFinishedSemaphores;
@@ -149,14 +149,15 @@ public:
 
 private:
 
-	//high level functions
+	//high level app functions
 	static void initGLFWWindow();
-	static void frameBufferResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight);
-	static VkExtent2D waitToGetNonZeroExtent();
-
-
 	static void createAllVulkanResources();
 	static void mainLoop();
+	static void cleanup();
+
+	//GLFW callbacks
+	static void windowResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight);
+	static VkExtent2D waitToGetNonZeroWindowExtent();	//continuously loops until window width/height are non-zero, then returns the extent
 
     //specify all required instance layers, instance extensions and device extensions here
     static void configureAllRequirements();
@@ -166,7 +167,7 @@ private:
 	static void createSurface();
 	static void findPhysicalDevice();
 	static void createDevice();
-	static void createSwapChain(const VkExtent2D extent);
+	static void createSwapChain(const VkExtent2D appExtent);
 	static void recreateSwapChain();
 	
 	//helper to find physical device
@@ -206,7 +207,7 @@ private:
 	
 	static void createDescriptorSets();
 
-	//to start rendering
+
 	static void createRenderPass();	
 	static void createSwapChainFrameBuffers();
 	static void createGraphicsPipeline();
@@ -215,8 +216,7 @@ private:
 	//the command buffer that will render the scene to our swapchain images
 	static void createRenderCommandBuffers();
 
-	static void cleanup();
-
+	
 	//to allow Utils class to perform transfer operations
 	static VkCommandPool& getTransferCmdPool();
 	static VkQueue& getTransferQueue();

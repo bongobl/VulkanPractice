@@ -457,12 +457,11 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 
 			if (uniqueVertices.count(vertex) == 0) {
 				uniqueVertices[vertex] = (uint32_t)vertexArray.size();
-				indexArray.push_back((uint32_t)vertexArray.size());
 				vertexArray.push_back(vertex);
 			}
-			else {
-				indexArray.push_back(uniqueVertices[vertex]);
-			}
+
+			indexArray.push_back(uniqueVertices[vertex]);
+			
 		}
 	}
 	cout << "Model " << modelFilename << " loaded with " << vertexArray.size() << " vertices and " << (indexArray.size() / 3) << " triangles" << endl << endl;
@@ -485,7 +484,7 @@ void Utils::createImageFromFile(const string imageName, VkImage &image, VkDevice
 	//debug output
     cout << "loaded " << imageName << endl;
     cout << "Num numChannels: " << numChannels << endl;
-    cout << "Width: " << imageExtent.width << endl << "Height: " << imageExtent.height << endl;
+    cout << "Width: " << imageExtent.width << endl << "Height: " << imageExtent.height << endl << endl;
 
 	//define byte size of image
 	VkDeviceSize imageSize = imageExtent.width * imageExtent.height * 4;
@@ -548,7 +547,7 @@ void Utils::createCubeMapImageFromFile(const std::vector<string> imageNames, VkI
 			throw std::runtime_error(error.c_str());
 		}
 		//debug output
-		cout << "\nloaded " << imageNames[i] << endl;
+		cout << "loaded " << imageNames[i] << endl;
 		cout << "Num numChannels: " << numChannels << endl;
 		cout << "Width: " << imageExtent.width << endl << "Height: " << imageExtent.height << endl << endl;
 	}
@@ -660,7 +659,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
 
 {
 
-	printf("\nDebug Report: %s: %s\n\n", pLayerPrefix, pMessage);
+	printf("\nValidation Layer Report: %s: %s\n\n", pLayerPrefix, pMessage);
 
 	return VK_FALSE;
 }

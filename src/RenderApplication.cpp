@@ -71,7 +71,6 @@ void RenderApplication::run() {
 	//create all vulkan resources we will need in the app
 	createAllVulkanResources();
 
-	//copyOutputToSwapChainImages();
 
 	//play around with window as long as we want
 	cout << "In Main Loop" << endl;
@@ -84,7 +83,7 @@ void RenderApplication::run() {
 		mainLoop();
 	}
 
-	//wait for remaining images to finish rendering and presenting
+	// wait for remaining images to finish rendering and presenting
 	vkDeviceWaitIdle(device);
 
     // Clean up all resources.
@@ -98,15 +97,16 @@ void RenderApplication::initGLFWWindow(){
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	window = glfwCreateWindow(desiredInitialExtent.width,desiredInitialExtent.height, "Test Window", NULL, NULL);
-	glfwSetFramebufferSizeCallback(window, &frameBufferResizeCallback);
+	glfwSetFramebufferSizeCallback(window, &windowResizeCallback);
 }
 
-void RenderApplication::frameBufferResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight){
+//this function is called repetitively until the user stops resizing the window
+void RenderApplication::windowResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight){
 
 	windowResized = true;
 }
 
-VkExtent2D RenderApplication::waitToGetNonZeroExtent() {
+VkExtent2D RenderApplication::waitToGetNonZeroWindowExtent() {
 
 	int width = 0, height = 0;
 
@@ -115,7 +115,6 @@ VkExtent2D RenderApplication::waitToGetNonZeroExtent() {
 		glfwGetFramebufferSize(window, &width, &height);
 		glfwWaitEvents();
 	}
-
 
 	VkExtent2D actualWindowExtent = {
 		(uint32_t)width,
@@ -136,7 +135,7 @@ void RenderApplication::createAllVulkanResources() {
 	createDevice();
 
 	//create swapchain with valid extent
-	VkExtent2D initialExtent = waitToGetNonZeroExtent();
+	VkExtent2D initialExtent = waitToGetNonZeroWindowExtent();
 	createSwapChain(initialExtent);
 
 	//create descriptor and command resources
@@ -197,14 +196,15 @@ void RenderApplication::mainLoop(){
 	//wait for image at current frame to finish rendering
 	vkWaitForFences(device,1, &inFlightFences[currentFrame], VK_TRUE, MAX_UNSIGNED_64_BIT_VAL);
 
+
 	//acquire next image from swapchain, which may currently still be presenting
 	result = vkAcquireNextImageKHR(
-		device, 
-		SwapChain::vulkanHandle, 
-		MAX_UNSIGNED_64_BIT_VAL,
-		imageAvailableSemaphores[currentFrame],
-		VK_NULL_HANDLE,
-		&imageIndex
+		device,		//device
+		SwapChain::vulkanHandle,	//Vulkan swapchain handle 
+		MAX_UNSIGNED_64_BIT_VAL,	//max time to wait to acquire next image
+		imageAvailableSemaphores[currentFrame],	//semaphore to signal when image is done presenting
+		VK_NULL_HANDLE,		//fence to signal when image is done presenting
+		&imageIndex			//index of image we are acquiring 
 	);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -213,9 +213,8 @@ void RenderApplication::mainLoop(){
 	else {
 		VK_CHECK_RESULT(result);
 	}
-	
-	
 
+	
 	//update uniform data for this frame
 	writeToUniformBuffer(imageIndex);
 
@@ -234,7 +233,9 @@ void RenderApplication::mainLoop(){
 
 	vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
+	//SUBMIT A RENDER COMMAND TO THIS IMAGE
 	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]));
+
 
 	//Enqueue presenting this image
 	VkPresentInfoKHR presentInfo = {};
@@ -245,8 +246,10 @@ void RenderApplication::mainLoop(){
 	presentInfo.pSwapchains = &SwapChain::vulkanHandle;
 	presentInfo.pImageIndices = &imageIndex;
 
+	//SUBMIT A PRESENT COMMAND FOR THIS IMAGE
 	result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
+	
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || windowResized) {
 		windowResized = false;
 		recreateSwapChain();
@@ -264,18 +267,21 @@ void RenderApplication::mainLoop(){
 	deltaTime = currTime - prevTime;
 	prevTime = currTime;
 
-	modelRotation += 50.0f * deltaTime;
+	modelRotation += 75.0f * deltaTime;
 }
 void RenderApplication::cleanup() {
 
-	//clean up all Vulkan resources
+	//clean up all App/Vulkan/Window resources
+
+	//destroy validation layer callback
 	if (enableValidationLayers) {
-		// destroy callback.
-		auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
-		if (func == nullptr) {
+		
+		//load function to clean up validation layer callback
+		auto vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+		if (vkDestroyDebugReportCallbackEXT == nullptr) {
 			throw std::runtime_error("Error: Could not load vkDestroyDebugReportCallbackEXT");
 		}
-		func(instance, debugReportCallback, NULL);
+		vkDestroyDebugReportCallbackEXT(instance, debugReportCallback, NULL);
 	}
 
 	//free vertex buffer
@@ -486,7 +492,7 @@ void RenderApplication::createSurface(){
 void RenderApplication::findPhysicalDevice() {
 
     //In this function, we find a physical device that can be used with Vulkan.
-    //So, first we will list all physical devices on the system with vkEnumeratePhysicalDevices .
+    //So, first we will list all physical devices on the system with vkEnumeratePhysicalDevices
 
     uint32_t physicalDeviceCount;
 
@@ -556,14 +562,19 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 
 	// Does this physical device support swapchain functions for our purposes
 	// Note: It is important that we only call querySupportDetails after we check 
-	// that this physical device supports our swapchain device extension
+	// that this physical device supports the swapchain device extension VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	SwapChain::querySupportDetails(potentialPhysicalDevice, surface);
-	bool hasSwapChainSupport = SwapChain::hasAdequateSupport();
+	if (!SwapChain::hasAdequateSupport()) {
+		return false;
+	}
 
-	bool hasAllIndices = queueFamilyIndices.compute(potentialPhysicalDevice, surface);
+	queueFamilyIndices.compute(potentialPhysicalDevice, surface);
+	if (!queueFamilyIndices.allHaveValues()) {
+		return false;
+	}
 
-
-	return hasAllIndices && hasSwapChainSupport;
+	//all requirements satisfied at this point, this physical device suits our needs
+	return true;
 
 }
 
@@ -620,25 +631,26 @@ void RenderApplication::createDevice() {
 	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(2), particularQueueIndex, &presentQueue);
 }
 
-void RenderApplication::createSwapChain(const VkExtent2D extent) {
+void RenderApplication::createSwapChain(const VkExtent2D appExtent) {
 
 	SwapChain::init(
 		device,			//App logical device
 		surface,		//Vulkan Surface object
 		queueFamilyIndices.getQueueFamilyIndexAt(0),	//graphics queue family index
 		queueFamilyIndices.getQueueFamilyIndexAt(1),	//present queue family index
-		extent								//actual extent of the window
+		appExtent								//actual extent of the window
 	);
 
 }
 
 void RenderApplication::recreateSwapChain(){
 
-	
-	VkExtent2D newExtent = waitToGetNonZeroExtent();
+	VkExtent2D newExtent = waitToGetNonZeroWindowExtent();
 
+	
 	vkDeviceWaitIdle(device);
 
+	
 	//free command buffers (while keeping command pool)
 	vkFreeCommandBuffers(device, graphicsCommandPool, (uint32_t)SwapChain::images.size(), renderCommandBuffers.data());
 
