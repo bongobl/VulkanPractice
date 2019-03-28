@@ -41,7 +41,6 @@ class RenderApplication{
 	static std::vector<const char*> requiredInstanceExtensions;
 	static std::vector<const char*> requiredDeviceExtensions;
 	static VkPhysicalDeviceFeatures requiredDeviceFeatures;
-	static QueueFamilyMap queueFamilyIndices;
 
 
     //In order to use Vulkan, you must create an instance. 

@@ -101,7 +101,7 @@ void Utils::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size
 	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
 }
 
-void Utils::copyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, VkExtent2D imageExtent) {
+void Utils::copyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, VkExtent2D imageExtent, bool cubeMapFlag) {
 
 	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
 
@@ -113,6 +113,10 @@ void Utils::copyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage ds
 	layers.baseArrayLayer = 0;
 	layers.layerCount = 1;
 	
+	if (cubeMapFlag) {
+		layers.layerCount = 6;
+	}
+
 	imageCopyInfo.srcSubresource = layers;
 	imageCopyInfo.srcOffset = { 0,0,0 };
 	imageCopyInfo.dstSubresource = layers;

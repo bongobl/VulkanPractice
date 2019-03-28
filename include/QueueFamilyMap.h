@@ -10,25 +10,25 @@ typedef enum AdditionalQueueFlagBits {
 
 class QueueFamilyMap{
 
-	unsigned int doneCount;
+	static unsigned int doneCount;
 
 	//maps required queue type enums to their queue family index
-	std::vector< pair<uint32_t, int> > indexMap;
+	static std::vector< pair<uint32_t, int> > indexMap;
 public:
 
 	//Note: Surface only needed if using present queue
-	void compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface);	
-	void addRequiredQueueType(uint32_t queueType);
-	int getQueueFamilyIndexAt(unsigned int index) const;
-	int numRequired() const;
-	bool allHaveValues() const;
+	static void compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface);	
+	static void addRequiredQueueType(uint32_t queueType);
+	static int getQueueFamilyIndexAt(unsigned int index);
+	static int numRequired();
+	static bool allHaveValues();
 	
 private:
 
-	void resetIndices();
+	static void resetIndices();
 	
-	bool hasValue(unsigned int index) const;
-	void setQueueFamilyIndexAt(unsigned int index, int queueFamilyIndex);
-	uint32_t getRequiredQueueTypeAt(unsigned int index) const;
+	static bool hasValue(unsigned int index);
+	static void setQueueFamilyIndexAt(unsigned int index, int queueFamilyIndex);
+	static uint32_t getRequiredQueueTypeAt(unsigned int index);
 		
 };

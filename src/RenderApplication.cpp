@@ -10,7 +10,6 @@ std::vector<const char*> RenderApplication::requiredInstanceLayers;
 std::vector<const char*> RenderApplication::requiredInstanceExtensions;
 std::vector<const char*> RenderApplication::requiredDeviceExtensions;
 VkPhysicalDeviceFeatures RenderApplication::requiredDeviceFeatures = {};
-QueueFamilyMap RenderApplication::queueFamilyIndices;
 
 
 VkInstance RenderApplication::instance;
@@ -378,9 +377,9 @@ void RenderApplication::configureAllRequirements(){
 	requiredDeviceFeatures.wideLines = VK_TRUE;
 
 	//specify what queue capabilities we need
-	queueFamilyIndices.addRequiredQueueType(VK_QUEUE_GRAPHICS_BIT);
-	queueFamilyIndices.addRequiredQueueType(VK_QUEUE_TRANSFER_BIT);
-	queueFamilyIndices.addRequiredQueueType(ADDITIONAL_VK_QUEUE_PRESENT_BIT);
+	QueueFamilyMap::addRequiredQueueType(VK_QUEUE_GRAPHICS_BIT);
+	QueueFamilyMap::addRequiredQueueType(VK_QUEUE_TRANSFER_BIT);
+	QueueFamilyMap::addRequiredQueueType(ADDITIONAL_VK_QUEUE_PRESENT_BIT);
 
 	//swap chain device extension
 	requiredDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -568,12 +567,13 @@ bool RenderApplication::isValidPhysicalDevice(VkPhysicalDevice potentialPhysical
 		return false;
 	}
 
-	queueFamilyIndices.compute(potentialPhysicalDevice, surface);
-	if (!queueFamilyIndices.allHaveValues()) {
+	// Does this physical device have queue family indices for all our required queue types
+	QueueFamilyMap::compute(potentialPhysicalDevice, surface);
+	if (!QueueFamilyMap::allHaveValues()) {
 		return false;
 	}
 
-	//all requirements satisfied at this point, this physical device suits our needs
+	// all requirements satisfied at this point, this physical device suits our needs
 	return true;
 
 }
@@ -582,8 +582,8 @@ void RenderApplication::createDevice() {
 
 	//only need unique queue families
 	std::set<uint32_t> uniqueQueueFamilies;
-	for (int i = 0; i < queueFamilyIndices.numRequired(); ++i) {
-		uniqueQueueFamilies.insert(queueFamilyIndices.getQueueFamilyIndexAt(i));
+	for (int i = 0; i < QueueFamilyMap::numRequired(); ++i) {
+		uniqueQueueFamilies.insert(QueueFamilyMap::getQueueFamilyIndexAt(i));
 	}
 
 	//contains all the queue create info structs the device needs to know about
@@ -620,15 +620,16 @@ void RenderApplication::createDevice() {
 	deviceCreateInfo.enabledExtensionCount = (uint32_t)requiredDeviceExtensions.size();
 	deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 
-    VK_CHECK_RESULT(vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); // create logical device.
+	// use the physical device we chose to create logical device.
+    VK_CHECK_RESULT(vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); 
 
 	//the index within this queue family of the queue to retrieve, we just take the first one
     uint32_t particularQueueIndex = 0;
 
-    // Get a handle to the first member of the queue family.
-    vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(0), particularQueueIndex, &graphicsQueue);
-	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(1), particularQueueIndex, &transferQueue);
-	vkGetDeviceQueue(device, queueFamilyIndices.getQueueFamilyIndexAt(2), particularQueueIndex, &presentQueue);
+    // Get a handle to the first member of each queue family.
+    vkGetDeviceQueue(device, QueueFamilyMap::getQueueFamilyIndexAt(0), particularQueueIndex, &graphicsQueue);
+	vkGetDeviceQueue(device, QueueFamilyMap::getQueueFamilyIndexAt(1), particularQueueIndex, &transferQueue);
+	vkGetDeviceQueue(device, QueueFamilyMap::getQueueFamilyIndexAt(2), particularQueueIndex, &presentQueue);
 }
 
 void RenderApplication::createSwapChain(const VkExtent2D appExtent) {
@@ -636,8 +637,8 @@ void RenderApplication::createSwapChain(const VkExtent2D appExtent) {
 	SwapChain::init(
 		device,			//App logical device
 		surface,		//Vulkan Surface object
-		queueFamilyIndices.getQueueFamilyIndexAt(0),	//graphics queue family index
-		queueFamilyIndices.getQueueFamilyIndexAt(1),	//present queue family index
+		QueueFamilyMap::getQueueFamilyIndexAt(0),	//graphics queue family index
+		QueueFamilyMap::getQueueFamilyIndexAt(1),	//present queue family index
 		appExtent								//actual extent of the window
 	);
 
@@ -645,9 +646,6 @@ void RenderApplication::createSwapChain(const VkExtent2D appExtent) {
 
 void RenderApplication::recreateSwapChain(){
 
-	VkExtent2D newExtent = waitToGetNonZeroWindowExtent();
-
-	
 	vkDeviceWaitIdle(device);
 
 	
@@ -675,6 +673,9 @@ void RenderApplication::recreateSwapChain(){
 	SwapChain::cleanUp(device);
 
 	
+	//we only want to recreate the following vulkan objects with a non zero app extent (width & height)
+	VkExtent2D newExtent = waitToGetNonZeroWindowExtent();
+
 	//Recreate previously destroyed objects
 	SwapChain::querySupportDetails(physicalDevice, surface);
 	createSwapChain(newExtent);
@@ -1154,7 +1155,7 @@ void RenderApplication::createCommandPool(){
 
     // the queue family of this command pool. All command buffers allocated from this command pool,
     // must be submitted to queues of this family ONLY.
-    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndices.getQueueFamilyIndexAt(0);	//graphics QFI
+    commandPoolCreateInfo.queueFamilyIndex = QueueFamilyMap::getQueueFamilyIndexAt(0);	//graphics QFI
     VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &graphicsCommandPool));
 }
 
@@ -1398,10 +1399,13 @@ void RenderApplication::createSyncObjects(){
 	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 
+	
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
+	//Syncronize rendering with presenting on GPU
+	//Note: All semaphores are created in the unsignaled state
 	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 

@@ -1,5 +1,6 @@
 #include <SwapChain.h>
 
+//statics
 VkSurfaceCapabilitiesKHR SwapChain::availableSurfaceCapabilities;
 std::vector<VkSurfaceFormatKHR> SwapChain::availableSurfaceFormats;
 std::vector<VkPresentModeKHR> SwapChain::availableSurfacePresentModes;

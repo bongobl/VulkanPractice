@@ -1,5 +1,7 @@
 #include <QueueFamilyMap.h>
 
+unsigned int QueueFamilyMap::doneCount;
+std::vector< pair<uint32_t, int> > QueueFamilyMap::indexMap;
 
 void QueueFamilyMap::compute(VkPhysicalDevice currPhysicalDevice, VkSurfaceKHR surface){
 
@@ -56,11 +58,11 @@ void QueueFamilyMap::addRequiredQueueType(uint32_t queueType){
 	indexMap.push_back(elem);
 }
 
-uint32_t QueueFamilyMap::getRequiredQueueTypeAt(unsigned int index) const{
+uint32_t QueueFamilyMap::getRequiredQueueTypeAt(unsigned int index){
 	return indexMap.at(index).first;
 }
 
-int QueueFamilyMap::numRequired() const {
+int QueueFamilyMap::numRequired(){
 	return (int)indexMap.size();
 }
 
@@ -72,11 +74,11 @@ void QueueFamilyMap::resetIndices(){
 		indexMap.at(i).second = -1;
 	}
 }
-bool QueueFamilyMap::allHaveValues() const{
+bool QueueFamilyMap::allHaveValues(){
 	return doneCount >= indexMap.size();
 }
 
-bool QueueFamilyMap::hasValue(unsigned int index) const{
+bool QueueFamilyMap::hasValue(unsigned int index){
 	return indexMap.at(index).second != -1;
 }
 
@@ -87,7 +89,7 @@ void QueueFamilyMap::setQueueFamilyIndexAt(unsigned int index, int queueFamilyIn
 	++doneCount;
 }
 
-int QueueFamilyMap::getQueueFamilyIndexAt(unsigned int index) const{
+int QueueFamilyMap::getQueueFamilyIndexAt(unsigned int index){
 	return indexMap.at(index).second;
 }
 

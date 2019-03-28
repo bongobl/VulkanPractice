@@ -46,7 +46,7 @@ public:
 		VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory, bool cubeMapFlag = false);
 
 	static void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-	static void copyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, VkExtent2D imageExtent);
+	static void copyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, VkExtent2D imageExtent, bool cubeMapFlag = false);
 	static void createImageView(VkImage image, VkImageView &imageView, 
 		VkFormat format, VkImageAspectFlags aspectFlags, bool cubeMapFlag = false);
 
