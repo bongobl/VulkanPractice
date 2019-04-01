@@ -135,18 +135,25 @@ class RenderApplication{
 
 	static std::vector<VkCommandBuffer> renderCommandBuffers;
 
+	//SCENE VARIABLES
 	//time variables
 	static float currTime;
 	static float prevTime;
 	static float deltaTime;
 
-	//trackball
-	static bool isLeftMouseButtonDown;
+	//mouse
 	static glm::vec2 mousePosition;
 	static glm::vec2 prevMousePosition;
+	static bool isLeftMouseButtonDown;
+	static bool isRightMouseButtonDown;
+
+	//model rotation
 	static glm::vec3 modelSpinAxis;
 	static float modelSpinAngle;
 	static glm::mat4 modelOrientation;
+
+	//light rotation;
+	static glm::mat3 lightOrientation;
 
 public:
 
@@ -157,7 +164,8 @@ private:
 	//high level app functions
 	static void initGLFWWindow();
 	static void createAllVulkanResources();
-	static void mainLoop();
+	static void drawFrame();
+	static void updateScene();
 	static void cleanup();
 
 	//GLFW callbacks
@@ -165,6 +173,7 @@ private:
 	static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 	static void cursorMovedCallback(GLFWwindow* window, double xpos, double ypos);
 
+	
 	static VkExtent2D waitToGetNonZeroWindowExtent();	//continuously loops until window width/height are non-zero, then returns the extent
 
     //specify all required instance layers, instance extensions and device extensions here
@@ -224,7 +233,9 @@ private:
 	//the command buffer that will render the scene to our swapchain images
 	static void createRenderCommandBuffers();
 
-	
+	static void updateModelRotation();
+	static void updateLightRotation();
+
 	//to allow Utils class to perform transfer operations
 	static VkCommandPool& getTransferCmdPool();
 	static VkQueue& getTransferQueue();

@@ -59,7 +59,7 @@ void main() {
 	vec3 specular = pow(max(0, dot(reflectedLight, fragToCam)),10) * vec3(1.0f);
 
 	//ambient
-	vec3 ambient = 0.04f * ubo.matColor;
+	vec3 ambient = 0.01f * ubo.matColor;
 
 	//final color
 	outColor.rgb = diffuse + specular + ambient; 

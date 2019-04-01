@@ -60,13 +60,15 @@ std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
 
 float RenderApplication::currTime;
 float RenderApplication::prevTime;
-float RenderApplication::deltaTime = 0;
-bool RenderApplication::isLeftMouseButtonDown = false;
+float RenderApplication::deltaTime;
 glm::vec2 RenderApplication::mousePosition;
 glm::vec2 RenderApplication::prevMousePosition;
+bool RenderApplication::isLeftMouseButtonDown = false;
+bool RenderApplication::isRightMouseButtonDown = false;
 glm::vec3 RenderApplication::modelSpinAxis(0, 1, 0);
 float RenderApplication::modelSpinAngle = 0;
 glm::mat4 RenderApplication::modelOrientation(1.0f);
+glm::mat3 RenderApplication::lightOrientation(1.0f);
 
 void RenderApplication::run() {
 
@@ -78,15 +80,20 @@ void RenderApplication::run() {
 	createAllVulkanResources();
 
 
-	//play around with window as long as we want
+
 	cout << "In Main Loop" << endl;
 	currentFrame = 0;	//set beginning frame to work with
 	currTime = (float)glfwGetTime();
 	prevTime = (float)glfwGetTime();
 	deltaTime = 0;
+
+	double xPos, yPos;
+	glfwGetCursorPos(window, &xPos, &yPos);
+	mousePosition = glm::vec2(xPos, yPos);
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
-		mainLoop();
+		drawFrame();
+		updateScene();
 	}
 
 	// wait for remaining images to finish rendering and presenting
@@ -117,17 +124,27 @@ void RenderApplication::windowResizeCallback(GLFWwindow* resizedWindow, int newW
 }
 
 void RenderApplication::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-	if (button == GLFW_MOUSE_BUTTON_LEFT) {
-		if (action == GLFW_PRESS) {
+	
+	if (action == GLFW_PRESS) {
 
+		if (button == GLFW_MOUSE_BUTTON_LEFT) {
 			isLeftMouseButtonDown = true;
-			prevMousePosition = mousePosition;
 		}
-
-		if (action == GLFW_RELEASE) {
-			isLeftMouseButtonDown = false;
+		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+			isRightMouseButtonDown = true;
 		}
 	}
+
+	if (action == GLFW_RELEASE) {
+
+		if (button == GLFW_MOUSE_BUTTON_LEFT) {
+			isLeftMouseButtonDown = false;
+		}
+		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+			isRightMouseButtonDown = false;
+		}
+	}
+	
 }
 void RenderApplication::cursorMovedCallback(GLFWwindow* window, double xpos, double ypos) {
 	mousePosition = glm::vec2(xpos, ypos);
@@ -185,10 +202,6 @@ void RenderApplication::createAllVulkanResources() {
 
 	createUniformBuffers();
 
-	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
-		writeToUniformBuffer(i);
-	}
-
 	createDiffuseTexture();
 	createDiffuseTextureView();
 
@@ -217,7 +230,7 @@ void RenderApplication::createAllVulkanResources() {
 
 }
 
-void RenderApplication::mainLoop(){
+void RenderApplication::drawFrame(){
 
 
 	uint64_t MAX_UNSIGNED_64_BIT_VAL = std::numeric_limits<uint64_t>::max();
@@ -290,28 +303,40 @@ void RenderApplication::mainLoop(){
 		VK_CHECK_RESULT(result);
 	}
 
+}
+
+void RenderApplication::updateScene() {
+
 	//limit frame rate
-	do{
+	do {
 		currTime = (float)glfwGetTime();
-	}while( currTime - prevTime < (1.0f / MAX_FRAME_RATE));
-	
+	} while (currTime - prevTime < (1.0f / MAX_FRAME_RATE));
+
 	//update deltaTime
 	deltaTime = currTime - prevTime;
 	prevTime = currTime;
 
-	//rotate model
+	updateModelRotation();
+	updateLightRotation();
+
+	prevMousePosition = mousePosition;
+}
+
+void RenderApplication::updateModelRotation() {
+
 	if (isLeftMouseButtonDown) {
 
-		Utils::calcTrackBallDeltas(mousePosition, prevMousePosition, SwapChain::extent, modelSpinAxis, modelSpinAngle);	
+		Utils::calcTrackBallDeltas(mousePosition, prevMousePosition, SwapChain::extent, modelSpinAxis, modelSpinAngle);
 	}
 	else {
-		
+
 		if (modelSpinAngle > 0) {
 			modelSpinAngle -= 0.65f * deltaTime * abs(modelSpinAngle);
 			if (modelSpinAngle < 0) {
 				modelSpinAngle = 0;
 			}
-		}else if (modelSpinAngle < 0) {
+		}
+		else if (modelSpinAngle < 0) {
 			modelSpinAngle += 0.65f * deltaTime * abs(modelSpinAngle);
 			if (modelSpinAngle > 0) {
 				modelSpinAngle = 0;
@@ -321,9 +346,21 @@ void RenderApplication::mainLoop(){
 
 	glm::mat4 deltaModelRotate = glm::rotate(glm::mat4(1.0f), modelSpinAngle, modelSpinAxis);
 	modelOrientation = deltaModelRotate * modelOrientation;
-
-	prevMousePosition = mousePosition;
 }
+
+void RenderApplication::updateLightRotation() {
+
+	glm::vec3 lightSpinAxis;
+	float lightSpinAngle;
+	if (isRightMouseButtonDown) {
+	
+		Utils::calcTrackBallDeltas(mousePosition, prevMousePosition, SwapChain::extent, lightSpinAxis, lightSpinAngle);
+		glm::mat4 deltaLightRotate = glm::rotate(glm::mat4(1.0f), lightSpinAngle, lightSpinAxis);
+		lightOrientation = glm::mat3(deltaLightRotate) * lightOrientation;
+	}
+
+}
+
 void RenderApplication::cleanup() {
 
 	//clean up all App/Vulkan/Window resources
@@ -865,7 +902,6 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 
 	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
 	tessShaderData.model = 
-		glm::translate(glm::mat4(1.0f), glm::vec3(0,0.75f,0)) * 
 		modelOrientation * 
 		glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -875,7 +911,7 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	
 	//Copy over Fragment Shader UBO
 	UniformDataFragShader fragShaderData;
-	fragShaderData.lightDirection = glm::normalize(glm::vec3(2.5f, -2, -3.5f));
+	fragShaderData.lightDirection = lightOrientation * glm::normalize(glm::vec3(2.5f, -2, -3.5f));
 	fragShaderData.textureParam = 0.65f;
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.normalMapStrength = 0.5f;
