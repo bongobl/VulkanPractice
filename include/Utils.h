@@ -35,9 +35,9 @@ struct UniformDataFragShader {
 };
 
 
-
+// provides frequently used helper functions, shouldn't contain any state variables
 class Utils{
-public:
+
 
 	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 		VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
@@ -46,7 +46,8 @@ public:
 		VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory& imageMemory, bool cubeMapFlag = false);
 
 	static void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-	static void copyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, VkExtent2D imageExtent, bool cubeMapFlag = false);
+	static void copyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, 
+		VkImageLayout dstImageLayout, VkExtent2D imageExtent, bool cubeMapFlag = false);
 	static void createImageView(VkImage image, VkImageView &imageView, 
 		VkFormat format, VkImageAspectFlags aspectFlags, bool cubeMapFlag = false);
 
@@ -72,6 +73,10 @@ public:
 
 	//Note: Images expected to be in transfer src layout with VK_FORMAT_B8G8R8A8_UNORM format
 	static void exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels);
+
+	static void calcTrackBallDeltas(glm::vec2 mousePosition, glm::vec2 prevMousePosition, VkExtent2D appExtent,
+		glm::vec3 &rotationAxis, float &rotationAngle);
+	static glm::vec3 trackBallMap(glm::vec2 mousePosition, VkExtent2D appExtent);
 
 	friend class RenderApplication;
 	friend class SwapChain;

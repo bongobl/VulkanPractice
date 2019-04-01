@@ -56,10 +56,17 @@ std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
 int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
+
+
 float RenderApplication::currTime;
 float RenderApplication::prevTime;
-float RenderApplication::deltaTime;
-float RenderApplication::modelRotation = 0;
+float RenderApplication::deltaTime = 0;
+bool RenderApplication::isLeftMouseButtonDown = false;
+glm::vec2 RenderApplication::mousePosition;
+glm::vec2 RenderApplication::prevMousePosition;
+glm::vec3 RenderApplication::modelSpinAxis(0, 1, 0);
+float RenderApplication::modelSpinAngle = 0;
+glm::mat4 RenderApplication::modelOrientation(1.0f);
 
 void RenderApplication::run() {
 
@@ -96,13 +103,35 @@ void RenderApplication::initGLFWWindow(){
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	window = glfwCreateWindow(desiredInitialExtent.width,desiredInitialExtent.height, "Test Window", NULL, NULL);
+
+	//setup callbacks
 	glfwSetFramebufferSizeCallback(window, &windowResizeCallback);
+	glfwSetMouseButtonCallback(window, mouseButtonCallback);
+	glfwSetCursorPosCallback(window, cursorMovedCallback);
 }
 
 //this function is called repetitively until the user stops resizing the window
 void RenderApplication::windowResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight){
 
 	windowResized = true;
+}
+
+void RenderApplication::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+	if (button == GLFW_MOUSE_BUTTON_LEFT) {
+		if (action == GLFW_PRESS) {
+
+			isLeftMouseButtonDown = true;
+			prevMousePosition = mousePosition;
+		}
+
+		if (action == GLFW_RELEASE) {
+			isLeftMouseButtonDown = false;
+		}
+	}
+}
+void RenderApplication::cursorMovedCallback(GLFWwindow* window, double xpos, double ypos) {
+	mousePosition = glm::vec2(xpos, ypos);
+
 }
 
 VkExtent2D RenderApplication::waitToGetNonZeroWindowExtent() {
@@ -122,6 +151,9 @@ VkExtent2D RenderApplication::waitToGetNonZeroWindowExtent() {
 
 	return actualWindowExtent;
 }
+
+
+
 void RenderApplication::createAllVulkanResources() {
 
 	//add all requirements that this app will need from the device and instance
@@ -186,6 +218,7 @@ void RenderApplication::createAllVulkanResources() {
 }
 
 void RenderApplication::mainLoop(){
+
 
 	uint64_t MAX_UNSIGNED_64_BIT_VAL = std::numeric_limits<uint64_t>::max();
 
@@ -266,7 +299,30 @@ void RenderApplication::mainLoop(){
 	deltaTime = currTime - prevTime;
 	prevTime = currTime;
 
-	modelRotation += 75.0f * deltaTime;
+	//rotate model
+	if (isLeftMouseButtonDown) {
+
+		Utils::calcTrackBallDeltas(mousePosition, prevMousePosition, SwapChain::extent, modelSpinAxis, modelSpinAngle);	
+	}
+	else {
+		
+		if (modelSpinAngle > 0) {
+			modelSpinAngle -= 0.65f * deltaTime * abs(modelSpinAngle);
+			if (modelSpinAngle < 0) {
+				modelSpinAngle = 0;
+			}
+		}else if (modelSpinAngle < 0) {
+			modelSpinAngle += 0.65f * deltaTime * abs(modelSpinAngle);
+			if (modelSpinAngle > 0) {
+				modelSpinAngle = 0;
+			}
+		}
+	}
+
+	glm::mat4 deltaModelRotate = glm::rotate(glm::mat4(1.0f), modelSpinAngle, modelSpinAxis);
+	modelOrientation = deltaModelRotate * modelOrientation;
+
+	prevMousePosition = mousePosition;
 }
 void RenderApplication::cleanup() {
 
@@ -810,7 +866,7 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
 	tessShaderData.model = 
 		glm::translate(glm::mat4(1.0f), glm::vec3(0,0.75f,0)) * 
-		glm::rotate(glm::mat4(1.0f), glm::radians(modelRotation), glm::vec3(0,1,0)) * 
+		modelOrientation * 
 		glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
 	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);

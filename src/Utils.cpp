@@ -650,6 +650,46 @@ void Utils::exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::st
 	vkDestroyBuffer(RenderApplication::device, stagingBuffer, nullptr);
 	vkFreeMemory(RenderApplication::device, stagingBufferMemory, nullptr);
 }
+
+void Utils::calcTrackBallDeltas(glm::vec2 mousePosition, glm::vec2 prevMousePosition, 
+	VkExtent2D appExtent, glm::vec3 &rotationAxis, float &rotationAngle) {
+
+	rotationAngle = 0;
+	rotationAxis = glm::vec3(0, 1, 0);
+
+	glm::vec3 direction;
+
+	glm::vec3 currPoint = Utils::trackBallMap(mousePosition, appExtent);
+	glm::vec3 prevPoint = Utils::trackBallMap(prevMousePosition, appExtent);
+	direction = currPoint - prevPoint;
+	float velocity = glm::length(direction);
+	if (velocity > 0.0001f) {
+
+		glm::vec3 rotAxis = glm::cross(prevPoint, currPoint);
+		float rotAngle = acos(glm::dot(prevPoint, currPoint)) * 1.0f;
+		if (!isnan(rotAngle)) {
+
+			rotationAxis = rotAxis;
+			rotationAngle = rotAngle;
+		}
+	}
+
+}
+glm::vec3 Utils::trackBallMap(glm::vec2 mousePosition, VkExtent2D appExtent) {
+
+	glm::vec3 v;
+	GLfloat d;
+	v.x = (2.0f * mousePosition.x - appExtent.width) / appExtent.width;
+	v.y = (appExtent.height - 2.0f * mousePosition.y) / appExtent.height;
+	v.z = 0;
+	d = glm::length(v);
+	if (d > 1.0f)
+		d = 1.0f;
+	v.z = sqrt(1.001f - d * d);
+	v = glm::normalize(v);
+
+	return v;
+}
 //debug callback
 VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
 	VkDebugReportFlagsEXT                       flags,

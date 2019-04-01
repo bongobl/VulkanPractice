@@ -135,12 +135,18 @@ class RenderApplication{
 
 	static std::vector<VkCommandBuffer> renderCommandBuffers;
 
-	//scene variables
+	//time variables
 	static float currTime;
 	static float prevTime;
 	static float deltaTime;
-	static float modelRotation;
 
+	//trackball
+	static bool isLeftMouseButtonDown;
+	static glm::vec2 mousePosition;
+	static glm::vec2 prevMousePosition;
+	static glm::vec3 modelSpinAxis;
+	static float modelSpinAngle;
+	static glm::mat4 modelOrientation;
 
 public:
 
@@ -156,6 +162,9 @@ private:
 
 	//GLFW callbacks
 	static void windowResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight);
+	static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+	static void cursorMovedCallback(GLFWwindow* window, double xpos, double ypos);
+
 	static VkExtent2D waitToGetNonZeroWindowExtent();	//continuously loops until window width/height are non-zero, then returns the extent
 
     //specify all required instance layers, instance extensions and device extensions here
@@ -219,6 +228,7 @@ private:
 	//to allow Utils class to perform transfer operations
 	static VkCommandPool& getTransferCmdPool();
 	static VkQueue& getTransferQueue();
+	
 	
 	friend class Utils;
 };
