@@ -2,11 +2,6 @@ project (BasicVulkanRender)
 
 find_package(Vulkan)
 
-# get rid of annoying MSVC warnings.
-add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-
-set (CMAKE_CXX_STANDARD 17)
-
 # directories to include
 set(EXTERNAL_INCLUDE_DIRECTORY "${CMAKE_SOURCE_DIR}/external/include")
 set(PROJECT_INCLUDE_DIRECTORY "${CMAKE_SOURCE_DIR}/include")
@@ -27,6 +22,7 @@ set (SOURCE_FILES
     "${SOURCE_DIRECTORY}/Vertex.cpp"
     "${SOURCE_DIRECTORY}/QueueFamilyMap.cpp"
     "${SOURCE_DIRECTORY}/SwapChain.cpp"
+    "${SOURCE_DIRECTORY}/Lighting.cpp"
 )
 
 # directories to look for libs

@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-//from vertex shader
+//from tesselation eval shader
 layout(location = 0) in vec3 modelSpacePosition;
 layout(location = 1) in vec3 modelSpaceNormal;
 layout(location = 2) in vec2 texCoord;
@@ -59,7 +59,7 @@ void main() {
 	vec3 specular = pow(max(0, dot(reflectedLight, fragToCam)),10) * vec3(1.0f);
 
 	//ambient
-	vec3 ambient = 0.01f * ubo.matColor;
+	vec3 ambient = 0.015f * ubo.matColor * combined;
 
 	//final color
 	outColor.rgb = diffuse + specular + ambient; 

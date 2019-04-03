@@ -16,7 +16,7 @@
 #include <Utils.h>
 #include <QueueFamilyMap.h>
 #include <SwapChain.h>
-
+#include <Lighting.h>
 using namespace std;
 
 #ifdef NDEBUG

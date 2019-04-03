@@ -331,13 +331,13 @@ void RenderApplication::updateModelRotation() {
 	else {
 
 		if (modelSpinAngle > 0) {
-			modelSpinAngle -= 0.65f * deltaTime * abs(modelSpinAngle);
+			modelSpinAngle -= 0.7f * deltaTime * abs(modelSpinAngle);
 			if (modelSpinAngle < 0) {
 				modelSpinAngle = 0;
 			}
 		}
 		else if (modelSpinAngle < 0) {
-			modelSpinAngle += 0.65f * deltaTime * abs(modelSpinAngle);
+			modelSpinAngle += 0.7f * deltaTime * abs(modelSpinAngle);
 			if (modelSpinAngle > 0) {
 				modelSpinAngle = 0;
 			}
@@ -739,6 +739,7 @@ void RenderApplication::createSwapChain(const VkExtent2D appExtent) {
 
 void RenderApplication::recreateSwapChain(){
 
+	//wait for frames to finish rendering/presenting
 	vkDeviceWaitIdle(device);
 
 	
@@ -901,9 +902,8 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
     UniformDataTessShader tessShaderData;
 
 	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
-	tessShaderData.model = 
-		modelOrientation * 
-		glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+
+	tessShaderData.model = modelOrientation * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
 	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
 	tessShaderData.projection[1][1] *= -1;
@@ -911,7 +911,7 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	
 	//Copy over Fragment Shader UBO
 	UniformDataFragShader fragShaderData;
-	fragShaderData.lightDirection = lightOrientation * glm::normalize(glm::vec3(2.5f, -2, -3.5f));
+	fragShaderData.lightDirection = lightOrientation * Lighting::direction;
 	fragShaderData.textureParam = 0.65f;
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.normalMapStrength = 0.5f;
@@ -987,7 +987,7 @@ void RenderApplication::createDepthAttachmentImage(){
 		SwapChain::extent,
 		VK_FORMAT_D32_SFLOAT,
 		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		depthAttachmentImage,
 		depthAttachmentImageMemory
@@ -1238,9 +1238,9 @@ void RenderApplication::createDescriptorSets() {
 
 void RenderApplication::createCommandPool(){
 
-    //We are getting closer to the end. In order to send commands to the device(GPU),
+    //In order to send commands to the device(GPU),
     //we must first record commands into a command buffer.
-    //To allocate a command buffer, we must first create a command pool. So let us do that.
+    //Command buffers are allocated from command pools, which manage their memory
     VkCommandPoolCreateInfo commandPoolCreateInfo = {};
     commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     commandPoolCreateInfo.flags = 0;
@@ -1268,7 +1268,7 @@ void RenderApplication::createRenderPass() {
 	depthAttachment.format = VK_FORMAT_D32_SFLOAT;
 	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;   //Note: use VK_ATTACHMENT_STORE_OP_STORE for shadow maps
 	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;

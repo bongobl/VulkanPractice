@@ -52,7 +52,7 @@ class Utils{
 		VkFormat format, VkImageAspectFlags aspectFlags, bool cubeMapFlag = false);
 
 	static void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions, bool cubeMapFlag = false);
-	static void copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions);
+	static void copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions, bool depthImageFlag = false);
 	static void transitionImageLayout(VkImage image, VkImageLayout oldLayout, 
 		VkImageLayout newLayout, bool cubeMapFlag = false);
 	
@@ -71,8 +71,11 @@ class Utils{
 	static void createCubeMapImageFromFile(const std::vector<string> imageNames, 
 		VkImage &image, VkDeviceMemory &imageMemory, VkImageLayout finalLayout);
 
-	//Note: Images expected to be in transfer src layout with VK_FORMAT_B8G8R8A8_UNORM format
+	//Note: Images expected to be in the VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL layout with VK_FORMAT_B8G8R8A8_UNORM format
 	static void exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::string fileName, uint32_t numChannels);
+
+	//Note: Images expected to be in the VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL layout with VK_FORMAT_D32_SFLOAT format
+	static void exportDepthImageAsPNG(VkImage depthImage, VkExtent2D dimensions, std::string fileName);
 
 	static void calcTrackBallDeltas(glm::vec2 mousePosition, glm::vec2 prevMousePosition, VkExtent2D appExtent,
 		glm::vec3 &rotationAxis, float &rotationAngle);

@@ -188,7 +188,7 @@ void Utils::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D imageDi
 	endSingleTimeCommandBuffer(singleTimeCommandBuffer);
 }
 
-void Utils::copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions){
+void Utils::copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDimensions, bool depthImageFlag){
 
 	VkCommandBuffer singleTimeCommandBuffer = beginSingleTimeCommandBuffer();
 
@@ -209,6 +209,10 @@ void Utils::copyImageToBuffer(VkBuffer buffer, VkImage image, VkExtent2D imageDi
 		1
 	};
 
+
+	if (depthImageFlag) {
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	}
 	vkCmdCopyImageToBuffer(
 		singleTimeCommandBuffer,
 		image,
@@ -237,7 +241,7 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 	barrier.image = image;
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL || oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
 		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 	}
 
@@ -284,6 +288,23 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 
 		sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	}
+
+	//DEBUT:::TO BE USED TO EXPORT DEPTH IMAGE TO DISK
+	else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+		barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+		sourceStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {	
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+		sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		
 	}
 
 	
@@ -643,6 +664,49 @@ void Utils::exportImageAsPNG(VkImage outputImage, VkExtent2D dimensions, std::st
 	}
 
 	stbi_write_png(fileName.c_str(), dimensions.width, dimensions.height, numChannels, mappedStagingBuffer, dimensions.width * numChannels);
+	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
+
+
+	//Clean Up Staging Buffer
+	vkDestroyBuffer(RenderApplication::device, stagingBuffer, nullptr);
+	vkFreeMemory(RenderApplication::device, stagingBufferMemory, nullptr);
+}
+
+void Utils::exportDepthImageAsPNG(VkImage depthImage, VkExtent2D dimensions, std::string fileName) {
+
+	//define image byte size
+	VkDeviceSize bufferByteSize = dimensions.width * dimensions.height * 4;	//4 bytes for "FORMAT_D32"
+
+	//create staging buffer
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	Utils::createBuffer(
+		bufferByteSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+		stagingBuffer,
+		stagingBufferMemory
+	);
+	
+	//copy image data from image to buffer
+	Utils::copyImageToBuffer(stagingBuffer, depthImage, dimensions, true);
+
+
+	//map staging buffer memory and export it
+	void* mappedStagingBuffer;
+	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, bufferByteSize, 0, &mappedStagingBuffer);
+	float* depthValues = (float*)mappedStagingBuffer;
+
+	std::vector<unsigned char> imagePixelData;
+	for (unsigned int i = 0; i < dimensions.width * dimensions.height; ++i) {
+		unsigned char value = (unsigned char)(255 * pow(depthValues[i], 10));	//using power of 10 so we can visually see depth values
+		imagePixelData.push_back(value);	//red
+		imagePixelData.push_back(value);	//green
+		imagePixelData.push_back(value);	//blue
+	}
+
+	stbi_write_png(fileName.c_str(), dimensions.width, dimensions.height, 3, (void*)imagePixelData.data(), dimensions.width * 3);
 	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
 
 
