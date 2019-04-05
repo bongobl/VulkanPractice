@@ -228,6 +228,8 @@ void RenderApplication::createAllVulkanResources() {
 	//record command buffer
 	createRenderCommandBuffers();
 
+	Lighting::createShadowResources();
+
 }
 
 void RenderApplication::drawFrame(){
@@ -253,7 +255,7 @@ void RenderApplication::drawFrame(){
 	);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-		recreateSwapChain();
+		recreateAppExtentDependents();
 	}
 	else {
 		VK_CHECK_RESULT(result);
@@ -297,7 +299,7 @@ void RenderApplication::drawFrame(){
 	
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || windowResized) {
 		windowResized = false;
-		recreateSwapChain();
+		recreateAppExtentDependents();
 	}
 	else {
 		VK_CHECK_RESULT(result);
@@ -364,6 +366,8 @@ void RenderApplication::updateLightRotation() {
 void RenderApplication::cleanup() {
 
 	//clean up all App/Vulkan/Window resources
+
+	Lighting::destroyShadowResources();
 
 	//destroy validation layer callback
 	if (enableValidationLayers) {
@@ -737,7 +741,7 @@ void RenderApplication::createSwapChain(const VkExtent2D appExtent) {
 
 }
 
-void RenderApplication::recreateSwapChain(){
+void RenderApplication::recreateAppExtentDependents(){
 
 	//wait for frames to finish rendering/presenting
 	vkDeviceWaitIdle(device);
@@ -1573,11 +1577,12 @@ void RenderApplication::createRenderCommandBuffers() {
 	
 }
 
-VkCommandPool& RenderApplication::getTransferCmdPool(){
+VkCommandPool RenderApplication::getTransferCmdPool(){
 
 	//queues and pools which work for graphics also work for transfer
 	return graphicsCommandPool;
 }
-VkQueue& RenderApplication::getTransferQueue(){
+VkQueue RenderApplication::getTransferQueue(){
+
 	return transferQueue;
 }

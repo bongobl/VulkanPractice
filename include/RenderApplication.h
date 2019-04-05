@@ -185,7 +185,7 @@ private:
 	static void findPhysicalDevice();
 	static void createDevice();
 	static void createSwapChain(const VkExtent2D appExtent);
-	static void recreateSwapChain();
+	static void recreateAppExtentDependents();
 	
 	//helper to find physical device
 	static bool isValidPhysicalDevice(VkPhysicalDevice potentialPhysicalDevice);
@@ -237,9 +237,10 @@ private:
 	static void updateLightRotation();
 
 	//to allow Utils class to perform transfer operations
-	static VkCommandPool& getTransferCmdPool();
-	static VkQueue& getTransferQueue();
+	static VkCommandPool getTransferCmdPool();
+	static VkQueue getTransferQueue();
 	
 	
 	friend class Utils;
+	friend class Lighting;
 };

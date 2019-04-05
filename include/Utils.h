@@ -38,7 +38,7 @@ struct UniformDataFragShader {
 // provides frequently used helper functions, shouldn't contain any state variables
 class Utils{
 
-
+public: 
 	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 		VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 
@@ -81,8 +81,6 @@ class Utils{
 		glm::vec3 &rotationAxis, float &rotationAngle);
 	static glm::vec3 trackBallMap(glm::vec2 mousePosition, VkExtent2D appExtent);
 
-	friend class RenderApplication;
-	friend class SwapChain;
 };
 
 // Used for validating return values of Vulkan API calls.
