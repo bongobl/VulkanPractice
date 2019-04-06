@@ -1082,7 +1082,7 @@ void RenderApplication::createDescriptorSetLayout() {
 		fragShaderUBOBinding		
 	};
 
-    //create descriptor set layout for binding to a UBO
+    //create descriptor set layout for all above binding points
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = (uint32_t)allBindings.size(); //number of bindings
@@ -1354,8 +1354,12 @@ void RenderApplication::createGraphicsPipeline(){
 	fragmentShaderStageInfo.pName = "main";
 
 	
-	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, tessContShaderStageInfo, 
-	tessEvalShaderStageInfo, fragmentShaderStageInfo };
+	VkPipelineShaderStageCreateInfo shaderStages[] = { 
+		vertexShaderStageInfo, 
+		tessContShaderStageInfo, 
+		tessEvalShaderStageInfo, 
+		fragmentShaderStageInfo 
+	};
 
     //Vertex Input
 	auto vertexBindingDescription = Vertex::getBindingDescription();
@@ -1585,4 +1589,8 @@ VkCommandPool RenderApplication::getTransferCmdPool(){
 VkQueue RenderApplication::getTransferQueue(){
 
 	return transferQueue;
+}
+
+VkCommandPool RenderApplication::getGraphicsCmdPool() {
+	return graphicsCommandPool;
 }

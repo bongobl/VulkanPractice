@@ -18,7 +18,6 @@
 
 #include <map>
 
-
 ///////////////////////////////Utils//////////////////////////////////
 
 void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 

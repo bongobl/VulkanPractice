@@ -240,6 +240,8 @@ private:
 	static VkCommandPool getTransferCmdPool();
 	static VkQueue getTransferQueue();
 	
+	//for shadow map
+	static VkCommandPool getGraphicsCmdPool();
 	
 	friend class Utils;
 	friend class Lighting;

@@ -12,15 +12,16 @@ class Lighting{
     static VkDeviceMemory shadowMapDepthImageMemory;
 	static VkImageView shadowMapDepthImageView;
 
-	static VkBuffer shadowMapUniformBuffer;
-	static VkDeviceMemory shadowMapUniformBufferMemory;
+	static VkBuffer shadowMapTessShaderUBO;
+	static VkDeviceMemory shadowMapTessShaderUBOMemory;
 
 	static VkDescriptorSetLayout shadowMapDescriptorSetLayout;
 	static VkDescriptorPool shadowMapDescriptorPool;
 	static VkDescriptorSet shadowMapDescriptorSet;
 
-	static VkFramebuffer shadowMapFrameBuffer;
 	static VkRenderPass shadowMapRenderPass;
+	static VkFramebuffer shadowMapFrameBuffer;	
+	static VkPipelineLayout shadowMapPipelineLayout;
 	static VkPipeline shadowMapGraphicsPipeline;
 	static VkCommandBuffer shadowMapCommandBuffer;
 
@@ -30,22 +31,21 @@ public:
     
     static void createShadowResources();
 	static void destroyShadowResources();
-	static void writeToShadowMapUniformBuffer();
+	static void writeToShadowMapTessShaderUBO(glm::mat4 model);	//need to figure out how to get same uniform struct from render app
 private:
 
 	static void createShadowMapDepthImage();
 	static void createShadowMapDepthImageView();
-	static void createShadowMapUniformBuffer();
+	static void createShadowMapTessShaderUBO();
 
 	static void createShadowMapDescriptorSetLayout();
 	static void createShadowMapDescriptorPool();
 	static void createShadowMapDescriptorSet();
 
-	static void createShadowMapFrameBuffer();
 	static void createShadowMapRenderPass();
+	static void createShadowMapFrameBuffer();
 	static void createShadowMapGraphicsPipeline();
 	static void createShadowMapCommandBuffer();
 	
-
 
 };
