@@ -1,5 +1,9 @@
 #include <Lighting.h>
 
+#ifndef GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#endif
+
 VkExtent2D Lighting::shadowMapExtent = { 1920,1470};
 VkImage Lighting::shadowMapDepthImage;
 VkDeviceMemory Lighting::shadowMapDepthImageMemory;
@@ -393,5 +397,58 @@ void Lighting::createShadowMapGraphicsPipeline() {
 }
 
 void Lighting::createShadowMapCommandBuffer() {
+	
+	//Allocate command buffer
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = RenderApplication::getGraphicsCmdPool();
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = 1;
 
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(RenderApplication::device, &allocInfo, &shadowMapCommandBuffer));
+
+	//begin command buffer
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+	beginInfo.pInheritanceInfo = NULL;
+
+	//main command buffer scope
+	VK_CHECK_RESULT(vkBeginCommandBuffer(shadowMapCommandBuffer, &beginInfo));
+
+		VkRenderPassBeginInfo renderPassInfo = {};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.renderPass = shadowMapRenderPass;
+		renderPassInfo.framebuffer = shadowMapFrameBuffer;
+		renderPassInfo.renderArea.offset = { 0,0 };
+		renderPassInfo.renderArea.extent = shadowMapExtent;
+
+		VkClearValue depthResetValue = {};
+		depthResetValue.depthStencil = { 1, 0 };
+
+		renderPassInfo.clearValueCount = 1;
+		renderPassInfo.pClearValues = &depthResetValue;
+
+		//render pass scope
+		vkCmdBeginRenderPass(shadowMapCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+			//bind our graphics pipeline
+			vkCmdBindPipeline(shadowMapCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapGraphicsPipeline);
+
+			//bind vertex buffer
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(shadowMapCommandBuffer, 0, 1, &RenderApplication::vertexBuffer, offsets);
+
+			//bind index buffer
+			vkCmdBindIndexBuffer(shadowMapCommandBuffer, RenderApplication::indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+			//bind descriptor set
+			vkCmdBindDescriptorSets(shadowMapCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapPipelineLayout, 0, 1, &shadowMapDescriptorSet, 0, NULL);
+
+			//invoke graphics pipeline and draw
+			vkCmdDrawIndexed(shadowMapCommandBuffer, (uint32_t)RenderApplication::indexArray.size(), 1, 0, 0, 0);
+
+		vkCmdEndRenderPass(shadowMapCommandBuffer);
+
+	VK_CHECK_RESULT(vkEndCommandBuffer(shadowMapCommandBuffer));
 }

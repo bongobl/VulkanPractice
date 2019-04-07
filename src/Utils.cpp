@@ -765,8 +765,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
 	void*                                       pUserData)
 
 {
-
+	
 	printf("\nValidation Layer Report: %s: %s\n\n", pLayerPrefix, pMessage);
-
+	
 	return VK_FALSE;
 }
