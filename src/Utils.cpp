@@ -307,7 +307,6 @@ void Utils::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImag
 	}
 
 	
-
 	//no other layout combo options
 	else {
 		throw std::runtime_error("unsupported layout transition!");

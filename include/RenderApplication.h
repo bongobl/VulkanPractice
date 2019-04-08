@@ -164,6 +164,7 @@ private:
 	//high level app functions
 	static void initGLFWWindow();
 	static void createAllVulkanResources();
+	static void initScene();
 	static void drawFrame();
 	static void updateScene();
 	static void cleanup();
@@ -242,6 +243,7 @@ private:
 	
 	//for shadow map
 	static VkCommandPool getGraphicsCmdPool();
+	static VkQueue getGraphicsQueue();
 	
 	friend class Utils;
 	friend class Lighting;

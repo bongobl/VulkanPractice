@@ -4,65 +4,82 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #endif
 
-VkExtent2D Lighting::shadowMapExtent = { 1920,1470};
-VkImage Lighting::shadowMapDepthImage;
-VkDeviceMemory Lighting::shadowMapDepthImageMemory;
-VkImageView Lighting::shadowMapDepthImageView;
+VkExtent2D Lighting::ShadowMap::extent = { 1920,1470};
+VkImage Lighting::ShadowMap::depthImage;
+VkImageView Lighting::ShadowMap::depthImageView;
 
-VkBuffer Lighting::shadowMapTessShaderUBO;
-VkDeviceMemory Lighting::shadowMapTessShaderUBOMemory;
+VkDeviceMemory Lighting::ShadowMap::depthImageMemory;
+VkBuffer Lighting::ShadowMap::tessShaderUBO;
+VkDeviceMemory Lighting::ShadowMap::tessShaderUBOMemory;
 
-VkDescriptorSetLayout Lighting::shadowMapDescriptorSetLayout;
-VkDescriptorPool Lighting::shadowMapDescriptorPool;
-VkDescriptorSet Lighting::shadowMapDescriptorSet;
+VkDescriptorSetLayout Lighting::ShadowMap::descriptorSetLayout;
+VkDescriptorPool Lighting::ShadowMap::descriptorPool;
+VkDescriptorSet Lighting::ShadowMap::descriptorSet;
 
-VkFramebuffer Lighting::shadowMapFrameBuffer;
-VkRenderPass Lighting::shadowMapRenderPass;
-VkPipelineLayout Lighting::shadowMapPipelineLayout;
-VkPipeline Lighting::shadowMapGraphicsPipeline;
-VkCommandBuffer Lighting::shadowMapCommandBuffer;
+VkFramebuffer Lighting::ShadowMap::frameBuffer;
+VkRenderPass Lighting::ShadowMap::renderPass;
+VkPipelineLayout Lighting::ShadowMap::pipelineLayout;
+VkPipeline Lighting::ShadowMap::graphicsPipeline;
+VkCommandBuffer Lighting::ShadowMap::commandBuffer;
 glm::vec3 Lighting::direction = glm::normalize(glm::vec3(2.5f, -2, -3.5f));
 
 
-void Lighting::createShadowResources(){
+void Lighting::ShadowMap::runCommandBuffer(){
 
-	createShadowMapDepthImage();
-	createShadowMapDepthImageView();
-	createShadowMapTessShaderUBO();
+	//Enqueue render to this image
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &ShadowMap::commandBuffer;
+	submitInfo.signalSemaphoreCount = 0;
 
-	createShadowMapDescriptorSetLayout();
-	createShadowMapDescriptorPool();
-	createShadowMapDescriptorSet();
+	//SUBMIT A RENDER COMMAND TO THIS IMAGE
+	VK_CHECK_RESULT(vkQueueSubmit(RenderApplication::getGraphicsQueue(), 1, &submitInfo, NULL));
 
-	createShadowMapRenderPass();
-	createShadowMapFrameBuffer();
-	createShadowMapGraphicsPipeline();
-	createShadowMapCommandBuffer();
+	vkDeviceWaitIdle(RenderApplication::device);
 }
 
-void Lighting::destroyShadowResources(){
+
+void Lighting::ShadowMap::init(){
+
+	createDepthImage();
+	createDepthImageView();
+	createTessShaderUBO();
+
+	createDescriptorSetLayout();
+	createDescriptorPool();
+	createDescriptorSet();
+
+	createRenderPass();
+	createFrameBuffer();
+	createGraphicsPipeline();
+	createCommandBuffer();
+}
+
+void Lighting::ShadowMap::destroy(){
 
 	//free shadowmap image
-	vkDestroyImageView(RenderApplication::device, shadowMapDepthImageView, NULL);
-	vkDestroyImage(RenderApplication::device, shadowMapDepthImage, NULL);
-	vkFreeMemory(RenderApplication::device, shadowMapDepthImageMemory, NULL);
+	vkDestroyImageView(RenderApplication::device, depthImageView, NULL);
+	vkDestroyImage(RenderApplication::device, depthImage, NULL);
+	vkFreeMemory(RenderApplication::device, depthImageMemory, NULL);
 
 	//free uniform buffer
-	vkDestroyBuffer(RenderApplication::device, shadowMapTessShaderUBO, NULL);
-	vkFreeMemory(RenderApplication::device, shadowMapTessShaderUBOMemory, NULL);
+	vkDestroyBuffer(RenderApplication::device, tessShaderUBO, NULL);
+	vkFreeMemory(RenderApplication::device, tessShaderUBOMemory, NULL);
 
 	//free descriptor resources
-	vkDestroyDescriptorPool(RenderApplication::device, shadowMapDescriptorPool, NULL);
-	vkDestroyDescriptorSetLayout(RenderApplication::device, shadowMapDescriptorSetLayout, NULL);
+	vkDestroyDescriptorPool(RenderApplication::device, descriptorPool, NULL);
+	vkDestroyDescriptorSetLayout(RenderApplication::device, descriptorSetLayout, NULL);
 
-	vkDestroyFramebuffer(RenderApplication::device, shadowMapFrameBuffer, NULL);
-	vkDestroyPipeline(RenderApplication::device, shadowMapGraphicsPipeline, NULL);
-	vkDestroyPipelineLayout(RenderApplication::device, shadowMapPipelineLayout, NULL);
-	vkDestroyRenderPass(RenderApplication::device, shadowMapRenderPass, NULL);
+	vkDestroyFramebuffer(RenderApplication::device, frameBuffer, NULL);
+	vkDestroyPipeline(RenderApplication::device, graphicsPipeline, NULL);
+	vkDestroyPipelineLayout(RenderApplication::device, pipelineLayout, NULL);
+	vkDestroyRenderPass(RenderApplication::device, renderPass, NULL);
 }
 
 //hardcoded for now
-void Lighting::writeToShadowMapTessShaderUBO(glm::mat4 model){
+void Lighting::ShadowMap::writeToTessShaderUBO(glm::mat4 model){
 
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;
@@ -76,50 +93,55 @@ void Lighting::writeToShadowMapTessShaderUBO(glm::mat4 model){
 
 	void* mappedMemory;
 
-	vkMapMemory(RenderApplication::device, shadowMapTessShaderUBOMemory, 0, sizeof(tessShaderData), 0, &mappedMemory);
+	vkMapMemory(RenderApplication::device, tessShaderUBOMemory, 0, sizeof(tessShaderData), 0, &mappedMemory);
 	memcpy(mappedMemory, &tessShaderData, sizeof(tessShaderData));
-	vkUnmapMemory(RenderApplication::device, shadowMapTessShaderUBOMemory);
+	vkUnmapMemory(RenderApplication::device, tessShaderUBOMemory);
 }
 
+void Lighting::ShadowMap::exportToDisk(){
+	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	Utils::exportDepthImageAsPNG(depthImage, extent, "testShadowMap.png");
+	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+}
 //////////////Private Functions////////////////////////////
-void Lighting::createShadowMapDepthImage() {
+void Lighting::ShadowMap::createDepthImage() {
 
 	Utils::createImage(
-		shadowMapExtent,
+		extent,
 		VK_FORMAT_D32_SFLOAT,
 		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		shadowMapDepthImage,
-		shadowMapDepthImageMemory
+		depthImage,
+		depthImageMemory
 	);
 
 	//we choose to transition layout here (not in render pass) since the transition only needs to happen once in a realtime app
-	Utils::transitionImageLayout(shadowMapDepthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
-void Lighting::createShadowMapDepthImageView() {
+void Lighting::ShadowMap::createDepthImageView() {
 	
 	Utils::createImageView(
-		shadowMapDepthImage, 
-		shadowMapDepthImageView, 
+		depthImage, 
+		depthImageView, 
 		VK_FORMAT_D32_SFLOAT, 
 		VK_IMAGE_ASPECT_DEPTH_BIT
 	);
 }
 
-void Lighting::createShadowMapTessShaderUBO(){
+void Lighting::ShadowMap::createTessShaderUBO(){
 
 	//Create UBO for the tess shader data
 	Utils::createBuffer(
 		sizeof(UniformDataTessShader),
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		shadowMapTessShaderUBO, shadowMapTessShaderUBOMemory
+		tessShaderUBO, tessShaderUBOMemory
 	);
 }
 
-void Lighting::createShadowMapDescriptorSetLayout() {
+void Lighting::ShadowMap::createDescriptorSetLayout() {
 
 	//define a binding for our tesselation eval shader UBO
     VkDescriptorSetLayoutBinding tessShaderUBOBinding = {};
@@ -135,10 +157,10 @@ void Lighting::createShadowMapDescriptorSetLayout() {
     layoutInfo.pBindings = &tessShaderUBOBinding;
 
     // Create the descriptor set layout.
-    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderApplication::device, &layoutInfo, NULL, &shadowMapDescriptorSetLayout));
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderApplication::device, &layoutInfo, NULL, &descriptorSetLayout));
 }
 
-void Lighting::createShadowMapDescriptorPool() {
+void Lighting::ShadowMap::createDescriptorPool() {
 
 
 	VkDescriptorPoolSize poolSize = {};
@@ -152,31 +174,31 @@ void Lighting::createShadowMapDescriptorPool() {
     descriptorPoolCreateInfo.pPoolSizes = &poolSize;
 
     //Create descriptor pool.
-    VK_CHECK_RESULT(vkCreateDescriptorPool(RenderApplication::device, &descriptorPoolCreateInfo, NULL, &shadowMapDescriptorPool));
+    VK_CHECK_RESULT(vkCreateDescriptorPool(RenderApplication::device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
 }
 
-void Lighting::createShadowMapDescriptorSet() {
+void Lighting::ShadowMap::createDescriptorSet() {
 
 	//With the pool allocated, we can now allocate the descriptor set.
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    descriptorSetAllocateInfo.descriptorPool = shadowMapDescriptorPool; // pool to allocate from.
+    descriptorSetAllocateInfo.descriptorPool = descriptorPool; // pool to allocate from.
     descriptorSetAllocateInfo.descriptorSetCount = 1;
-    descriptorSetAllocateInfo.pSetLayouts = &shadowMapDescriptorSetLayout;
+    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
 
 
     // allocate descriptor set.
-    VK_CHECK_RESULT(vkAllocateDescriptorSets(RenderApplication::device, &descriptorSetAllocateInfo, &shadowMapDescriptorSet));
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(RenderApplication::device, &descriptorSetAllocateInfo, &descriptorSet));
 
 	// Descriptor for our tesselation shader Uniform Buffer
 	VkWriteDescriptorSet tessUBODescriptorWrite = {};
 	tessUBODescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	tessUBODescriptorWrite.dstSet = shadowMapDescriptorSet;
+	tessUBODescriptorWrite.dstSet = descriptorSet;
 	tessUBODescriptorWrite.dstBinding = 0;		//binding = 0
 	tessUBODescriptorWrite.dstArrayElement = 0;	
 		// Descriptor info
 		VkDescriptorBufferInfo tessUBODescriptorInfo = {};
-		tessUBODescriptorInfo.buffer = shadowMapTessShaderUBO;	
+		tessUBODescriptorInfo.buffer = tessShaderUBO;	
 		tessUBODescriptorInfo.offset = 0;
 		tessUBODescriptorInfo.range = sizeof(UniformDataTessShader);
 
@@ -188,7 +210,7 @@ void Lighting::createShadowMapDescriptorSet() {
 	vkUpdateDescriptorSets(RenderApplication::device, 1, &tessUBODescriptorWrite, 0, NULL);
 }
 
-void Lighting::createShadowMapRenderPass() {
+void Lighting::ShadowMap::createRenderPass() {
 
 
 	VkAttachmentDescription depthAttachment = {};
@@ -221,25 +243,25 @@ void Lighting::createShadowMapRenderPass() {
 	renderPassInfo.pSubpasses = &subpass;
 	renderPassInfo.dependencyCount = 0;
 
-	VK_CHECK_RESULT(vkCreateRenderPass(RenderApplication::device, &renderPassInfo, nullptr, &shadowMapRenderPass));
+	VK_CHECK_RESULT(vkCreateRenderPass(RenderApplication::device, &renderPassInfo, nullptr, &renderPass));
 }
 
-void Lighting::createShadowMapFrameBuffer() {
+void Lighting::ShadowMap::createFrameBuffer() {
 
 	VkFramebufferCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	createInfo.renderPass = shadowMapRenderPass;
+	createInfo.renderPass = renderPass;
 	createInfo.attachmentCount = 1;
-	createInfo.pAttachments = &shadowMapDepthImageView;
-	createInfo.width = shadowMapExtent.width;
-	createInfo.height = shadowMapExtent.height;
+	createInfo.pAttachments = &depthImageView;
+	createInfo.width = extent.width;
+	createInfo.height = extent.height;
 	createInfo.layers = 1;
 
-	VK_CHECK_RESULT(vkCreateFramebuffer(RenderApplication::device, &createInfo, NULL, &shadowMapFrameBuffer));
+	VK_CHECK_RESULT(vkCreateFramebuffer(RenderApplication::device, &createInfo, NULL, &frameBuffer));
 
 }
 
-void Lighting::createShadowMapGraphicsPipeline() {
+void Lighting::ShadowMap::createGraphicsPipeline() {
 
 	//Vertex Shader Stage
 	VkShaderModule vertexShaderModule = Utils::createShaderModule("resources/shaders/vert.spv");
@@ -313,15 +335,15 @@ void Lighting::createShadowMapGraphicsPipeline() {
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
 	viewport.y = 0.0;
-	viewport.width = (float)shadowMapExtent.width;
-	viewport.height = (float)shadowMapExtent.height;
+	viewport.width = (float)extent.width;
+	viewport.height = (float)extent.height;
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 
 	//Scissors
 	VkRect2D scissor = {};
 	scissor.offset = { 0,0 };
-	scissor.extent = shadowMapExtent;
+	scissor.extent = extent;
 
 	//Viewport State
 	VkPipelineViewportStateCreateInfo viewportState = {};
@@ -361,11 +383,11 @@ void Lighting::createShadowMapGraphicsPipeline() {
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &shadowMapDescriptorSetLayout;
+	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
 
 	//Create Pipeline Layout
-	VK_CHECK_RESULT(vkCreatePipelineLayout(RenderApplication::device, &pipelineLayoutInfo, NULL, &shadowMapPipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(RenderApplication::device, &pipelineLayoutInfo, NULL, &pipelineLayout));
 
 
 	//Info to create graphics pipeline, Note: we can create more for multiple pipelines (shadow map + standard render)
@@ -382,12 +404,12 @@ void Lighting::createShadowMapGraphicsPipeline() {
 	pipelineInfo.pDepthStencilState = &depthStencil;
 	pipelineInfo.pColorBlendState = NULL; //can't be non-null if using color attachments
 	pipelineInfo.pDynamicState = NULL;
-	pipelineInfo.layout = shadowMapPipelineLayout;
-	pipelineInfo.renderPass = shadowMapRenderPass;
+	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.renderPass = renderPass;
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(RenderApplication::device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &shadowMapGraphicsPipeline));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(RenderApplication::device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &graphicsPipeline));
 
 	//destroy shader modules since we don't need their source code anymore
 	vkDestroyShaderModule(RenderApplication::device, vertexShaderModule, NULL);
@@ -396,7 +418,7 @@ void Lighting::createShadowMapGraphicsPipeline() {
 	vkDestroyShaderModule(RenderApplication::device, tessEvalShaderModule, NULL);
 }
 
-void Lighting::createShadowMapCommandBuffer() {
+void Lighting::ShadowMap::createCommandBuffer() {
 	
 	//Allocate command buffer
 	VkCommandBufferAllocateInfo allocInfo = {};
@@ -405,7 +427,7 @@ void Lighting::createShadowMapCommandBuffer() {
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = 1;
 
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(RenderApplication::device, &allocInfo, &shadowMapCommandBuffer));
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(RenderApplication::device, &allocInfo, &commandBuffer));
 
 	//begin command buffer
 	VkCommandBufferBeginInfo beginInfo = {};
@@ -414,14 +436,14 @@ void Lighting::createShadowMapCommandBuffer() {
 	beginInfo.pInheritanceInfo = NULL;
 
 	//main command buffer scope
-	VK_CHECK_RESULT(vkBeginCommandBuffer(shadowMapCommandBuffer, &beginInfo));
+	VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
 		VkRenderPassBeginInfo renderPassInfo = {};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = shadowMapRenderPass;
-		renderPassInfo.framebuffer = shadowMapFrameBuffer;
+		renderPassInfo.renderPass = renderPass;
+		renderPassInfo.framebuffer = frameBuffer;
 		renderPassInfo.renderArea.offset = { 0,0 };
-		renderPassInfo.renderArea.extent = shadowMapExtent;
+		renderPassInfo.renderArea.extent = extent;
 
 		VkClearValue depthResetValue = {};
 		depthResetValue.depthStencil = { 1, 0 };
@@ -430,25 +452,25 @@ void Lighting::createShadowMapCommandBuffer() {
 		renderPassInfo.pClearValues = &depthResetValue;
 
 		//render pass scope
-		vkCmdBeginRenderPass(shadowMapCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 			//bind our graphics pipeline
-			vkCmdBindPipeline(shadowMapCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapGraphicsPipeline);
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
 			//bind vertex buffer
 			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(shadowMapCommandBuffer, 0, 1, &RenderApplication::vertexBuffer, offsets);
+			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &RenderApplication::vertexBuffer, offsets);
 
 			//bind index buffer
-			vkCmdBindIndexBuffer(shadowMapCommandBuffer, RenderApplication::indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindIndexBuffer(commandBuffer, RenderApplication::indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 			//bind descriptor set
-			vkCmdBindDescriptorSets(shadowMapCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapPipelineLayout, 0, 1, &shadowMapDescriptorSet, 0, NULL);
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
 			//invoke graphics pipeline and draw
-			vkCmdDrawIndexed(shadowMapCommandBuffer, (uint32_t)RenderApplication::indexArray.size(), 1, 0, 0, 0);
+			vkCmdDrawIndexed(commandBuffer, (uint32_t)RenderApplication::indexArray.size(), 1, 0, 0, 0);
 
-		vkCmdEndRenderPass(shadowMapCommandBuffer);
+		vkCmdEndRenderPass(commandBuffer);
 
-	VK_CHECK_RESULT(vkEndCommandBuffer(shadowMapCommandBuffer));
+	VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
 }

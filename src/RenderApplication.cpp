@@ -72,24 +72,19 @@ glm::mat3 RenderApplication::lightOrientation(1.0f);
 
 void RenderApplication::run() {
 
-
 	//init glfw window
 	initGLFWWindow();
 
 	//create all vulkan resources we will need in the app
 	createAllVulkanResources();
 
+	//initialize scene variables 
+	initScene();
 
 
 	cout << "In Main Loop" << endl;
 	currentFrame = 0;	//set beginning frame to work with
-	currTime = (float)glfwGetTime();
-	prevTime = (float)glfwGetTime();
-	deltaTime = 0;
-
-	double xPos, yPos;
-	glfwGetCursorPos(window, &xPos, &yPos);
-	mousePosition = glm::vec2(xPos, yPos);
+	
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
 		drawFrame();
@@ -228,8 +223,23 @@ void RenderApplication::createAllVulkanResources() {
 	//record command buffer
 	createRenderCommandBuffers();
 
-	Lighting::createShadowResources();
+	//create all shadow map resources 
+	Lighting::ShadowMap::init();
 
+}
+
+void RenderApplication::initScene(){
+	
+	//time
+	currTime = (float)glfwGetTime();
+	prevTime = (float)glfwGetTime();
+	deltaTime = 0;
+
+	//mouse
+	double xPos, yPos;
+	glfwGetCursorPos(window, &xPos, &yPos);
+	mousePosition = glm::vec2(xPos, yPos);
+	prevMousePosition = glm::vec2(xPos, yPos);
 }
 
 void RenderApplication::drawFrame(){
@@ -265,7 +275,7 @@ void RenderApplication::drawFrame(){
 	//update uniform data for this frame
 	writeToUniformBuffer(imageIndex);
 
-	//Enqueue render to this image
+	//Enqueue render to this swapchain image
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -365,9 +375,9 @@ void RenderApplication::updateLightRotation() {
 
 void RenderApplication::cleanup() {
 
-	//clean up all App/Vulkan/Window resources
+	//clean up all Window/Vulkan/Scene resources
 
-	Lighting::destroyShadowResources();
+	Lighting::ShadowMap::destroy();
 
 	//destroy validation layer callback
 	if (enableValidationLayers) {
@@ -1593,4 +1603,8 @@ VkQueue RenderApplication::getTransferQueue(){
 
 VkCommandPool RenderApplication::getGraphicsCmdPool() {
 	return graphicsCommandPool;
+}
+
+VkQueue RenderApplication::getGraphicsQueue(){
+	return graphicsQueue;
 }
