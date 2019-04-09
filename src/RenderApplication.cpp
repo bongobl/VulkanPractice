@@ -81,6 +81,9 @@ void RenderApplication::run() {
 	//initialize scene variables 
 	initScene();
 
+	Lighting::ShadowMap::writeToTessShaderUBO(glm::mat4(1.0f));	//param not used yet
+	Lighting::ShadowMap::runCommandBuffer();
+	Lighting::ShadowMap::exportToDisk();
 
 	cout << "In Main Loop" << endl;
 	currentFrame = 0;	//set beginning frame to work with
