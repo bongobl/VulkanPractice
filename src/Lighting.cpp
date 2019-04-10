@@ -4,7 +4,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #endif
 
-VkExtent2D Lighting::ShadowMap::extent = { 1920,1470};
+VkExtent2D Lighting::ShadowMap::extent = { 1000,1000};
 VkImage Lighting::ShadowMap::depthImage;
 VkImageView Lighting::ShadowMap::depthImageView;
 
@@ -87,8 +87,9 @@ void Lighting::ShadowMap::writeToTessShaderUBO(glm::mat4 model){
 	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
 
 	tessShaderData.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
-	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
-	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
+	
+	tessShaderData.view = glm::lookAt(glm::vec3(0,0,0), direction, glm::vec3(0.0f, 1.0f, 0.0f));
+	tessShaderData.projection = glm::ortho<float>(-5, 5, -5, 5, -60, 25);
 	tessShaderData.projection[1][1] *= -1;
 
 	void* mappedMemory;
@@ -99,9 +100,9 @@ void Lighting::ShadowMap::writeToTessShaderUBO(glm::mat4 model){
 }
 
 void Lighting::ShadowMap::exportToDisk(){
-	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	Utils::exportDepthImageAsPNG(depthImage, extent, "testShadowMap.png");
-	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 }
 //////////////Private Functions////////////////////////////
 void Lighting::ShadowMap::createDepthImage() {
@@ -117,7 +118,7 @@ void Lighting::ShadowMap::createDepthImage() {
 	);
 
 	//we choose to transition layout here (not in render pass) since the transition only needs to happen once in a realtime app
-	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	//Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 void Lighting::ShadowMap::createDepthImageView() {
@@ -220,8 +221,8 @@ void Lighting::ShadowMap::createRenderPass() {
 	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
 
 	VkAttachmentReference depthAttachmentRef = {};

@@ -296,7 +296,6 @@ void RenderApplication::drawFrame(){
 	//SUBMIT A RENDER COMMAND TO THIS IMAGE
 	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]));
 
-
 	//Enqueue presenting this image
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -799,7 +798,7 @@ void RenderApplication::recreateAppExtentDependents(){
 
 }
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/bunny.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
