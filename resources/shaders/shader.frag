@@ -20,14 +20,24 @@ layout(binding = 4) uniform UniformBufferObject{
     float normalMapStrength;
     vec3 matColor;
     float padding3;
+    mat4 lightVP;
 
 } ubo;
 
+layout(binding = 5) uniform sampler2D shadowMap;
 
 
 
 //output to color attachment
 layout(location = 0) out vec4 outColor;
+
+
+mat4 paramMatrix = mat4(
+		0.5, 0.0, 0.0, 0.0,
+		0.0, 0.5, 0.0, 0.0,
+		0.0, 0.0, 1, 0.0,
+		0.5, 0.5, 0.0, 1.0
+);
 
 void main() {
 	
@@ -45,7 +55,7 @@ void main() {
 	vec3 reflectiveColor = texture(envMap,reflectedCam).rgb;
 
 	//diffuse texture
-	vec3 diffuseTextureColor = vec3(texture(diffuseTexture, texCoord));
+	vec3 diffuseTextureColor = texture(diffuseTexture, texCoord).rgb;
 
 	//combine env map and diffuse texture
 	vec3 combined = (1 - ubo.textureParam) * diffuseTextureColor + ubo.textureParam * reflectiveColor;
@@ -64,6 +74,14 @@ void main() {
 	//final color
 	outColor.rgb = diffuse + specular + ambient; 
 
+	
+	//test
+	
+	vec4 lightSpaceposition = paramMatrix * ubo.lightVP * vec4(worldPosition,1);
+
+	if (texture(shadowMap, lightSpaceposition.xy ).r  <  lightSpaceposition.z - 0.001){
+		outColor.rgb = outColor.rgb * 0.2f;
+	}
     outColor.a = 1.0f;
 
 

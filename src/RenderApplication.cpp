@@ -1,5 +1,5 @@
 #include <RenderApplication.h>
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #define MAX_FRAMES_IN_FLIGHT 2
 
 //Initialize static members
@@ -65,6 +65,7 @@ glm::vec2 RenderApplication::mousePosition;
 glm::vec2 RenderApplication::prevMousePosition;
 bool RenderApplication::isLeftMouseButtonDown = false;
 bool RenderApplication::isRightMouseButtonDown = false;
+glm::mat4 RenderApplication::modelCorrect = glm::scale(glm::mat4(1.0f), glm::vec3(0.03f,0.03f,0.03f));
 glm::vec3 RenderApplication::modelSpinAxis(0, 1, 0);
 float RenderApplication::modelSpinAngle = 0;
 glm::mat4 RenderApplication::modelOrientation(1.0f);
@@ -80,11 +81,11 @@ void RenderApplication::run() {
 
 	//initialize scene variables 
 	initScene();
-
-	Lighting::ShadowMap::writeToTessShaderUBO(glm::mat4(1.0f));	//param not used yet
+	
+	Lighting::ShadowMap::writeToTessShaderUBO(modelOrientation * modelCorrect, lightOrientation);
 	Lighting::ShadowMap::runCommandBuffer();
 	Lighting::ShadowMap::exportToDisk();
-
+	
 	cout << "In Main Loop" << endl;
 	currentFrame = 0;	//set beginning frame to work with
 	
@@ -140,6 +141,9 @@ void RenderApplication::mouseButtonCallback(GLFWwindow* window, int button, int 
 		}
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 			isRightMouseButtonDown = false;
+			Lighting::ShadowMap::writeToTessShaderUBO(modelOrientation * modelCorrect, lightOrientation);
+			Lighting::ShadowMap::runCommandBuffer();
+			//Lighting::ShadowMap::exportToDisk();
 		}
 	}
 	
@@ -214,6 +218,9 @@ void RenderApplication::createAllVulkanResources() {
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
 
+	//create all shadow map resources (need to be done before descriptors are created)
+	Lighting::ShadowMap::init();
+	
 	//create descriptors
 	createDescriptorSets();
 
@@ -225,9 +232,6 @@ void RenderApplication::createAllVulkanResources() {
 
 	//record command buffer
 	createRenderCommandBuffers();
-
-	//create all shadow map resources 
-	Lighting::ShadowMap::init();
 
 }
 
@@ -795,10 +799,10 @@ void RenderApplication::recreateAppExtentDependents(){
 	createDepthAttachmentImageView();
 	createSwapChainFrameBuffers();
 	createRenderCommandBuffers();
-
+	
 }
 void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/bunny.obj", vertexArray, indexArray);
+	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
 }
 void RenderApplication::createVertexBuffer(){
 
@@ -914,12 +918,13 @@ void RenderApplication::createUniformBuffers(){
 
 void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 
-	//Copy over Vertex Shader UBO
-    UniformDataTessShader tessShaderData;
+	
 
 	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
 
-	tessShaderData.model = modelOrientation * glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
+	//Copy over Vertex Shader UBO
+	UniformDataTessShader tessShaderData;
+	tessShaderData.model = modelOrientation * modelCorrect;
 	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
 	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
 	tessShaderData.projection[1][1] *= -1;
@@ -932,7 +937,8 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.normalMapStrength = 0.5f;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
-
+	fragShaderData.lightVP = Lighting::ShadowMap::projMatrix * Lighting::ShadowMap::viewMatrix;
+	
 	void* mappedMemory;
 
 	
@@ -1084,14 +1090,21 @@ void RenderApplication::createDescriptorSetLayout() {
 	fragShaderUBOBinding.descriptorCount = 1;
 	fragShaderUBOBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+	//define a binding for our shadow map
+	VkDescriptorSetLayoutBinding shadowMapBinding = {};
+	shadowMapBinding.binding = 5;
+	shadowMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	shadowMapBinding.descriptorCount = 1;
+	shadowMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 5> allBindings = { 
+    std::array<VkDescriptorSetLayoutBinding, 6> allBindings = { 
 		tessShaderUBOBinding, 
 		diffuseTextureBinding,
 		normalTextureBinding, 
 		environmentMapBinding, 
-		fragShaderUBOBinding		
+		fragShaderUBOBinding,
+		shadowMapBinding	
 	};
 
     //create descriptor set layout for all above binding points
@@ -1108,7 +1121,7 @@ void RenderApplication::createDescriptorSetLayout() {
 void RenderApplication::createDescriptorPool(){
 
 
-    std::array<VkDescriptorPoolSize, 5> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 6> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1119,6 +1132,8 @@ void RenderApplication::createDescriptorPool(){
 	poolSizes[3].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[4].descriptorCount = (uint32_t)SwapChain::images.size();
+	poolSizes[5].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[5].descriptorCount = (uint32_t)SwapChain::images.size();
 	
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -1233,15 +1248,30 @@ void RenderApplication::createDescriptorSets() {
 		fragmentUBODescriptorWrite.pBufferInfo = &fragmentUBODescriptorInfo;
 
 
+		// Descriptor for our normal texture
+		VkWriteDescriptorSet shadowMapDescriptorWrite = {};
+		shadowMapDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		shadowMapDescriptorWrite.dstSet = descriptorSets[i];
+		shadowMapDescriptorWrite.dstBinding = 5;	//binding = 5
+		shadowMapDescriptorWrite.dstArrayElement = 0;
+			// Descriptor info
+			VkDescriptorImageInfo shadowMapDescriptorInfo = {};
+			shadowMapDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			shadowMapDescriptorInfo.imageView = Lighting::ShadowMap::depthImageView;
+			shadowMapDescriptorInfo.sampler = textureSampler;
+
+		shadowMapDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		shadowMapDescriptorWrite.descriptorCount = 1;
+		shadowMapDescriptorWrite.pImageInfo = &shadowMapDescriptorInfo;
 
 		//put all descriptor write info in an array
-		std::array<VkWriteDescriptorSet, 5> descriptorWrites = { 
+		std::array<VkWriteDescriptorSet, 6> descriptorWrites = { 
 			tessUBODescriptorWrite,
 			diffuseTextureDescriptorWrite,
 			normalTextureDescriptorWrite,
 			environmentMapDescriptorWrite,
-			fragmentUBODescriptorWrite
-			
+			fragmentUBODescriptorWrite,
+			shadowMapDescriptorWrite
 		};
 
 		// perform the update of the descriptor sets

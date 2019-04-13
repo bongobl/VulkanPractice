@@ -1,18 +1,21 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-#include <vulkan/vulkan.h>
+
 #include <iostream>
 #include <array>
 #include <set>
 #include <vector>
 #include <algorithm>
-#include <string.h>
-#include <assert.h>
+#include <string>
+#include <cstring>
+#include <cassert>
 #include <stdexcept>
 #include <cmath>
-#include <string>
+
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+#include <vulkan/vulkan.h>
+
 #include <Utils.h>
 #include <QueueFamilyMap.h>
 #include <SwapChain.h>
@@ -148,6 +151,7 @@ class RenderApplication{
 	static bool isRightMouseButtonDown;
 
 	//model rotation
+	static glm::mat4 modelCorrect;
 	static glm::vec3 modelSpinAxis;
 	static float modelSpinAngle;
 	static glm::mat4 modelOrientation;

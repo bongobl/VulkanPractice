@@ -2,6 +2,10 @@ project (BasicVulkanRender)
 
 find_package(Vulkan)
 
+#preprocessor definitions
+add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE)
+add_compile_definitions(GLM_FORCE_RADIANS)
+
 # directories to include
 set(EXTERNAL_INCLUDE_DIRECTORY "${CMAKE_SOURCE_DIR}/external/include")
 set(PROJECT_INCLUDE_DIRECTORY "${CMAKE_SOURCE_DIR}/include")

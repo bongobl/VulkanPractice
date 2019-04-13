@@ -1,10 +1,10 @@
 #include <Lighting.h>
 
-#ifndef GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#endif
+glm::vec3 Lighting::direction = glm::normalize(glm::vec3(2.5f, -1.6f, -3.5f));
 
-VkExtent2D Lighting::ShadowMap::extent = { 1000,1000};
+glm::mat4 Lighting::ShadowMap::viewMatrix;
+glm::mat4 Lighting::ShadowMap::projMatrix;
+VkExtent2D Lighting::ShadowMap::extent = { 1000,1000 };
 VkImage Lighting::ShadowMap::depthImage;
 VkImageView Lighting::ShadowMap::depthImageView;
 
@@ -21,7 +21,8 @@ VkRenderPass Lighting::ShadowMap::renderPass;
 VkPipelineLayout Lighting::ShadowMap::pipelineLayout;
 VkPipeline Lighting::ShadowMap::graphicsPipeline;
 VkCommandBuffer Lighting::ShadowMap::commandBuffer;
-glm::vec3 Lighting::direction = glm::normalize(glm::vec3(2.5f, -2, -3.5f));
+
+
 
 
 void Lighting::ShadowMap::runCommandBuffer(){
@@ -37,12 +38,16 @@ void Lighting::ShadowMap::runCommandBuffer(){
 	//SUBMIT A RENDER COMMAND TO THIS IMAGE
 	VK_CHECK_RESULT(vkQueueSubmit(RenderApplication::getGraphicsQueue(), 1, &submitInfo, NULL));
 
+	//not very practical since CPU will be used a lot after this for export
 	vkDeviceWaitIdle(RenderApplication::device);
 }
 
 
 void Lighting::ShadowMap::init(){
 
+	projMatrix = glm::ortho<float>(-5, 5, -5, 5, -60, 60);
+	projMatrix[1][1] *= -1;
+	
 	createDepthImage();
 	createDepthImageView();
 	createTessShaderUBO();
@@ -78,28 +83,26 @@ void Lighting::ShadowMap::destroy(){
 	vkDestroyRenderPass(RenderApplication::device, renderPass, NULL);
 }
 
-//hardcoded for now
-void Lighting::ShadowMap::writeToTessShaderUBO(glm::mat4 model){
+void Lighting::ShadowMap::writeToTessShaderUBO(glm::mat4 model, glm::mat3 lightOrientation){
 
+	viewMatrix = glm::lookAt(glm::vec3(0, 0, 0), lightOrientation * direction, lightOrientation * glm::vec3(0.0f, 1.0f, 0.0f));
+	
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;
 
-	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
-
-	tessShaderData.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.03f, 0.03f, 0.03f));
-	
-	tessShaderData.view = glm::lookAt(glm::vec3(0,0,0), direction, glm::vec3(0.0f, 1.0f, 0.0f));
-	tessShaderData.projection = glm::ortho<float>(-5, 5, -5, 5, -60, 25);
-	tessShaderData.projection[1][1] *= -1;
+	tessShaderData.model = model;
+	tessShaderData.view = viewMatrix;
+	tessShaderData.projection = projMatrix;
 
 	void* mappedMemory;
-
+	
 	vkMapMemory(RenderApplication::device, tessShaderUBOMemory, 0, sizeof(tessShaderData), 0, &mappedMemory);
 	memcpy(mappedMemory, &tessShaderData, sizeof(tessShaderData));
 	vkUnmapMemory(RenderApplication::device, tessShaderUBOMemory);
 }
 
 void Lighting::ShadowMap::exportToDisk(){
+
 	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	Utils::exportDepthImageAsPNG(depthImage, extent, "testShadowMap.png");
 	Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
@@ -117,8 +120,6 @@ void Lighting::ShadowMap::createDepthImage() {
 		depthImageMemory
 	);
 
-	//we choose to transition layout here (not in render pass) since the transition only needs to happen once in a realtime app
-	//Utils::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 void Lighting::ShadowMap::createDepthImageView() {
@@ -213,7 +214,7 @@ void Lighting::ShadowMap::createDescriptorSet() {
 
 void Lighting::ShadowMap::createRenderPass() {
 
-
+	
 	VkAttachmentDescription depthAttachment = {};
 	depthAttachment.format = VK_FORMAT_D32_SFLOAT;
 	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;

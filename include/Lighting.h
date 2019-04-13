@@ -17,6 +17,9 @@ public:
 		friend class Lighting;
 	public:
 
+		static glm::mat4 viewMatrix;
+		static glm::mat4 projMatrix;
+
 		static VkExtent2D extent;
 		static VkImage depthImage;
 		static VkImageView depthImageView;
@@ -38,10 +41,12 @@ public:
 		static VkPipeline graphicsPipeline;
 		static VkCommandBuffer commandBuffer;
 
+		
+
 	public:
 		static void init();
 		static void destroy();
-		static void writeToTessShaderUBO(glm::mat4 model);	//need to figure out how to get same uniform struct from render app
+		static void writeToTessShaderUBO(glm::mat4 model, glm::mat3 lightOrientation);	//need to figure out how to get same uniform struct from render app
 		static void runCommandBuffer();
 		static void exportToDisk();
 		
