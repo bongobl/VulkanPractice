@@ -54,7 +54,7 @@ void SwapChain::init(VkDevice device, VkSurfaceKHR surface, uint32_t graphicsQFI
 	presentMode = choosePresentMode();
 	extent = chooseExtent(actualExtent);
 
-	//choose minimum number of images 
+	//choose minimum number of images + 1
 	uint32_t imageCount = availableSurfaceCapabilities.minImageCount + 1;
 
 	//Translation: if there exists a max image count and our imageCount exceeds it

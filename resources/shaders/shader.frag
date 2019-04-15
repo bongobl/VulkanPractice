@@ -38,7 +38,7 @@ mat4 paramMatrix = mat4(
 		0.0, 0.0, 1, 0.0,
 		0.5, 0.5, 0.0, 1.0
 );
-
+bool inShadow = false;
 void main() {
 	
 	//world space correction
@@ -46,6 +46,11 @@ void main() {
 	mat3 toWorldMat3 = transpose(inverse(mat3(modelMatrix)));
 	vec3 worldNormal = normalize(toWorldMat3 * modelSpaceNormal);
 
+	//check if fragment is in shadow
+	vec4 lightSpaceposition = paramMatrix * ubo.lightVP * vec4(worldPosition,1);
+	if (texture(shadowMap, lightSpaceposition.xy ).r  <  lightSpaceposition.z - 0.001){
+		inShadow = true;
+	}
 
 	//apply normal texture offsets
 	worldNormal = normalize(worldNormal + ubo.normalMapStrength * (texture(normalTexture, texCoord).xyz * 2.0f - 1.0f));
@@ -53,35 +58,32 @@ void main() {
 	//environment map reflection
 	vec3 reflectedCam = reflect(worldPosition - ubo.cameraPosition, worldNormal);
 	vec3 reflectiveColor = texture(envMap,reflectedCam).rgb;
-
+	
 	//diffuse texture
 	vec3 diffuseTextureColor = texture(diffuseTexture, texCoord).rgb;
-
+	
 	//combine env map and diffuse texture
 	vec3 combined = (1 - ubo.textureParam) * diffuseTextureColor + ubo.textureParam * reflectiveColor;
 
 	//diffuse
 	vec3 diffuse = ubo.matColor * combined * max(0, dot(-ubo.lightDirection, worldNormal));
-
+	if(inShadow){
+		diffuse = diffuse * 0.25f;
+	}
+	
 	//specular
 	vec3 reflectedLight = reflect(ubo.lightDirection, worldNormal);
 	vec3 fragToCam = normalize(ubo.cameraPosition - worldPosition);
 	vec3 specular = pow(max(0, dot(reflectedLight, fragToCam)),10) * vec3(1.0f);
-
+	if(inShadow){
+		specular = vec3(0,0,0);
+	}
 	//ambient
 	vec3 ambient = 0.015f * ubo.matColor * combined;
 
 	//final color
 	outColor.rgb = diffuse + specular + ambient; 
-
 	
-	//test
-	
-	vec4 lightSpaceposition = paramMatrix * ubo.lightVP * vec4(worldPosition,1);
-
-	if (texture(shadowMap, lightSpaceposition.xy ).r  <  lightSpaceposition.z - 0.001){
-		outColor.rgb = outColor.rgb * 0.2f;
-	}
     outColor.a = 1.0f;
 
 

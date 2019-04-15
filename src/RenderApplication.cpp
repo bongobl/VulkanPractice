@@ -53,6 +53,7 @@ VkPipeline RenderApplication::graphicsPipeline;
 std::vector<VkFence> RenderApplication::inFlightFences;
 std::vector<VkSemaphore> RenderApplication::imageAvailableSemaphores;
 std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
+std::vector<VkSemaphore> RenderApplication::shadowMapDoneSemaphores;
 int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
@@ -84,7 +85,7 @@ void RenderApplication::run() {
 	
 	Lighting::ShadowMap::writeToTessShaderUBO(modelOrientation * modelCorrect, lightOrientation);
 	Lighting::ShadowMap::runCommandBuffer();
-	Lighting::ShadowMap::exportToDisk();
+	//Lighting::ShadowMap::exportToDisk();
 	
 	cout << "In Main Loop" << endl;
 	currentFrame = 0;	//set beginning frame to work with
@@ -219,13 +220,13 @@ void RenderApplication::createAllVulkanResources() {
 	createDepthAttachmentImageView();
 
 	//create all shadow map resources (need to be done before descriptors are created)
-	Lighting::ShadowMap::init();
+	Lighting::ShadowMap::init(SwapChain::images.size());
 	
 	//create descriptors
 	createDescriptorSets();
 
 	//create rendering utils
-	createRenderPass();	//will rename
+	createRenderPass();	
 	createSwapChainFrameBuffers();
 	createGraphicsPipeline();
 	createSyncObjects();
@@ -278,7 +279,22 @@ void RenderApplication::drawFrame(){
 		VK_CHECK_RESULT(result);
 	}
 
+	//Submit ShadowMap
+
+	Lighting::ShadowMap::writeToTessShaderUBO(modelOrientation * modelCorrect, lightOrientation);
 	
+	VkSubmitInfo shadowMapSubmitInfo = {};
+	shadowMapSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	shadowMapSubmitInfo.waitSemaphoreCount = 0;	//depends
+	shadowMapSubmitInfo.pWaitSemaphores = NULL;	//depends
+	shadowMapSubmitInfo.commandBufferCount = 1;
+	shadowMapSubmitInfo.pCommandBuffers = &Lighting::ShadowMap::commandBuffer;
+	shadowMapSubmitInfo.signalSemaphoreCount = 1;
+	shadowMapSubmitInfo.pSignalSemaphores = &shadowMapDoneSemaphores[imageIndex];
+
+	//END Submit ShadowMap
+
+
 	//update uniform data for this frame
 	writeToUniformBuffer(imageIndex);
 
@@ -449,6 +465,7 @@ void RenderApplication::cleanup() {
 		vkDestroyFence(device, inFlightFences[i], NULL);
 		vkDestroySemaphore(device, imageAvailableSemaphores[i], NULL);
 		vkDestroySemaphore(device, renderFinishedSemaphores[i], NULL);
+		vkDestroySemaphore(device, shadowMapDoneSemaphores[i], NULL);
 	}
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
 	vkDestroyPipelineLayout(device, pipelineLayout, NULL);
@@ -1540,7 +1557,7 @@ void RenderApplication::createSyncObjects(){
 	inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-
+	shadowMapDoneSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 	
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -1555,6 +1572,7 @@ void RenderApplication::createSyncObjects(){
 		VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &inFlightFences[i]));
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &imageAvailableSemaphores[i]));
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &renderFinishedSemaphores[i]));
+		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &shadowMapDoneSemaphores[i]));
 	}
 
 

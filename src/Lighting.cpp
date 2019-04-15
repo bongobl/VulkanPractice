@@ -7,7 +7,9 @@ glm::mat4 Lighting::ShadowMap::projMatrix;
 VkExtent2D Lighting::ShadowMap::extent = { 1000,1000 };
 VkImage Lighting::ShadowMap::depthImage;
 VkImageView Lighting::ShadowMap::depthImageView;
+VkCommandBuffer Lighting::ShadowMap::commandBuffer;
 
+uint32_t Lighting::ShadowMap::numDepthImages;
 VkDeviceMemory Lighting::ShadowMap::depthImageMemory;
 VkBuffer Lighting::ShadowMap::tessShaderUBO;
 VkDeviceMemory Lighting::ShadowMap::tessShaderUBOMemory;
@@ -20,9 +22,6 @@ VkFramebuffer Lighting::ShadowMap::frameBuffer;
 VkRenderPass Lighting::ShadowMap::renderPass;
 VkPipelineLayout Lighting::ShadowMap::pipelineLayout;
 VkPipeline Lighting::ShadowMap::graphicsPipeline;
-VkCommandBuffer Lighting::ShadowMap::commandBuffer;
-
-
 
 
 void Lighting::ShadowMap::runCommandBuffer(){
@@ -43,8 +42,12 @@ void Lighting::ShadowMap::runCommandBuffer(){
 }
 
 
-void Lighting::ShadowMap::init(){
+void Lighting::ShadowMap::init(uint32_t numSwapChainImages){
 
+	//we want to create a depthImage per swapchain image
+	numDepthImages = numSwapChainImages;
+
+	//set up projection matrix
 	projMatrix = glm::ortho<float>(-5, 5, -5, 5, -60, 60);
 	projMatrix[1][1] *= -1;
 	
