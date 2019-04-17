@@ -83,9 +83,9 @@ void RenderApplication::run() {
 	//initialize scene variables 
 	initScene();
 	
-	Lighting::ShadowMap::writeToTessShaderUBO(modelOrientation * modelCorrect, lightOrientation);
-	Lighting::ShadowMap::runCommandBuffer();
-	//Lighting::ShadowMap::exportToDisk();
+	Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex, modelOrientation * modelCorrect, lightOrientation);
+	Lighting::ShadowMap::runCommandBuffer(testShadowIndex);
+	//Lighting::ShadowMap::exportToDisk(testShadowIndex);
 	
 	cout << "In Main Loop" << endl;
 	currentFrame = 0;	//set beginning frame to work with
@@ -142,8 +142,8 @@ void RenderApplication::mouseButtonCallback(GLFWwindow* window, int button, int 
 		}
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 			isRightMouseButtonDown = false;
-			Lighting::ShadowMap::writeToTessShaderUBO(modelOrientation * modelCorrect, lightOrientation);
-			Lighting::ShadowMap::runCommandBuffer();
+			Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex,modelOrientation * modelCorrect, lightOrientation);
+			Lighting::ShadowMap::runCommandBuffer(testShadowIndex);
 			//Lighting::ShadowMap::exportToDisk();
 		}
 	}
@@ -281,16 +281,16 @@ void RenderApplication::drawFrame(){
 
 	//Submit ShadowMap
 
-	Lighting::ShadowMap::writeToTessShaderUBO(modelOrientation * modelCorrect, lightOrientation);
+	Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex,modelOrientation * modelCorrect, lightOrientation);
 	
 	VkSubmitInfo shadowMapSubmitInfo = {};
 	shadowMapSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	shadowMapSubmitInfo.waitSemaphoreCount = 0;	//depends
 	shadowMapSubmitInfo.pWaitSemaphores = NULL;	//depends
 	shadowMapSubmitInfo.commandBufferCount = 1;
-	shadowMapSubmitInfo.pCommandBuffers = &Lighting::ShadowMap::commandBuffer;
+	shadowMapSubmitInfo.pCommandBuffers = &Lighting::ShadowMap::commandBuffers[imageIndex];
 	shadowMapSubmitInfo.signalSemaphoreCount = 1;
-	shadowMapSubmitInfo.pSignalSemaphores = &shadowMapDoneSemaphores[imageIndex];
+	shadowMapSubmitInfo.pSignalSemaphores = &shadowMapDoneSemaphores[currentFrame];
 
 	//END Submit ShadowMap
 
@@ -954,7 +954,7 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.normalMapStrength = 0.5f;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
-	fragShaderData.lightVP = Lighting::ShadowMap::projMatrix * Lighting::ShadowMap::viewMatrix;
+	fragShaderData.lightVP = Lighting::ShadowMap::projMatrix * Lighting::ShadowMap::viewMatrices[testShadowIndex];
 	
 	void* mappedMemory;
 
@@ -1175,7 +1175,7 @@ void RenderApplication::createDescriptorSets() {
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     descriptorSetAllocateInfo.descriptorPool = descriptorPool; // pool to allocate from.
-    descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)SwapChain::images.size(); // one descriptor set per swapchain image
+    descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)descriptorSets.size(); // one descriptor set per swapchain image
     descriptorSetAllocateInfo.pSetLayouts = allLayouts.data();
 
 
@@ -1274,7 +1274,7 @@ void RenderApplication::createDescriptorSets() {
 			// Descriptor info
 			VkDescriptorImageInfo shadowMapDescriptorInfo = {};
 			shadowMapDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-			shadowMapDescriptorInfo.imageView = Lighting::ShadowMap::depthImageView;
+			shadowMapDescriptorInfo.imageView = Lighting::ShadowMap::depthImageViews[testShadowIndex];
 			shadowMapDescriptorInfo.sampler = textureSampler;
 
 		shadowMapDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

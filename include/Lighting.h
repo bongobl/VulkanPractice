@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -17,42 +18,42 @@ public:
 		friend class Lighting;
 	public:
 
-		static glm::mat4 viewMatrix;
+		static std::vector<glm::mat4> viewMatrices;
 		static glm::mat4 projMatrix;
 
 		static VkExtent2D extent;
-		static VkImage depthImage;
-		static VkImageView depthImageView;
-		static VkCommandBuffer commandBuffer;
+		static std::vector<VkImage> depthImages;
+		static std::vector<VkImageView> depthImageViews;
+		static std::vector<VkCommandBuffer> commandBuffers;
 
 	private:
 
-		static uint32_t numDepthImages;
-		static VkDeviceMemory depthImageMemory;
+		static size_t numDepthImages;
+		static std::vector<VkDeviceMemory> depthImageMemories;
 
-		static VkBuffer tessShaderUBO;
-		static VkDeviceMemory tessShaderUBOMemory;
+		static std::vector<VkBuffer> tessShaderUBOs;
+		static std::vector<VkDeviceMemory> tessShaderUBOMemories;
 
 		static VkDescriptorSetLayout descriptorSetLayout;
-		static VkDescriptorPool descriptorPool;
-		static VkDescriptorSet descriptorSet;
+		static VkDescriptorPool descriptorPool;	
+		static std::vector<VkDescriptorSet> descriptorSets;
 
 		static VkRenderPass renderPass;
-		static VkFramebuffer frameBuffer;
+		static std::vector<VkFramebuffer> frameBuffers;
 		static VkPipelineLayout pipelineLayout;
 		static VkPipeline graphicsPipeline;
 
 		
 
 	public:
-		static void init(uint32_t numSwapChainImages);
+		static void init(size_t numSwapChainImages);
 		static void destroy();
-		static void writeToTessShaderUBO(glm::mat4 model, glm::mat3 lightOrientation);	//need to figure out how to get same uniform struct from render app
-		static void runCommandBuffer();
-		static void exportToDisk();
+		static void writeToTessShaderUBO(uint32_t imageIndex, glm::mat4 model, glm::mat3 lightOrientation);
+		static void runCommandBuffer(uint32_t imageIndex);
+		static void exportToDisk(uint32_t imageIndex);
 		
 	private:
-		static void createDepthImage();
+		static void createDepthImages();
 		static void createDepthImageView();
 		static void createTessShaderUBO();
 
