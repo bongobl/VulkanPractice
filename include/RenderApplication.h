@@ -30,7 +30,7 @@ const bool enableValidationLayers = true;
 
 #define MAX_FRAME_RATE 60
 
-const uint32_t testShadowIndex = 0;
+const uint32_t testShadowIndex = 1;
 class RenderApplication{
 
 	//test glfw window
@@ -141,6 +141,9 @@ class RenderApplication{
 	static std::vector<VkCommandBuffer> renderCommandBuffers;
 
 	//SCENE VARIABLES
+
+	static bool firstFrame;
+
 	//time variables
 	static float currTime;
 	static float prevTime;
@@ -182,6 +185,8 @@ private:
 
 	
 	static VkExtent2D waitToGetNonZeroWindowExtent();	//continuously loops until window width/height are non-zero, then returns the extent
+
+	static int getPrevFrameIndex(int currFrameIndex);
 
     //specify all required instance layers, instance extensions and device extensions here
     static void configureAllRequirements();

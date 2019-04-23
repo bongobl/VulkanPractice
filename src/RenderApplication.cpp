@@ -58,7 +58,7 @@ int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
 
-
+bool RenderApplication::firstFrame = true;
 float RenderApplication::currTime;
 float RenderApplication::prevTime;
 float RenderApplication::deltaTime;
@@ -172,7 +172,12 @@ VkExtent2D RenderApplication::waitToGetNonZeroWindowExtent() {
 	return actualWindowExtent;
 }
 
-
+int RenderApplication::getPrevFrameIndex(int currFrameIndex){
+	if(currFrameIndex == 0){
+		return MAX_FRAME_RATE - 1;
+	}
+	return currFrameIndex - 1;
+}
 
 void RenderApplication::createAllVulkanResources() {
 
@@ -285,12 +290,18 @@ void RenderApplication::drawFrame(){
 	
 	VkSubmitInfo shadowMapSubmitInfo = {};
 	shadowMapSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	shadowMapSubmitInfo.waitSemaphoreCount = 0;	//depends
-	shadowMapSubmitInfo.pWaitSemaphores = NULL;	//depends
+	if(firstFrame){
+		shadowMapSubmitInfo.waitSemaphoreCount = 0;	//depends
+		shadowMapSubmitInfo.pWaitSemaphores = NULL;	//depends
+	}else{
+		shadowMapSubmitInfo.waitSemaphoreCount = 1;
+		shadowMapSubmitInfo.pWaitSemaphores = &renderFinishedSemaphores[ getPrevFrameIndex(currentFrame) ];
+	}
 	shadowMapSubmitInfo.commandBufferCount = 1;
 	shadowMapSubmitInfo.pCommandBuffers = &Lighting::ShadowMap::commandBuffers[imageIndex];
 	shadowMapSubmitInfo.signalSemaphoreCount = 1;
 	shadowMapSubmitInfo.pSignalSemaphores = &shadowMapDoneSemaphores[currentFrame];
+
 
 	//END Submit ShadowMap
 
@@ -340,6 +351,8 @@ void RenderApplication::drawFrame(){
 }
 
 void RenderApplication::updateScene() {
+
+	firstFrame = false;
 
 	//limit frame rate
 	do {
@@ -491,7 +504,7 @@ void RenderApplication::configureAllRequirements(){
 		requiredInstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 	}
 
-	//add glfw instance extensions
+	//add glfw instance extensions (after you init glfw window)
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions;
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
