@@ -83,8 +83,8 @@ void RenderApplication::run() {
 	//initialize scene variables 
 	initScene();
 	
-	Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex, modelOrientation * modelCorrect, lightOrientation);
-	Lighting::ShadowMap::runCommandBuffer(testShadowIndex);
+	//Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex, modelOrientation * modelCorrect, lightOrientation);
+	//Lighting::ShadowMap::runCommandBuffer(testShadowIndex);
 	//Lighting::ShadowMap::exportToDisk(testShadowIndex);
 	
 	cout << "In Main Loop" << endl;
@@ -142,8 +142,8 @@ void RenderApplication::mouseButtonCallback(GLFWwindow* window, int button, int 
 		}
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 			isRightMouseButtonDown = false;
-			Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex,modelOrientation * modelCorrect, lightOrientation);
-			Lighting::ShadowMap::runCommandBuffer(testShadowIndex);
+			//Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex,modelOrientation * modelCorrect, lightOrientation);
+			//Lighting::ShadowMap::runCommandBuffer(testShadowIndex);
 			//Lighting::ShadowMap::exportToDisk();
 		}
 	}
@@ -174,7 +174,7 @@ VkExtent2D RenderApplication::waitToGetNonZeroWindowExtent() {
 
 int RenderApplication::getPrevFrameIndex(int currFrameIndex){
 	if(currFrameIndex == 0){
-		return MAX_FRAME_RATE - 1;
+		return MAX_FRAMES_IN_FLIGHT - 1;
 	}
 	return currFrameIndex - 1;
 }
@@ -286,23 +286,23 @@ void RenderApplication::drawFrame(){
 
 	//Submit ShadowMap
 
-	Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex,modelOrientation * modelCorrect, lightOrientation);
+	Lighting::ShadowMap::writeToTessShaderUBO(imageIndex,modelOrientation * modelCorrect, lightOrientation);
 	
 	VkSubmitInfo shadowMapSubmitInfo = {};
 	shadowMapSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	if(firstFrame){
-		shadowMapSubmitInfo.waitSemaphoreCount = 0;	//depends
-		shadowMapSubmitInfo.pWaitSemaphores = NULL;	//depends
-	}else{
-		shadowMapSubmitInfo.waitSemaphoreCount = 1;
-		shadowMapSubmitInfo.pWaitSemaphores = &renderFinishedSemaphores[ getPrevFrameIndex(currentFrame) ];
-	}
+
+	//we don't need to wait on any semaphores, we are certain that the shadow map image we are rendering
+	//to has already been used by the main render because of the fence. 
+	shadowMapSubmitInfo.waitSemaphoreCount = 0;	
 	shadowMapSubmitInfo.commandBufferCount = 1;
 	shadowMapSubmitInfo.pCommandBuffers = &Lighting::ShadowMap::commandBuffers[imageIndex];
 	shadowMapSubmitInfo.signalSemaphoreCount = 1;
 	shadowMapSubmitInfo.pSignalSemaphores = &shadowMapDoneSemaphores[currentFrame];
 
+	//SUBMIT A RENDER COMMAND TO THIS IMAGE
+	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &shadowMapSubmitInfo, NULL));
 
+	
 	//END Submit ShadowMap
 
 
@@ -313,9 +313,10 @@ void RenderApplication::drawFrame(){
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = &imageAvailableSemaphores[currentFrame];
+	VkSemaphore waitToRenderSems[] = { imageAvailableSemaphores[currentFrame], shadowMapDoneSemaphores[currentFrame] };
+	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo.waitSemaphoreCount = 2;
+	submitInfo.pWaitSemaphores = waitToRenderSems;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &renderCommandBuffers[imageIndex];
@@ -348,6 +349,7 @@ void RenderApplication::drawFrame(){
 		VK_CHECK_RESULT(result);
 	}
 
+	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void RenderApplication::updateScene() {
@@ -967,7 +969,7 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.normalMapStrength = 0.5f;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
-	fragShaderData.lightVP = Lighting::ShadowMap::projMatrix * Lighting::ShadowMap::viewMatrices[testShadowIndex];
+	fragShaderData.lightVP = Lighting::ShadowMap::projMatrix * Lighting::ShadowMap::viewMatrices[imageIndex];
 	
 	void* mappedMemory;
 
@@ -1287,7 +1289,7 @@ void RenderApplication::createDescriptorSets() {
 			// Descriptor info
 			VkDescriptorImageInfo shadowMapDescriptorInfo = {};
 			shadowMapDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-			shadowMapDescriptorInfo.imageView = Lighting::ShadowMap::depthImageViews[testShadowIndex];
+			shadowMapDescriptorInfo.imageView = Lighting::ShadowMap::depthImageViews[i];
 			shadowMapDescriptorInfo.sampler = textureSampler;
 
 		shadowMapDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

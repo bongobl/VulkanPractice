@@ -30,7 +30,6 @@ const bool enableValidationLayers = true;
 
 #define MAX_FRAME_RATE 60
 
-const uint32_t testShadowIndex = 1;
 class RenderApplication{
 
 	//test glfw window
