@@ -30,6 +30,9 @@ std::vector<VkBuffer> RenderApplication::tessShaderUBOs;
 std::vector<VkDeviceMemory> RenderApplication::tessShaderUBOMemories;
 std::vector<VkBuffer> RenderApplication::fragShaderUBOs;
 std::vector<VkDeviceMemory> RenderApplication::fragShaderUBOMemories;
+VkImage RenderApplication::displacementMap;
+VkDeviceMemory RenderApplication::displacementMapMemory;
+VkImageView RenderApplication::displacementMapView;
 VkImage RenderApplication::diffuseTexture;
 VkDeviceMemory RenderApplication::diffuseTextureMemory;
 VkImageView RenderApplication::diffuseTextureView;
@@ -39,7 +42,7 @@ VkImageView RenderApplication::normalTextureView;
 VkImage RenderApplication::environmentMap;
 VkDeviceMemory RenderApplication::environmentMapMemory;
 VkImageView RenderApplication::environmentMapView;
-VkSampler RenderApplication::textureSampler;
+VkSampler RenderApplication::imageSampler;
 VkImage RenderApplication::depthAttachmentImage;
 VkDeviceMemory RenderApplication::depthAttachmentImageMemory;
 VkImageView RenderApplication::depthAttachmentImageView;
@@ -58,7 +61,6 @@ int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
 
-bool RenderApplication::firstFrame = true;
 float RenderApplication::currTime;
 float RenderApplication::prevTime;
 float RenderApplication::deltaTime;
@@ -83,9 +85,6 @@ void RenderApplication::run() {
 	//initialize scene variables 
 	initScene();
 	
-	//Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex, modelOrientation * modelCorrect, lightOrientation);
-	//Lighting::ShadowMap::runCommandBuffer(testShadowIndex);
-	//Lighting::ShadowMap::exportToDisk(testShadowIndex);
 	
 	cout << "In Main Loop" << endl;
 	currentFrame = 0;	//set beginning frame to work with
@@ -142,9 +141,6 @@ void RenderApplication::mouseButtonCallback(GLFWwindow* window, int button, int 
 		}
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 			isRightMouseButtonDown = false;
-			//Lighting::ShadowMap::writeToTessShaderUBO(testShadowIndex,modelOrientation * modelCorrect, lightOrientation);
-			//Lighting::ShadowMap::runCommandBuffer(testShadowIndex);
-			//Lighting::ShadowMap::exportToDisk();
 		}
 	}
 	
@@ -210,6 +206,9 @@ void RenderApplication::createAllVulkanResources() {
 
 	createUniformBuffers();
 
+	createDisplacementMap();
+	createDisplacementMapView();
+
 	createDiffuseTexture();
 	createDiffuseTextureView();
 
@@ -219,7 +218,7 @@ void RenderApplication::createAllVulkanResources() {
 	createEnvironmentMap();
 	createEnvironmentMapView();
 
-	createTextureSampler();
+	createImageSampler();
 
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
@@ -292,7 +291,7 @@ void RenderApplication::drawFrame(){
 	shadowMapSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
 	//we don't need to wait on any semaphores, we are certain that the shadow map image we are rendering
-	//to has already been used by the main render because of the fence. 
+	//to has already been used by the main render because of the fence which waited for it to finish. 
 	shadowMapSubmitInfo.waitSemaphoreCount = 0;	
 	shadowMapSubmitInfo.commandBufferCount = 1;
 	shadowMapSubmitInfo.pCommandBuffers = &Lighting::ShadowMap::commandBuffers[imageIndex];
@@ -354,8 +353,6 @@ void RenderApplication::drawFrame(){
 
 void RenderApplication::updateScene() {
 
-	firstFrame = false;
-
 	//limit frame rate
 	do {
 		currTime = (float)glfwGetTime();
@@ -373,10 +370,11 @@ void RenderApplication::updateScene() {
 
 void RenderApplication::updateModelRotation() {
 
+	//if button down, mouse has control
 	if (isLeftMouseButtonDown) {
 
 		Utils::calcTrackBallDeltas(mousePosition, prevMousePosition, SwapChain::extent, modelSpinAxis, modelSpinAngle);
-	}
+	}	//else, decay current speed around axis
 	else {
 
 		if (modelSpinAngle > 0) {
@@ -443,6 +441,11 @@ void RenderApplication::cleanup() {
 		vkFreeMemory(device, fragShaderUBOMemories[i], NULL);
 	}
 
+	//free displacement map
+	vkDestroyImageView(device, displacementMapView, NULL);
+	vkDestroyImage(device, displacementMap, NULL);
+	vkFreeMemory(device, displacementMapMemory, NULL);
+
 	//free diffuse texture
 	vkDestroyImageView(device, diffuseTextureView, NULL);
 	vkDestroyImage(device, diffuseTexture, NULL);
@@ -459,7 +462,7 @@ void RenderApplication::cleanup() {
 	vkFreeMemory(device, environmentMapMemory, NULL);
 
 	//free sampler
-	vkDestroySampler(device, textureSampler, NULL);
+	vkDestroySampler(device, imageSampler, NULL);
 
 
 	//free depth attachment image
@@ -612,10 +615,10 @@ void RenderApplication::createInstance() {
     //Register a callback function for the extension VK_EXT_DEBUG_REPORT_EXTENSION_NAME, so that warnings emitted from the validation
     //layer are actually printed.
     if (enableValidationLayers) {
-        VkDebugReportCallbackCreateInfoEXT createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-        createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-        createInfo.pfnCallback = &debugReportCallbackFunction;
+        VkDebugReportCallbackCreateInfoEXT debugCallbackCreateInfo = {};
+        debugCallbackCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+        debugCallbackCreateInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
+        debugCallbackCreateInfo.pfnCallback = &debugReportCallbackFunction;
 
         // We have to explicitly load this function and have our local function pointer point to it
         auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
@@ -624,7 +627,7 @@ void RenderApplication::createInstance() {
         }
 
         // Create and register callback.
-        VK_CHECK_RESULT(vkCreateDebugReportCallbackEXT(instance, &createInfo, NULL, &debugReportCallback));
+        VK_CHECK_RESULT(vkCreateDebugReportCallbackEXT(instance, &debugCallbackCreateInfo, NULL, &debugReportCallback));
     }
 
 }
@@ -982,8 +985,18 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	memcpy(mappedMemory, &fragShaderData, sizeof(fragShaderData));
 	vkUnmapMemory(device, fragShaderUBOMemories[imageIndex]);
 
+}
 
-
+void RenderApplication::createDisplacementMap(){
+	Utils::createImageFromFile(
+		"resources/images/rock/rock_disp.png",
+		displacementMap,
+		displacementMapMemory,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+	);
+}
+void RenderApplication::createDisplacementMapView(){
+	Utils::createImageView(displacementMap,displacementMapView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void RenderApplication::createDiffuseTexture(){
@@ -1030,8 +1043,8 @@ void RenderApplication::createEnvironmentMapView() {
 	Utils::createImageView(environmentMap, environmentMapView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, true);
 }
 
-void RenderApplication::createTextureSampler(){
-	Utils::createImageSampler(textureSampler);
+void RenderApplication::createImageSampler(){
+	Utils::createImageSampler(imageSampler);
 }
 
 
@@ -1225,7 +1238,7 @@ void RenderApplication::createDescriptorSets() {
 			VkDescriptorImageInfo diffuseTextureDescriptorInfo = {};
 			diffuseTextureDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			diffuseTextureDescriptorInfo.imageView = diffuseTextureView;
-			diffuseTextureDescriptorInfo.sampler = textureSampler;
+			diffuseTextureDescriptorInfo.sampler = imageSampler;
 
 		diffuseTextureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		diffuseTextureDescriptorWrite.descriptorCount = 1;
@@ -1241,7 +1254,7 @@ void RenderApplication::createDescriptorSets() {
 			VkDescriptorImageInfo normalTextureDescriptorInfo = {};
 			normalTextureDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			normalTextureDescriptorInfo.imageView = normalTextureView;
-			normalTextureDescriptorInfo.sampler = textureSampler;
+			normalTextureDescriptorInfo.sampler = imageSampler;
 
 		normalTextureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		normalTextureDescriptorWrite.descriptorCount = 1;
@@ -1257,7 +1270,7 @@ void RenderApplication::createDescriptorSets() {
 			VkDescriptorImageInfo environmentMapDescriptorInfo = {};
 			environmentMapDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			environmentMapDescriptorInfo.imageView = environmentMapView;
-			environmentMapDescriptorInfo.sampler = textureSampler;
+			environmentMapDescriptorInfo.sampler = imageSampler;
 
 		environmentMapDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		environmentMapDescriptorWrite.descriptorCount = 1;
@@ -1290,7 +1303,7 @@ void RenderApplication::createDescriptorSets() {
 			VkDescriptorImageInfo shadowMapDescriptorInfo = {};
 			shadowMapDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 			shadowMapDescriptorInfo.imageView = Lighting::ShadowMap::depthImageViews[i];
-			shadowMapDescriptorInfo.sampler = textureSampler;
+			shadowMapDescriptorInfo.sampler = imageSampler;
 
 		shadowMapDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		shadowMapDescriptorWrite.descriptorCount = 1;
@@ -1672,4 +1685,11 @@ VkCommandPool RenderApplication::getGraphicsCmdPool() {
 
 VkQueue RenderApplication::getGraphicsQueue(){
 	return graphicsQueue;
+}
+
+VkSampler RenderApplication::getImageSampler(){
+	return imageSampler;
+}
+VkImageView RenderApplication::getDisplacementMapView(){
+	return displacementMapView;
 }

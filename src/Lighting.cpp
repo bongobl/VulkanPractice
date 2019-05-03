@@ -1,10 +1,10 @@
 #include <Lighting.h>
 
-glm::vec3 Lighting::direction = glm::normalize(glm::vec3(2.5f, -1.6f, -3.5f));
+const glm::vec3 Lighting::direction = glm::normalize(glm::vec3(2.5f, -1.6f, -3.5f));
 
 std::vector<glm::mat4> Lighting::ShadowMap::viewMatrices;
 glm::mat4 Lighting::ShadowMap::projMatrix;
-VkExtent2D Lighting::ShadowMap::extent = { 1000,1000 };
+VkExtent2D Lighting::ShadowMap::extent = { 1500,1500 };
 std::vector<VkImage> Lighting::ShadowMap::depthImages;
 std::vector<VkImageView> Lighting::ShadowMap::depthImageViews;
 std::vector<VkCommandBuffer> Lighting::ShadowMap::commandBuffers;
@@ -54,17 +54,17 @@ void Lighting::ShadowMap::init(size_t numSwapChainImages){
 	projMatrix[1][1] *= -1;
 	
 	createDepthImages();
-	createDepthImageView();
-	createTessShaderUBO();
+	createDepthImageViews();
+	createTessShaderUBOs();
 
 	createDescriptorSetLayout();
 	createDescriptorPool();
-	createDescriptorSet();
+	createDescriptorSets();
 
 	createRenderPass();
-	createFrameBuffer();
+	createFrameBuffers();
 	createGraphicsPipeline();
-	createCommandBuffer();
+	createCommandBuffers();
 }
 
 void Lighting::ShadowMap::destroy(){
@@ -138,7 +138,7 @@ void Lighting::ShadowMap::createDepthImages() {
 
 }
 
-void Lighting::ShadowMap::createDepthImageView() {
+void Lighting::ShadowMap::createDepthImageViews() {
 	
 	depthImageViews.resize(numDepthImages);
 
@@ -152,7 +152,7 @@ void Lighting::ShadowMap::createDepthImageView() {
 	}
 }
 
-void Lighting::ShadowMap::createTessShaderUBO(){
+void Lighting::ShadowMap::createTessShaderUBOs(){
 
 	tessShaderUBOs.resize(numDepthImages);
 	tessShaderUBOMemories.resize(numDepthImages);
@@ -204,7 +204,7 @@ void Lighting::ShadowMap::createDescriptorPool() {
     VK_CHECK_RESULT(vkCreateDescriptorPool(RenderApplication::device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
 }
 
-void Lighting::ShadowMap::createDescriptorSet() {
+void Lighting::ShadowMap::createDescriptorSets() {
 
 	descriptorSets.resize(numDepthImages);
 
@@ -281,7 +281,7 @@ void Lighting::ShadowMap::createRenderPass() {
 	VK_CHECK_RESULT(vkCreateRenderPass(RenderApplication::device, &renderPassInfo, nullptr, &renderPass));
 }
 
-void Lighting::ShadowMap::createFrameBuffer() {
+void Lighting::ShadowMap::createFrameBuffers() {
 
 	frameBuffers.resize(numDepthImages);
 
@@ -458,7 +458,7 @@ void Lighting::ShadowMap::createGraphicsPipeline() {
 	vkDestroyShaderModule(RenderApplication::device, tessEvalShaderModule, NULL);
 }
 
-void Lighting::ShadowMap::createCommandBuffer() {
+void Lighting::ShadowMap::createCommandBuffers() {
 	
 	commandBuffers.resize(numDepthImages);
 

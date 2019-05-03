@@ -11,11 +11,10 @@ class Lighting{
 
 public:
 
-	static glm::vec3 direction;
+	static const glm::vec3 direction;
 
 	class ShadowMap{
 
-		friend class Lighting;
 	public:
 
 		static std::vector<glm::mat4> viewMatrices;
@@ -54,17 +53,17 @@ public:
 		
 	private:
 		static void createDepthImages();
-		static void createDepthImageView();
-		static void createTessShaderUBO();
+		static void createDepthImageViews();
+		static void createTessShaderUBOs();
 
 		static void createDescriptorSetLayout();
 		static void createDescriptorPool();
-		static void createDescriptorSet();
+		static void createDescriptorSets();
 
 		static void createRenderPass();
-		static void createFrameBuffer();
+		static void createFrameBuffers();
 		static void createGraphicsPipeline();
-		static void createCommandBuffer();
+		static void createCommandBuffers();
 	};
     
 

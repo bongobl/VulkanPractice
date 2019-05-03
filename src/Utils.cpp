@@ -727,6 +727,7 @@ void Utils::calcTrackBallDeltas(glm::vec2 mousePosition, glm::vec2 prevMousePosi
 	glm::vec3 currPoint = Utils::trackBallMap(mousePosition, appExtent);
 	glm::vec3 prevPoint = Utils::trackBallMap(prevMousePosition, appExtent);
 	direction = currPoint - prevPoint;
+	
 	float velocity = glm::length(direction);
 	if (velocity > 0.0001f) {
 

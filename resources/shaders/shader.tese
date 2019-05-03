@@ -10,7 +10,11 @@ layout (location = 1) in vec3 contPointNormals[];
 layout (location = 2) in vec2 contPointTexCoords[];
 
 
+
  //Descriptor Bindings
+ //both shadow map pipeline and main pipelinne need to agree on the binding id of the displacement map, make it 0
+ //layout(binding = 0) uniform sampler2D displacementMap;   
+
 layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
     mat4 view;
@@ -35,6 +39,8 @@ void main()
     // uncomment when ready to use
     //float displacement = texture(displacementTexture, innerTexCoord).r;
  	//innerPosition.y += displacement;
+
+    //innerPosition += vec3(0,8,0) * innerNormal;
 
     gl_Position = ubo.projection * ubo.view * ubo.model * vec4(innerPosition, 1.0f);
 

@@ -88,6 +88,11 @@ class RenderApplication{
 	static std::vector<VkBuffer> fragShaderUBOs;
 	static std::vector<VkDeviceMemory> fragShaderUBOMemories;
 
+	//for our displacement texture
+	static VkImage displacementMap;
+	static VkDeviceMemory displacementMapMemory;
+	static VkImageView displacementMapView;
+
 	//for our diffuse texture
 	static VkImage diffuseTexture;
 	static VkDeviceMemory diffuseTextureMemory;
@@ -104,7 +109,7 @@ class RenderApplication{
 	static VkImageView environmentMapView;
 
 	//to sample image textures
-	static VkSampler textureSampler;
+	static VkSampler imageSampler;
 
 	//Depth attachment image to use
 	static VkImage depthAttachmentImage;
@@ -140,8 +145,6 @@ class RenderApplication{
 	static std::vector<VkCommandBuffer> renderCommandBuffers;
 
 	//SCENE VARIABLES
-
-	static bool firstFrame;
 
 	//time variables
 	static float currTime;
@@ -218,6 +221,9 @@ private:
 	static void createUniformBuffers();
 	static void writeToUniformBuffer(uint32_t imageIndex);
 
+	static void createDisplacementMap();
+	static void createDisplacementMapView();
+
 	static void createDiffuseTexture();
 	static void createDiffuseTextureView();
 
@@ -227,7 +233,7 @@ private:
 	static void createEnvironmentMap();
 	static void createEnvironmentMapView();
 
-	static void createTextureSampler();
+	static void createImageSampler();
 
 	static void createDepthAttachmentImage();
 	static void createDepthAttachmentImageView();
@@ -254,6 +260,8 @@ private:
 	//for shadow map
 	static VkCommandPool getGraphicsCmdPool();
 	static VkQueue getGraphicsQueue();
+	static VkSampler getImageSampler();
+	static VkImageView getDisplacementMapView();
 	
 	friend class Utils;
 	friend class Lighting;
