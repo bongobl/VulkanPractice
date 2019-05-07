@@ -2,7 +2,7 @@
 
 const glm::vec3 Lighting::direction = glm::normalize(glm::vec3(2.5f, -1.6f, -3.5f));
 
-std::vector<glm::mat4> Lighting::ShadowMap::viewMatrices;
+glm::mat4 Lighting::ShadowMap::viewMatrix;
 glm::mat4 Lighting::ShadowMap::projMatrix;
 VkExtent2D Lighting::ShadowMap::extent = { 1500,1500 };
 std::vector<VkImage> Lighting::ShadowMap::depthImages;
@@ -46,8 +46,6 @@ void Lighting::ShadowMap::init(size_t numSwapChainImages){
 
 	//we want to create a depthImage per swapchain image
 	numDepthImages = numSwapChainImages;
-
-	viewMatrices.resize(numSwapChainImages);
 
 	//set up projection matrix
 	projMatrix = glm::ortho<float>(-5, 5, -5, 5, -60, 60);
@@ -96,13 +94,13 @@ void Lighting::ShadowMap::destroy(){
 
 void Lighting::ShadowMap::writeToTessShaderUBO(uint32_t imageIndex, glm::mat4 model, glm::mat3 lightOrientation){
 
-	viewMatrices[imageIndex] = glm::lookAt(glm::vec3(0, 0, 0), lightOrientation * direction, lightOrientation * glm::vec3(0.0f, 1.0f, 0.0f));
+	viewMatrix = glm::lookAt(glm::vec3(0, 0, 0), lightOrientation * direction, lightOrientation * glm::vec3(0.0f, 1.0f, 0.0f));
 	
 	//Copy over Vertex Shader UBO
     UniformDataTessShader tessShaderData;
 
 	tessShaderData.model = model;
-	tessShaderData.view = viewMatrices[imageIndex];
+	tessShaderData.view = viewMatrix;
 	tessShaderData.projection = projMatrix;
 
 	void* mappedMemory;

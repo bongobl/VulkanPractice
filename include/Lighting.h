@@ -17,7 +17,7 @@ public:
 
 	public:
 
-		static std::vector<glm::mat4> viewMatrices;
+		static glm::mat4 viewMatrix;
 		static glm::mat4 projMatrix;
 
 		static VkExtent2D extent;

@@ -30,9 +30,6 @@ std::vector<VkBuffer> RenderApplication::tessShaderUBOs;
 std::vector<VkDeviceMemory> RenderApplication::tessShaderUBOMemories;
 std::vector<VkBuffer> RenderApplication::fragShaderUBOs;
 std::vector<VkDeviceMemory> RenderApplication::fragShaderUBOMemories;
-VkImage RenderApplication::displacementMap;
-VkDeviceMemory RenderApplication::displacementMapMemory;
-VkImageView RenderApplication::displacementMapView;
 VkImage RenderApplication::diffuseTexture;
 VkDeviceMemory RenderApplication::diffuseTextureMemory;
 VkImageView RenderApplication::diffuseTextureView;
@@ -205,9 +202,6 @@ void RenderApplication::createAllVulkanResources() {
 	writeToIndexBuffer();
 
 	createUniformBuffers();
-
-	createDisplacementMap();
-	createDisplacementMapView();
 
 	createDiffuseTexture();
 	createDiffuseTextureView();
@@ -441,10 +435,6 @@ void RenderApplication::cleanup() {
 		vkFreeMemory(device, fragShaderUBOMemories[i], NULL);
 	}
 
-	//free displacement map
-	vkDestroyImageView(device, displacementMapView, NULL);
-	vkDestroyImage(device, displacementMap, NULL);
-	vkFreeMemory(device, displacementMapMemory, NULL);
 
 	//free diffuse texture
 	vkDestroyImageView(device, diffuseTextureView, NULL);
@@ -558,7 +548,7 @@ void RenderApplication::createInstance() {
 	}
 
 
-	//check for presence of required instance extensions
+	//check for presence of all required instance extensions
     uint32_t numAvailableExtensions;
 
     vkEnumerateInstanceExtensionProperties(NULL, &numAvailableExtensions, NULL);
@@ -970,9 +960,9 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	fragShaderData.lightDirection = lightOrientation * Lighting::direction;
 	fragShaderData.textureParam = 0.65f;
 	fragShaderData.cameraPosition = cameraPosition;
-	fragShaderData.normalMapStrength = 0.5f;
+	fragShaderData.normalMapStrength = 0.7f;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
-	fragShaderData.lightVP = Lighting::ShadowMap::projMatrix * Lighting::ShadowMap::viewMatrices[imageIndex];
+	fragShaderData.lightVP = Lighting::ShadowMap::projMatrix * Lighting::ShadowMap::viewMatrix;
 	
 	void* mappedMemory;
 
@@ -985,18 +975,6 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	memcpy(mappedMemory, &fragShaderData, sizeof(fragShaderData));
 	vkUnmapMemory(device, fragShaderUBOMemories[imageIndex]);
 
-}
-
-void RenderApplication::createDisplacementMap(){
-	Utils::createImageFromFile(
-		"resources/images/rock/rock_disp.png",
-		displacementMap,
-		displacementMapMemory,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-	);
-}
-void RenderApplication::createDisplacementMapView(){
-	Utils::createImageView(displacementMap,displacementMapView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void RenderApplication::createDiffuseTexture(){
@@ -1096,7 +1074,7 @@ void RenderApplication::createSwapChainFrameBuffers() {
 	}
 }
 void RenderApplication::createDescriptorSetLayout() {
-
+	
     //define a binding for our tesselation shader UBO
     VkDescriptorSetLayoutBinding tessShaderUBOBinding = {};
 	tessShaderUBOBinding.binding = 0;	//binding = 0
@@ -1685,11 +1663,4 @@ VkCommandPool RenderApplication::getGraphicsCmdPool() {
 
 VkQueue RenderApplication::getGraphicsQueue(){
 	return graphicsQueue;
-}
-
-VkSampler RenderApplication::getImageSampler(){
-	return imageSampler;
-}
-VkImageView RenderApplication::getDisplacementMapView(){
-	return displacementMapView;
 }

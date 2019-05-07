@@ -10,11 +10,6 @@ layout (location = 1) in vec3 contPointNormals[];
 layout (location = 2) in vec2 contPointTexCoords[];
 
 
-
- //Descriptor Bindings
- //both shadow map pipeline and main pipelinne need to agree on the binding id of the displacement map, make it 0
- //layout(binding = 0) uniform sampler2D displacementMap;   
-
 layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
     mat4 view;
