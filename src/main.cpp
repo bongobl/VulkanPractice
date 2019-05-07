@@ -3,7 +3,7 @@
 
 using namespace std;
 
-//On BasicRender branch
+//On Particles branch
 int main() {
 
     cout << "Running Render Application" << endl;
