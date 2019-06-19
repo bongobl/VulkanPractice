@@ -279,7 +279,7 @@ void RenderApplication::drawFrame(){
 
 	//Submit ShadowMap
 
-	Lighting::ShadowMap::writeToTessShaderUBO(imageIndex,modelOrientation * modelCorrect, lightOrientation);
+	Lighting::ShadowMap::writeToTessShaderUBO(imageIndex, modelOrientation * modelCorrect, lightOrientation);
 	
 	VkSubmitInfo shadowMapSubmitInfo = {};
 	shadowMapSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -368,7 +368,8 @@ void RenderApplication::updateModelRotation() {
 	if (isLeftMouseButtonDown) {
 
 		Utils::calcTrackBallDeltas(mousePosition, prevMousePosition, SwapChain::extent, modelSpinAxis, modelSpinAngle);
-	}	//else, decay current speed around axis
+	}	
+	//else, decay current speed around axis
 	else {
 
 		if (modelSpinAngle > 0) {

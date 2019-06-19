@@ -1,4 +1,4 @@
-project (BasicVulkanRender)
+project (Particles)
 
 find_package(Vulkan)
 
@@ -39,12 +39,12 @@ set(EXTERNAL_LIBS
     glfw3
 )
 
-include_directories(BasicVulkanRender ${ALL_INCLUDE_DIRECTORIES})
-link_directories(BasicVulkanRender ${EXTERNAL_LIB_DIRECTORIES})
+include_directories(Particles ${ALL_INCLUDE_DIRECTORIES})
+link_directories(Particles ${EXTERNAL_LIB_DIRECTORIES})
 
-add_executable(BasicVulkanRender "${SOURCE_FILES}")
+add_executable(Particles "${SOURCE_FILES}")
 
-target_link_libraries(BasicVulkanRender ${EXTERNAL_LIBS} )
+target_link_libraries(Particles ${EXTERNAL_LIBS} )
 
 #define runtime resource directory
 set(RESOURCE_DIRECTORIES
@@ -54,7 +54,7 @@ set(RESOURCE_DIRECTORIES
 #post build, copy runtime resources to directory
 foreach(RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
     add_custom_command(
-        TARGET BasicVulkanRender POST_BUILD
+        TARGET Particles POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_SOURCE_DIR}/${RESOURCE_DIRECTORY}"
             "${CMAKE_CURRENT_BINARY_DIR}/${RESOURCE_DIRECTORY}"

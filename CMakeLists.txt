@@ -11,5 +11,5 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "")
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "")
 add_subdirectory(external/glfw)
 
-#build BasicVulkanRender
-add_subdirectory(src BasicVulkanRender)
+#build Particles
+add_subdirectory(src Particles)
