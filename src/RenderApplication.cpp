@@ -53,7 +53,6 @@ VkPipeline RenderApplication::graphicsPipeline;
 std::vector<VkFence> RenderApplication::inFlightFences;
 std::vector<VkSemaphore> RenderApplication::imageAvailableSemaphores;
 std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
-std::vector<VkSemaphore> RenderApplication::shadowMapDoneSemaphores;
 int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
@@ -216,9 +215,6 @@ void RenderApplication::createAllVulkanResources() {
 
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
-
-	//create all shadow map resources (need to be done before descriptors are created)
-	Lighting::ShadowMap::init(SwapChain::images.size());
 	
 	//create descriptors
 	createDescriptorSets();
@@ -277,27 +273,6 @@ void RenderApplication::drawFrame(){
 		VK_CHECK_RESULT(result);
 	}
 
-	//Submit ShadowMap
-
-	Lighting::ShadowMap::writeToTessShaderUBO(imageIndex, modelOrientation * modelCorrect, lightOrientation);
-	
-	VkSubmitInfo shadowMapSubmitInfo = {};
-	shadowMapSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-	//we don't need to wait on any semaphores, we are certain that the shadow map image we are rendering
-	//to has already been used by the main render because of the fence which waited for it to finish. 
-	shadowMapSubmitInfo.waitSemaphoreCount = 0;	
-	shadowMapSubmitInfo.commandBufferCount = 1;
-	shadowMapSubmitInfo.pCommandBuffers = &Lighting::ShadowMap::commandBuffers[imageIndex];
-	shadowMapSubmitInfo.signalSemaphoreCount = 1;
-	shadowMapSubmitInfo.pSignalSemaphores = &shadowMapDoneSemaphores[currentFrame];
-
-	//SUBMIT A RENDER COMMAND TO THIS IMAGE
-	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &shadowMapSubmitInfo, NULL));
-
-	
-	//END Submit ShadowMap
-
 
 	//update uniform data for this frame
 	writeToUniformBuffer(imageIndex);
@@ -306,9 +281,9 @@ void RenderApplication::drawFrame(){
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkSemaphore waitToRenderSems[] = { imageAvailableSemaphores[currentFrame], shadowMapDoneSemaphores[currentFrame] };
-	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	submitInfo.waitSemaphoreCount = 2;
+	VkSemaphore waitToRenderSems[] = { imageAvailableSemaphores[currentFrame]};
+	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitToRenderSems;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
@@ -371,7 +346,7 @@ void RenderApplication::updateModelRotation() {
 	}	
 	//else, decay current speed around axis
 	else {
-
+		
 		if (modelSpinAngle > 0) {
 			modelSpinAngle -= 0.7f * deltaTime * abs(modelSpinAngle);
 			if (modelSpinAngle < 0) {
@@ -406,8 +381,6 @@ void RenderApplication::updateLightRotation() {
 void RenderApplication::cleanup() {
 
 	//clean up all Window/Vulkan/Scene resources
-
-	Lighting::ShadowMap::destroy();
 
 	//destroy validation layer callback
 	if (enableValidationLayers) {
@@ -474,7 +447,6 @@ void RenderApplication::cleanup() {
 		vkDestroyFence(device, inFlightFences[i], NULL);
 		vkDestroySemaphore(device, imageAvailableSemaphores[i], NULL);
 		vkDestroySemaphore(device, renderFinishedSemaphores[i], NULL);
-		vkDestroySemaphore(device, shadowMapDoneSemaphores[i], NULL);
 	}
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
 	vkDestroyPipelineLayout(device, pipelineLayout, NULL);
@@ -963,7 +935,6 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	fragShaderData.cameraPosition = cameraPosition;
 	fragShaderData.normalMapStrength = 0.7f;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
-	fragShaderData.lightVP = Lighting::ShadowMap::projMatrix * Lighting::ShadowMap::viewMatrix;
 	
 	void* mappedMemory;
 
@@ -1114,21 +1085,14 @@ void RenderApplication::createDescriptorSetLayout() {
 	fragShaderUBOBinding.descriptorCount = 1;
 	fragShaderUBOBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	//define a binding for our shadow map
-	VkDescriptorSetLayoutBinding shadowMapBinding = {};
-	shadowMapBinding.binding = 5;
-	shadowMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	shadowMapBinding.descriptorCount = 1;
-	shadowMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 6> allBindings = { 
+    std::array<VkDescriptorSetLayoutBinding, 5> allBindings = { 
 		tessShaderUBOBinding, 
 		diffuseTextureBinding,
 		normalTextureBinding, 
 		environmentMapBinding, 
-		fragShaderUBOBinding,
-		shadowMapBinding	
+		fragShaderUBOBinding	
 	};
 
     //create descriptor set layout for all above binding points
@@ -1145,7 +1109,7 @@ void RenderApplication::createDescriptorSetLayout() {
 void RenderApplication::createDescriptorPool(){
 
 
-    std::array<VkDescriptorPoolSize, 6> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 5> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1156,8 +1120,6 @@ void RenderApplication::createDescriptorPool(){
 	poolSizes[3].descriptorCount = (uint32_t)SwapChain::images.size();
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[4].descriptorCount = (uint32_t)SwapChain::images.size();
-	poolSizes[5].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[5].descriptorCount = (uint32_t)SwapChain::images.size();
 	
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -1272,30 +1234,13 @@ void RenderApplication::createDescriptorSets() {
 		fragmentUBODescriptorWrite.pBufferInfo = &fragmentUBODescriptorInfo;
 
 
-		// Descriptor for our normal texture
-		VkWriteDescriptorSet shadowMapDescriptorWrite = {};
-		shadowMapDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		shadowMapDescriptorWrite.dstSet = descriptorSets[i];
-		shadowMapDescriptorWrite.dstBinding = 5;	//binding = 5
-		shadowMapDescriptorWrite.dstArrayElement = 0;
-			// Descriptor info
-			VkDescriptorImageInfo shadowMapDescriptorInfo = {};
-			shadowMapDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-			shadowMapDescriptorInfo.imageView = Lighting::ShadowMap::depthImageViews[i];
-			shadowMapDescriptorInfo.sampler = imageSampler;
-
-		shadowMapDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		shadowMapDescriptorWrite.descriptorCount = 1;
-		shadowMapDescriptorWrite.pImageInfo = &shadowMapDescriptorInfo;
-
 		//put all descriptor write info in an array
-		std::array<VkWriteDescriptorSet, 6> descriptorWrites = { 
+		std::array<VkWriteDescriptorSet, 5> descriptorWrites = { 
 			tessUBODescriptorWrite,
 			diffuseTextureDescriptorWrite,
 			normalTextureDescriptorWrite,
 			environmentMapDescriptorWrite,
-			fragmentUBODescriptorWrite,
-			shadowMapDescriptorWrite
+			fragmentUBODescriptorWrite
 		};
 
 		// perform the update of the descriptor sets
@@ -1564,7 +1509,6 @@ void RenderApplication::createSyncObjects(){
 	inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-	shadowMapDoneSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 	
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -1579,9 +1523,7 @@ void RenderApplication::createSyncObjects(){
 		VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &inFlightFences[i]));
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &imageAvailableSemaphores[i]));
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &renderFinishedSemaphores[i]));
-		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &shadowMapDoneSemaphores[i]));
 	}
-
 
 }
 

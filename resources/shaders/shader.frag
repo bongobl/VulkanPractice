@@ -24,7 +24,6 @@ layout(binding = 4) uniform UniformBufferObject{
 
 } ubo;
 
-layout(binding = 5) uniform sampler2D shadowMap;
 
 
 //output to color attachment
