@@ -14,7 +14,7 @@
 using namespace std;
 
 
-struct UniformDataTessShader {
+struct UniformDataVertexShader {
 
 	glm::mat4 model;
 	glm::mat4 view;

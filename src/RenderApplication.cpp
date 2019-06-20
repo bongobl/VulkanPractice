@@ -26,8 +26,8 @@ VkBuffer RenderApplication::vertexBuffer;
 VkDeviceMemory RenderApplication::vertexBufferMemory;
 VkBuffer RenderApplication::indexBuffer;
 VkDeviceMemory RenderApplication::indexBufferMemory;
-std::vector<VkBuffer> RenderApplication::tessShaderUBOs;
-std::vector<VkDeviceMemory> RenderApplication::tessShaderUBOMemories;
+std::vector<VkBuffer> RenderApplication::vertexShaderUBOs;
+std::vector<VkDeviceMemory> RenderApplication::vertexShaderUBOMemories;
 std::vector<VkBuffer> RenderApplication::fragShaderUBOs;
 std::vector<VkDeviceMemory> RenderApplication::fragShaderUBOMemories;
 VkImage RenderApplication::diffuseTexture;
@@ -403,8 +403,8 @@ void RenderApplication::cleanup() {
 
 	//free uniform buffers
 	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
-		vkDestroyBuffer(device, tessShaderUBOs[i], NULL);
-		vkFreeMemory(device, tessShaderUBOMemories[i], NULL);
+		vkDestroyBuffer(device, vertexShaderUBOs[i], NULL);
+		vkFreeMemory(device, vertexShaderUBOMemories[i], NULL);
 		vkDestroyBuffer(device, fragShaderUBOs[i], NULL);
 		vkFreeMemory(device, fragShaderUBOMemories[i], NULL);
 	}
@@ -483,7 +483,6 @@ void RenderApplication::configureAllRequirements(){
 
 	//specify required device features 
 	requiredDeviceFeatures.samplerAnisotropy = VK_TRUE;
-	requiredDeviceFeatures.tessellationShader = VK_TRUE;
 	requiredDeviceFeatures.fillModeNonSolid = VK_TRUE;
 	requiredDeviceFeatures.wideLines = VK_TRUE;
 
@@ -889,18 +888,18 @@ void RenderApplication::writeToIndexBuffer(){
 void RenderApplication::createUniformBuffers(){
 
 	
-	tessShaderUBOs.resize(SwapChain::images.size());
-	tessShaderUBOMemories.resize(SwapChain::images.size());
+	vertexShaderUBOs.resize(SwapChain::images.size());
+	vertexShaderUBOMemories.resize(SwapChain::images.size());
 	fragShaderUBOs.resize(SwapChain::images.size());
 	fragShaderUBOMemories.resize(SwapChain::images.size());
 
 	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
-		//Create UBO for the tess shader data
+		//Create UBO for the vertex shader data
 		Utils::createBuffer(
-			sizeof(UniformDataTessShader),
+			sizeof(UniformDataVertexShader),
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-			tessShaderUBOs[i], tessShaderUBOMemories[i]
+			vertexShaderUBOs[i], vertexShaderUBOMemories[i]
 		);
 
 		//Create UBO for the fragment shader data
@@ -921,11 +920,11 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
 
 	//Copy over Vertex Shader UBO
-	UniformDataTessShader tessShaderData;
-	tessShaderData.model = modelOrientation * modelCorrect;
-	tessShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
-	tessShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
-	tessShaderData.projection[1][1] *= -1;
+	UniformDataVertexShader vertexShaderData;
+	vertexShaderData.model = modelOrientation * modelCorrect;
+	vertexShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
+	vertexShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
+	vertexShaderData.projection[1][1] *= -1;
 	
 	
 	//Copy over Fragment Shader UBO
@@ -939,9 +938,9 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	void* mappedMemory;
 
 	
-	vkMapMemory(device, tessShaderUBOMemories[imageIndex], 0, sizeof(tessShaderData), 0, &mappedMemory);
-	memcpy(mappedMemory, &tessShaderData, sizeof(tessShaderData));
-	vkUnmapMemory(device, tessShaderUBOMemories[imageIndex]);
+	vkMapMemory(device, vertexShaderUBOMemories[imageIndex], 0, sizeof(vertexShaderData), 0, &mappedMemory);
+	memcpy(mappedMemory, &vertexShaderData, sizeof(vertexShaderData));
+	vkUnmapMemory(device, vertexShaderUBOMemories[imageIndex]);
 
 	vkMapMemory(device, fragShaderUBOMemories[imageIndex], 0, sizeof(fragShaderData), 0, &mappedMemory);
 	memcpy(mappedMemory, &fragShaderData, sizeof(fragShaderData));
@@ -1047,12 +1046,12 @@ void RenderApplication::createSwapChainFrameBuffers() {
 }
 void RenderApplication::createDescriptorSetLayout() {
 	
-    //define a binding for our tesselation shader UBO
-    VkDescriptorSetLayoutBinding tessShaderUBOBinding = {};
-	tessShaderUBOBinding.binding = 0;	//binding = 0
-	tessShaderUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	tessShaderUBOBinding.descriptorCount = 1;
-	tessShaderUBOBinding.stageFlags = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+    //define a binding for our vertex shader UBO
+    VkDescriptorSetLayoutBinding vertexShaderUBOBinding = {};
+	vertexShaderUBOBinding.binding = 0;	//binding = 0
+	vertexShaderUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	vertexShaderUBOBinding.descriptorCount = 1;
+	vertexShaderUBOBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 	//define a binding for our diffuse texture
 	VkDescriptorSetLayoutBinding diffuseTextureBinding = {};
@@ -1088,7 +1087,7 @@ void RenderApplication::createDescriptorSetLayout() {
 
     //put all bindings in an array
     std::array<VkDescriptorSetLayoutBinding, 5> allBindings = { 
-		tessShaderUBOBinding, 
+		vertexShaderUBOBinding, 
 		diffuseTextureBinding,
 		normalTextureBinding, 
 		environmentMapBinding, 
@@ -1153,21 +1152,21 @@ void RenderApplication::createDescriptorSets() {
 
 	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
 
-		// Descriptor for our tesselation shader Uniform Buffer
-		VkWriteDescriptorSet tessUBODescriptorWrite = {};
-		tessUBODescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		tessUBODescriptorWrite.dstSet = descriptorSets[i];
-		tessUBODescriptorWrite.dstBinding = 0;		//binding = 0
-		tessUBODescriptorWrite.dstArrayElement = 0;	
+		// Descriptor for our vertex shader Uniform Buffer
+		VkWriteDescriptorSet vertexUBODescriptorWrite = {};
+		vertexUBODescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		vertexUBODescriptorWrite.dstSet = descriptorSets[i];
+		vertexUBODescriptorWrite.dstBinding = 0;		//binding = 0
+		vertexUBODescriptorWrite.dstArrayElement = 0;	
 			// Descriptor info
-			VkDescriptorBufferInfo tessUBODescriptorInfo = {};
-			tessUBODescriptorInfo.buffer = tessShaderUBOs[i];		
-			tessUBODescriptorInfo.offset = 0;
-			tessUBODescriptorInfo.range = sizeof(UniformDataTessShader);
+			VkDescriptorBufferInfo vertexUBODescriptorInfo = {};
+			vertexUBODescriptorInfo.buffer = vertexShaderUBOs[i];		
+			vertexUBODescriptorInfo.offset = 0;
+			vertexUBODescriptorInfo.range = sizeof(UniformDataVertexShader);
 
-		tessUBODescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		tessUBODescriptorWrite.descriptorCount = 1;
-		tessUBODescriptorWrite.pBufferInfo = &tessUBODescriptorInfo;
+		vertexUBODescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		vertexUBODescriptorWrite.descriptorCount = 1;
+		vertexUBODescriptorWrite.pBufferInfo = &vertexUBODescriptorInfo;
 
 		// Descriptor for our diffuse texture
 		VkWriteDescriptorSet diffuseTextureDescriptorWrite = {};
@@ -1236,7 +1235,7 @@ void RenderApplication::createDescriptorSets() {
 
 		//put all descriptor write info in an array
 		std::array<VkWriteDescriptorSet, 5> descriptorWrites = { 
-			tessUBODescriptorWrite,
+			vertexUBODescriptorWrite,
 			diffuseTextureDescriptorWrite,
 			normalTextureDescriptorWrite,
 			environmentMapDescriptorWrite,
@@ -1337,23 +1336,6 @@ void RenderApplication::createGraphicsPipeline(){
 	vertexShaderStageInfo.module = vertexShaderModule;
 	vertexShaderStageInfo.pName = "main";
 
-	//Tessalation Control Shader Stage
-	VkShaderModule tessContShaderModule = Utils::createShaderModule("resources/shaders/tesc.spv");
-
-	VkPipelineShaderStageCreateInfo tessContShaderStageInfo = {};
-	tessContShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	tessContShaderStageInfo.stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-	tessContShaderStageInfo.module = tessContShaderModule;
-	tessContShaderStageInfo.pName = "main";
-
-	//Tessalation Control Shader Stage
-	VkShaderModule tessEvalShaderModule = Utils::createShaderModule("resources/shaders/tese.spv");
-
-	VkPipelineShaderStageCreateInfo tessEvalShaderStageInfo = {};
-	tessEvalShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	tessEvalShaderStageInfo.stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-	tessEvalShaderStageInfo.module = tessEvalShaderModule;
-	tessEvalShaderStageInfo.pName = "main";
 	
 	//Fragment Shader Stage
 	VkShaderModule fragmentShaderModule = Utils::createShaderModule("resources/shaders/frag.spv");
@@ -1367,8 +1349,6 @@ void RenderApplication::createGraphicsPipeline(){
 	
 	VkPipelineShaderStageCreateInfo shaderStages[] = { 
 		vertexShaderStageInfo, 
-		tessContShaderStageInfo, 
-		tessEvalShaderStageInfo, 
 		fragmentShaderStageInfo 
 	};
 
@@ -1387,15 +1367,9 @@ void RenderApplication::createGraphicsPipeline(){
     //Input Assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-	//Tesselation
-	VkPipelineTessellationStateCreateInfo tessellation = {};
-	tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
-	tessellation.pNext = NULL;
-	tessellation.flags = 0;
-	tessellation.patchControlPoints = 3;
 
     //Viewports
     VkViewport viewport = {};
@@ -1474,11 +1448,10 @@ void RenderApplication::createGraphicsPipeline(){
 	//Info to create graphics pipeline, Note: we can create more for multiple pipelines (shadow map + standard render)
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineInfo.stageCount = 4;
+	pipelineInfo.stageCount = 2;
 	pipelineInfo.pStages = shaderStages;
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
-	pipelineInfo.pTessellationState = &tessellation;
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;
@@ -1497,8 +1470,6 @@ void RenderApplication::createGraphicsPipeline(){
 	//destroy shader modules since we don't need their source code anymore
 	vkDestroyShaderModule(device,vertexShaderModule, NULL);
 	vkDestroyShaderModule(device, fragmentShaderModule, NULL);
-	vkDestroyShaderModule(device, tessContShaderModule, NULL);
-	vkDestroyShaderModule(device, tessEvalShaderModule, NULL);
 
 }
 

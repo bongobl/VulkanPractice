@@ -83,8 +83,8 @@ class RenderApplication{
 	static VkDeviceMemory indexBufferMemory;
 
     //Uniform buffers used to pass simple parameters shaders
-	static std::vector<VkBuffer> tessShaderUBOs;
-	static std::vector<VkDeviceMemory> tessShaderUBOMemories;
+	static std::vector<VkBuffer> vertexShaderUBOs;
+	static std::vector<VkDeviceMemory> vertexShaderUBOMemories;
 	static std::vector<VkBuffer> fragShaderUBOs;
 	static std::vector<VkDeviceMemory> fragShaderUBOMemories;
 

@@ -47,16 +47,14 @@ add_executable(Particles "${SOURCE_FILES}")
 target_link_libraries(Particles ${EXTERNAL_LIBS} )
 
 #define runtime resource directory
-set(RESOURCE_DIRECTORIES
+set(RESOURCE_DIRECTORY
     "resources/"
 )
 
 #post build, copy runtime resources to directory
-foreach(RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
-    add_custom_command(
-        TARGET Particles POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/${RESOURCE_DIRECTORY}"
-            "${CMAKE_CURRENT_BINARY_DIR}/${RESOURCE_DIRECTORY}"
-    )
-endforeach()
+add_custom_command(
+    TARGET Particles POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/${RESOURCE_DIRECTORY}"
+        "${CMAKE_CURRENT_BINARY_DIR}/${RESOURCE_DIRECTORY}"
+)

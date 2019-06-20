@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-//from tesselation eval shader
+//from vertex shader
 layout(location = 0) in vec3 modelSpacePosition;
 layout(location = 1) in vec3 modelSpaceNormal;
 layout(location = 2) in vec2 texCoord;
