@@ -64,10 +64,11 @@ glm::vec2 RenderApplication::mousePosition;
 glm::vec2 RenderApplication::prevMousePosition;
 bool RenderApplication::isLeftMouseButtonDown = false;
 bool RenderApplication::isRightMouseButtonDown = false;
+float RenderApplication::mouseWheelDelta = 0;
 glm::mat4 RenderApplication::modelCorrect = glm::scale(glm::mat4(1.0f), glm::vec3(0.03f,0.03f,0.03f));
-glm::vec3 RenderApplication::modelSpinAxis(0, 1, 0);
-float RenderApplication::modelSpinAngle = 0;
-glm::mat4 RenderApplication::modelOrientation(1.0f);
+glm::mat4 RenderApplication::cameraHeading = glm::mat4(1.0f);
+glm::mat4 RenderApplication::cameraPitch = glm::mat4(1.0f);
+glm::mat4 RenderApplication::cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 12));
 glm::mat3 RenderApplication::lightOrientation(1.0f);
 
 void RenderApplication::run() {
@@ -110,6 +111,7 @@ void RenderApplication::initGLFWWindow(){
 	glfwSetFramebufferSizeCallback(window, &windowResizeCallback);
 	glfwSetMouseButtonCallback(window, mouseButtonCallback);
 	glfwSetCursorPosCallback(window, cursorMovedCallback);
+	glfwSetScrollCallback(window, mouseWheelCallback);
 }
 
 //this function is called repetitively until the user stops resizing the window
@@ -146,6 +148,10 @@ void RenderApplication::cursorMovedCallback(GLFWwindow* window, double xpos, dou
 
 }
 
+void RenderApplication::mouseWheelCallback(GLFWwindow* window, double xpos, double ypos) {
+
+	mouseWheelDelta = (float)ypos;
+}
 VkExtent2D RenderApplication::waitToGetNonZeroWindowExtent() {
 
 	int width = 0, height = 0;
@@ -275,7 +281,7 @@ void RenderApplication::drawFrame(){
 
 
 	//update uniform data for this frame
-	writeToUniformBuffer(imageIndex);
+	writeToUniformBuffers(imageIndex);
 
 	//Enqueue render to this swapchain image
 	VkSubmitInfo submitInfo = {};
@@ -331,39 +337,13 @@ void RenderApplication::updateScene() {
 	deltaTime = currTime - prevTime;
 	prevTime = currTime;
 
-	updateModelRotation();
 	updateLightRotation();
+	updateCameraMatrix();
 
+	mouseWheelDelta = 0;
 	prevMousePosition = mousePosition;
 }
 
-void RenderApplication::updateModelRotation() {
-
-	//if button down, mouse has control
-	if (isLeftMouseButtonDown) {
-
-		Utils::calcTrackBallDeltas(mousePosition, prevMousePosition, SwapChain::extent, modelSpinAxis, modelSpinAngle);
-	}	
-	//else, decay current speed around axis
-	else {
-		
-		if (modelSpinAngle > 0) {
-			modelSpinAngle -= 0.7f * deltaTime * abs(modelSpinAngle);
-			if (modelSpinAngle < 0) {
-				modelSpinAngle = 0;
-			}
-		}
-		else if (modelSpinAngle < 0) {
-			modelSpinAngle += 0.7f * deltaTime * abs(modelSpinAngle);
-			if (modelSpinAngle > 0) {
-				modelSpinAngle = 0;
-			}
-		}
-	}
-
-	glm::mat4 deltaModelRotate = glm::rotate(glm::mat4(1.0f), modelSpinAngle, modelSpinAxis);
-	modelOrientation = deltaModelRotate * modelOrientation;
-}
 
 void RenderApplication::updateLightRotation() {
 
@@ -376,6 +356,21 @@ void RenderApplication::updateLightRotation() {
 		lightOrientation = glm::mat3(deltaLightRotate) * lightOrientation;
 	}
 
+}
+
+void RenderApplication::updateCameraMatrix() {
+
+	if (isLeftMouseButtonDown) {
+		glm::mat4 rotDeltaX = glm::rotate(glm::mat4(1.0f), 0.003f * (prevMousePosition.x - mousePosition.x), glm::vec3(0, 1, 0));
+		cameraHeading = rotDeltaX * cameraHeading;
+
+		glm::mat4 rotDeltaY = glm::rotate(glm::mat4(1.0f), 0.003f * (prevMousePosition.y - mousePosition.y), glm::vec3(1, 0, 0));
+		cameraPitch = rotDeltaY * cameraPitch;
+	}
+
+	cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -mouseWheelDelta)) * cameraZoom;
+	
+	
 }
 
 void RenderApplication::cleanup() {
@@ -913,16 +908,15 @@ void RenderApplication::createUniformBuffers(){
 
 }
 
-void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
+void RenderApplication::writeToUniformBuffers(uint32_t imageIndex){
 
 	
-
-	glm::vec3 cameraPosition(0, 7.8f, 8.8f);
+	glm::mat4 cameraMatrix = cameraHeading * cameraPitch * cameraZoom;
 
 	//Copy over Vertex Shader UBO
 	UniformDataVertexShader vertexShaderData;
-	vertexShaderData.model = modelOrientation * modelCorrect;
-	vertexShaderData.view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0.0f, 1.0f, 0.0f));
+	vertexShaderData.model = modelCorrect;
+	vertexShaderData.view = glm::inverse(cameraMatrix);
 	vertexShaderData.projection = glm::perspective(glm::radians(45.0f), (float)(SwapChain::extent.width) / SwapChain::extent.height, 0.2f, 300.0f);
 	vertexShaderData.projection[1][1] *= -1;
 	
@@ -931,7 +925,7 @@ void RenderApplication::writeToUniformBuffer(uint32_t imageIndex){
 	UniformDataFragShader fragShaderData;
 	fragShaderData.lightDirection = lightOrientation * Lighting::direction;
 	fragShaderData.textureParam = 0.65f;
-	fragShaderData.cameraPosition = cameraPosition;
+	fragShaderData.cameraPosition = cameraMatrix * glm::vec4(0,0,0,1);
 	fragShaderData.normalMapStrength = 0.7f;
 	fragShaderData.matColor = glm::vec3(1, 1, 1);
 	

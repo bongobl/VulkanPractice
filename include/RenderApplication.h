@@ -151,15 +151,19 @@ class RenderApplication{
 	static glm::vec2 prevMousePosition;
 	static bool isLeftMouseButtonDown;
 	static bool isRightMouseButtonDown;
+	static float mouseWheelDelta;
 
-	//model rotation
+	//model matrices
 	static glm::mat4 modelCorrect;
-	static glm::vec3 modelSpinAxis;
-	static float modelSpinAngle;
-	static glm::mat4 modelOrientation;
+
+	//camera rotation
+	static glm::mat4 cameraHeading;
+	static glm::mat4 cameraPitch;
+	static glm::mat4 cameraZoom;
 
 	//light rotation;
 	static glm::mat3 lightOrientation;
+
 
 public:
 
@@ -179,7 +183,7 @@ private:
 	static void windowResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight);
 	static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 	static void cursorMovedCallback(GLFWwindow* window, double xpos, double ypos);
-
+	static void mouseWheelCallback(GLFWwindow* window, double xpos, double ypos);
 	
 	static VkExtent2D waitToGetNonZeroWindowExtent();	//continuously loops until window width/height are non-zero, then returns the extent
 
@@ -214,7 +218,7 @@ private:
     static void writeToIndexBuffer();
 
 	static void createUniformBuffers();
-	static void writeToUniformBuffer(uint32_t imageIndex);
+	static void writeToUniformBuffers(uint32_t imageIndex);
 
 	static void createDiffuseTexture();
 	static void createDiffuseTextureView();
@@ -242,8 +246,8 @@ private:
 	//the command buffer that will render the scene to our swapchain images
 	static void createRenderCommandBuffers();
 
-	static void updateModelRotation();
 	static void updateLightRotation();
+	static void updateCameraMatrix();
 
 	//to allow Utils class to perform transfer operations
 	static VkCommandPool getTransferCmdPool();
