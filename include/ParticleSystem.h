@@ -11,8 +11,13 @@ class ParticleSystem{
 
 	static std::vector<Vertex> particleArray;
 
-	static VkBuffer particleBuffer;
-	static VkDeviceMemory particleBufferMemory;
+	//vertex buffer
+	static VkBuffer vertexBuffer;
+	static VkDeviceMemory vertexBufferMemory;
+
+	//physics buffer
+	static VkBuffer physicsBuffer;
+	static VkDeviceMemory physicsBufferMemory;
 
 	//descriptors
 	static VkDescriptorSetLayout descriptorSetLayout;
@@ -33,8 +38,9 @@ public:
 
 private:
 	static void loadParticlesFromModelFile(string filename);
-	static void createParticleBuffer();
-	static void createParticleBufferMemory();
+	static void createBuffers();
+	static void writeToBuffers();
+
 
 	static void createDescriptorSetLayout();
 	static void createDescriptorPool();

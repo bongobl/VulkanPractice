@@ -1280,7 +1280,7 @@ void RenderApplication::createRenderCommandBuffers() {
 
 				//bind vertex buffer
 				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, &ParticleSystem::particleBuffer, offsets);
+				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, &ParticleSystem::vertexBuffer, offsets);
 
 				//bind descriptor set
 				vkCmdBindDescriptorSets(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, NULL);
