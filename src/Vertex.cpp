@@ -25,7 +25,7 @@ bool Vertex::operator<(const Vertex& other) const {
 		return normal.z < other.normal.z;
 	}
 
-	//texCoord
+	//compare based on texCoord
 	if (texCoord.x != other.texCoord.x) {
 		return texCoord.x < other.texCoord.x;
 	}
@@ -33,7 +33,11 @@ bool Vertex::operator<(const Vertex& other) const {
 		return texCoord.y < other.texCoord.y;
 	}
 
-	
+	//compare based on mass
+	if (mass != other.mass) {
+		return mass < other.mass;
+	}
+
 	return false;
 }
 
@@ -46,9 +50,10 @@ VkVertexInputBindingDescription Vertex::getBindingDescription() {
 
 	return bindingDescriptions;
 }
-std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescriptions() {
+std::array<VkVertexInputAttributeDescription, 4> Vertex::getAttributeDescriptions() {
 
-	std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = {};
+	std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions = {};
+
 	attributeDescriptions[0].binding = 0;
 	attributeDescriptions[0].location = 0;
 	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -63,6 +68,11 @@ std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescription
 	attributeDescriptions[2].location = 2;
 	attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
 	attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
+	attributeDescriptions[3].binding = 0;
+	attributeDescriptions[3].location = 3;
+	attributeDescriptions[3].format = VK_FORMAT_R32_SFLOAT;
+	attributeDescriptions[3].offset = offsetof(Vertex, texCoord);
 
 	return attributeDescriptions;
 

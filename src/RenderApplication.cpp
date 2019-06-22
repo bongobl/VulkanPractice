@@ -19,13 +19,8 @@ VkDevice RenderApplication::device;
 VkQueue RenderApplication::graphicsQueue;
 VkQueue RenderApplication::transferQueue;
 VkQueue RenderApplication::presentQueue;
+VkQueue RenderApplication::computeQueue;
 VkSurfaceKHR RenderApplication:: surface;
-std::vector<Vertex> RenderApplication::vertexArray;
-std::vector<uint32_t> RenderApplication::indexArray;
-VkBuffer RenderApplication::vertexBuffer;
-VkDeviceMemory RenderApplication::vertexBufferMemory;
-VkBuffer RenderApplication::indexBuffer;
-VkDeviceMemory RenderApplication::indexBufferMemory;
 std::vector<VkBuffer> RenderApplication::vertexShaderUBOs;
 std::vector<VkDeviceMemory> RenderApplication::vertexShaderUBOMemories;
 std::vector<VkBuffer> RenderApplication::fragShaderUBOs;
@@ -188,14 +183,8 @@ void RenderApplication::createAllVulkanResources() {
 	createDescriptorPool();
 	createCommandPool();
 
-
-	//create all device data
-	loadVertexAndIndexArrays();
-	createVertexBuffer();
-	writeToVertexBuffer();
-
-	createIndexBuffer();
-	writeToIndexBuffer();
+	//GPU resources
+	ParticleSystem::init();
 
 	createUniformBuffers();
 
@@ -215,6 +204,7 @@ void RenderApplication::createAllVulkanResources() {
 
 	//record command buffer
 	createRenderCommandBuffers();
+
 
 }
 
@@ -350,7 +340,7 @@ void RenderApplication::updateCameraMatrix() {
 		cameraPitch = rotDeltaY * cameraPitch;
 	}
 	
-	cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -mouseWheelDelta * 0.3f)) * cameraZoom;
+	cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -mouseWheelDelta * 0.2f)) * cameraZoom;
 	
 	
 }
@@ -358,6 +348,8 @@ void RenderApplication::updateCameraMatrix() {
 void RenderApplication::cleanup() {
 
 	//clean up all Window/Vulkan/Scene resources
+
+	ParticleSystem::cleanUp();
 
 	//destroy validation layer callback
 	if (enableValidationLayers) {
@@ -370,13 +362,6 @@ void RenderApplication::cleanup() {
 		vkDestroyDebugReportCallbackEXT(instance, debugReportCallback, NULL);
 	}
 
-	//free vertex buffer
-	vkDestroyBuffer(device, vertexBuffer, NULL);
-	vkFreeMemory(device, vertexBufferMemory, NULL);
-
-	//free index buffer
-	vkDestroyBuffer(device, indexBuffer, NULL);
-	vkFreeMemory(device, indexBufferMemory, NULL);
 
 	//free uniform buffers
 	for(unsigned int i = 0; i < SwapChain::images.size(); ++i){
@@ -452,6 +437,7 @@ void RenderApplication::configureAllRequirements(){
 	QueueFamilyMap::addRequiredQueueType(VK_QUEUE_GRAPHICS_BIT);
 	QueueFamilyMap::addRequiredQueueType(VK_QUEUE_TRANSFER_BIT);
 	QueueFamilyMap::addRequiredQueueType(ADDITIONAL_VK_QUEUE_PRESENT_BIT);
+	QueueFamilyMap::addRequiredQueueType(VK_QUEUE_COMPUTE_BIT);
 
 	//swap chain device extension
 	requiredDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -702,6 +688,7 @@ void RenderApplication::createDevice() {
     vkGetDeviceQueue(device, QueueFamilyMap::getQueueFamilyIndexAt(0), particularQueueIndex, &graphicsQueue);
 	vkGetDeviceQueue(device, QueueFamilyMap::getQueueFamilyIndexAt(1), particularQueueIndex, &transferQueue);
 	vkGetDeviceQueue(device, QueueFamilyMap::getQueueFamilyIndexAt(2), particularQueueIndex, &presentQueue);
+	vkGetDeviceQueue(device, QueueFamilyMap::getQueueFamilyIndexAt(3), particularQueueIndex, &computeQueue);
 }
 
 void RenderApplication::createSwapChain(const VkExtent2D appExtent) {
@@ -760,92 +747,7 @@ void RenderApplication::recreateAppExtentDependents(){
 	createRenderCommandBuffers();
 	
 }
-void RenderApplication::loadVertexAndIndexArrays(){
-	Utils::loadModel("resources/models/Heptoroid.obj", vertexArray, indexArray);
-}
-void RenderApplication::createVertexBuffer(){
 
-	VkDeviceSize vertexArraySize = vertexArray.size() * sizeof(Vertex);
-	Utils::createBuffer(
-		vertexArraySize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		vertexBuffer, vertexBufferMemory
-	);
-
-}
-
-void RenderApplication::writeToVertexBuffer(){
-
-	VkDeviceSize vertexArraySize = vertexArray.size() * sizeof(Vertex);
-
-	//create staging buffer
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-
-
-	Utils::createBuffer(
-		vertexArraySize,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		stagingBuffer, stagingBufferMemory
-	);
-
-	//copy contents of our hard coded triangle into the staging buffer
-	void* mappedMemory;
-	vkMapMemory(device, stagingBufferMemory, 0, vertexArraySize, 0, &mappedMemory);
-	memcpy(mappedMemory, vertexArray.data(), (size_t)vertexArraySize);
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	//copy contents of staging buffer to vertex buffer
-	Utils::copyBuffer(stagingBuffer, vertexBuffer, vertexArraySize);
-
-	//destroy staging buffer
-	vkDestroyBuffer(device, stagingBuffer, NULL);
-	vkFreeMemory(device, stagingBufferMemory, NULL);
-}
-
-void RenderApplication::createIndexBuffer(){
-
-	VkDeviceSize indexArraySize = indexArray.size() * sizeof(uint32_t);
-
-	Utils::createBuffer(
-		indexArraySize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		indexBuffer, indexBufferMemory
-	);
-}
-
-void RenderApplication::writeToIndexBuffer(){
-
-	VkDeviceSize indexArraySize = indexArray.size() * sizeof(uint32_t);
-
-	//create staging buffer
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-
-
-	Utils::createBuffer(
-		indexArraySize,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		stagingBuffer, stagingBufferMemory
-	);
-
-	//copy contents of our hard coded triangle indices into the staging buffer
-	void* mappedMemory;
-	vkMapMemory(device, stagingBufferMemory, 0, indexArraySize, 0, &mappedMemory);
-	memcpy(mappedMemory, indexArray.data(), (size_t)indexArraySize);
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	//copy contents of staging buffer to index buffer
-	Utils::copyBuffer(stagingBuffer, indexBuffer, indexArraySize);
-
-	//destroy staging buffer
-	vkDestroyBuffer(device, stagingBuffer, NULL);
-	vkFreeMemory(device, stagingBufferMemory, NULL);
-}
 
 void RenderApplication::createUniformBuffers(){
 
@@ -1378,13 +1280,13 @@ void RenderApplication::createRenderCommandBuffers() {
 
 				//bind vertex buffer
 				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, &vertexBuffer, offsets);
+				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, &ParticleSystem::particleBuffer, offsets);
 
 				//bind descriptor set
 				vkCmdBindDescriptorSets(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, NULL);
 
 				//invoke graphics pipeline and draw
-				vkCmdDraw(renderCommandBuffers[i], (uint32_t)vertexArray.size(), 1, 0, 0);
+				vkCmdDraw(renderCommandBuffers[i], (uint32_t)ParticleSystem::particleArray.size(), 1, 0, 0);
 
 			vkCmdEndRenderPass(renderCommandBuffers[i]);
 

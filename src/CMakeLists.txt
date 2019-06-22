@@ -27,6 +27,7 @@ set (SOURCE_FILES
     "${SOURCE_DIRECTORY}/QueueFamilyMap.cpp"
     "${SOURCE_DIRECTORY}/SwapChain.cpp"
     "${SOURCE_DIRECTORY}/Lighting.cpp"
+    "${SOURCE_DIRECTORY}/ParticleSystem.cpp"
 )
 
 # directories to look for libs

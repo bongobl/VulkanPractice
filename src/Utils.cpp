@@ -444,7 +444,7 @@ uint32_t Utils::findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags pr
 	throw std::runtime_error("Memory type not found");
 }
 
-void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray) {
+void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray, bool positionsOnly) {
 
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -455,6 +455,27 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 		throw std::runtime_error("Failed to load model " + modelFilename);
 	}
 	cout << "loading model " << modelFilename << endl;
+
+	if (positionsOnly) {
+		for (unsigned int i = 0; i < attrib.vertices.size(); ++i) {
+
+			if (i % 3 == 0) {
+				Vertex vertex = {};
+				vertex.position = {
+					attrib.vertices[i + 0],
+					attrib.vertices[i + 1],
+					attrib.vertices[i + 2]
+				};
+				
+				vertexArray.push_back(vertex);
+			}
+			
+		}
+
+		indexArray.push_back(1);
+		return;
+	}
+
 
 	std::map<Vertex, uint32_t> uniqueVertices = {};
 	for (const auto& shape : shapes) {
@@ -756,6 +777,21 @@ glm::vec3 Utils::trackBallMap(glm::vec2 mousePosition, VkExtent2D appExtent) {
 
 	return v;
 }
+
+
+float Utils::getRandomFloat(float min, float max) {
+
+	static bool firstTime = true;
+
+	if (firstTime) {
+		srand((unsigned int)time(0));
+		rand();
+		firstTime = false;
+	}
+	float param = (float)rand() / (float)RAND_MAX;
+	return min * (1 - param) + max * param;
+}
+
 //debug callback
 VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFunction(
 	VkDebugReportFlagsEXT                       flags,

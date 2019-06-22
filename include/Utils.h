@@ -5,7 +5,7 @@
 #include <array>
 #include <vector>
 #include <utility>
-
+#include <ctime>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -64,7 +64,7 @@ public:
 	static std::vector<char> readFile(const std::string& filename);
 	static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 	
-	static void loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray);
+	static void loadModel(std::string modelFilename, std::vector<Vertex> &vertexArray, std::vector<uint32_t> &indexArray, bool positionsOnly = false);
 	static void createImageFromFile(const string imageName, VkImage &image, 
 		VkDeviceMemory &imageMemory, VkImageLayout finalLayout);
 
@@ -80,7 +80,7 @@ public:
 	static void calcTrackBallDeltas(glm::vec2 mousePosition, glm::vec2 prevMousePosition, VkExtent2D appExtent,
 		glm::vec3 &rotationAxis, float &rotationAngle);
 	static glm::vec3 trackBallMap(glm::vec2 mousePosition, VkExtent2D appExtent);
-
+	static float getRandomFloat(float min, float max);
 };
 
 // Used for validating return values of Vulkan API calls.

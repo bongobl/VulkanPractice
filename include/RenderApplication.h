@@ -20,6 +20,7 @@
 #include <QueueFamilyMap.h>
 #include <SwapChain.h>
 #include <Lighting.h>
+#include <ParticleSystem.h>
 using namespace std;
 
 #ifdef NDEBUG
@@ -66,21 +67,12 @@ class RenderApplication{
 	static VkQueue graphicsQueue;
 	static VkQueue transferQueue;
 	static VkQueue presentQueue;
+	static VkQueue computeQueue;
+
 
 	//handle to the window surface that we will present rendered images to
 	static VkSurfaceKHR surface;
 
-	//Used to store mesh data as they are loaded in from disk
-	static std::vector<Vertex> vertexArray;
-	static std::vector<uint32_t> indexArray;
-	
-	//used to store all the vertices
-	static VkBuffer vertexBuffer;
-	static VkDeviceMemory vertexBufferMemory;
-
-	//used to store all the indices
-	static VkBuffer indexBuffer;
-	static VkDeviceMemory indexBufferMemory;
 
     //Uniform buffers used to pass simple parameters shaders
 	static std::vector<VkBuffer> vertexShaderUBOs;
@@ -195,13 +187,6 @@ private:
 	static void createCommandPool();
 
 	//GPU resources
-	static void loadVertexAndIndexArrays();
-	static void createVertexBuffer();
-    static void writeToVertexBuffer();
-
-    static void createIndexBuffer();
-    static void writeToIndexBuffer();
-
 	static void createUniformBuffers();
 	static void writeToUniformBuffers(uint32_t imageIndex);
 
@@ -235,4 +220,5 @@ private:
 	
 	friend class Utils;
 	friend class Lighting;
+	friend class ParticleSystem;
 };
