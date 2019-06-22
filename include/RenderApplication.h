@@ -89,21 +89,6 @@ class RenderApplication{
 	static std::vector<VkDeviceMemory> fragShaderUBOMemories;
 
 
-	//for our diffuse texture
-	static VkImage diffuseTexture;
-	static VkDeviceMemory diffuseTextureMemory;
-	static VkImageView diffuseTextureView;
-
-	//for our normal texture
-	static VkImage normalTexture;
-	static VkDeviceMemory normalTextureMemory;
-	static VkImageView normalTextureView;
-
-	//for our environment map
-	static VkImage environmentMap;
-	static VkDeviceMemory environmentMapMemory;
-	static VkImageView environmentMapView;
-
 	//to sample image textures
 	static VkSampler imageSampler;
 
@@ -160,7 +145,7 @@ class RenderApplication{
 	static glm::mat4 cameraHeading;
 	static glm::mat4 cameraPitch;
 	static glm::mat4 cameraZoom;
-
+	
 	//light rotation;
 	static glm::mat3 lightOrientation;
 
@@ -219,15 +204,6 @@ private:
 
 	static void createUniformBuffers();
 	static void writeToUniformBuffers(uint32_t imageIndex);
-
-	static void createDiffuseTexture();
-	static void createDiffuseTextureView();
-
-	static void createNormalTexture();
-	static void createNormalTextureView();
-
-	static void createEnvironmentMap();
-	static void createEnvironmentMapView();
 
 	static void createImageSampler();
 

@@ -30,15 +30,6 @@ std::vector<VkBuffer> RenderApplication::vertexShaderUBOs;
 std::vector<VkDeviceMemory> RenderApplication::vertexShaderUBOMemories;
 std::vector<VkBuffer> RenderApplication::fragShaderUBOs;
 std::vector<VkDeviceMemory> RenderApplication::fragShaderUBOMemories;
-VkImage RenderApplication::diffuseTexture;
-VkDeviceMemory RenderApplication::diffuseTextureMemory;
-VkImageView RenderApplication::diffuseTextureView;
-VkImage RenderApplication::normalTexture;
-VkDeviceMemory RenderApplication::normalTextureMemory;
-VkImageView RenderApplication::normalTextureView;
-VkImage RenderApplication::environmentMap;
-VkDeviceMemory RenderApplication::environmentMapMemory;
-VkImageView RenderApplication::environmentMapView;
 VkSampler RenderApplication::imageSampler;
 VkImage RenderApplication::depthAttachmentImage;
 VkDeviceMemory RenderApplication::depthAttachmentImageMemory;
@@ -208,15 +199,6 @@ void RenderApplication::createAllVulkanResources() {
 
 	createUniformBuffers();
 
-	createDiffuseTexture();
-	createDiffuseTextureView();
-
-	createNormalTexture();
-	createNormalTextureView();
-
-	createEnvironmentMap();
-	createEnvironmentMapView();
-
 	createImageSampler();
 
 	createDepthAttachmentImage();
@@ -367,8 +349,8 @@ void RenderApplication::updateCameraMatrix() {
 		glm::mat4 rotDeltaY = glm::rotate(glm::mat4(1.0f), 0.003f * (prevMousePosition.y - mousePosition.y), glm::vec3(1, 0, 0));
 		cameraPitch = rotDeltaY * cameraPitch;
 	}
-
-	cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -mouseWheelDelta)) * cameraZoom;
+	
+	cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -mouseWheelDelta * 0.3f)) * cameraZoom;
 	
 	
 }
@@ -404,21 +386,6 @@ void RenderApplication::cleanup() {
 		vkFreeMemory(device, fragShaderUBOMemories[i], NULL);
 	}
 
-
-	//free diffuse texture
-	vkDestroyImageView(device, diffuseTextureView, NULL);
-	vkDestroyImage(device, diffuseTexture, NULL);
-	vkFreeMemory(device, diffuseTextureMemory, NULL);
-
-	//free normal texture
-	vkDestroyImageView(device, normalTextureView, NULL);
-	vkDestroyImage(device, normalTexture, NULL);
-	vkFreeMemory(device, normalTextureMemory, NULL);
-
-	//free environment map texture
-	vkDestroyImageView(device, environmentMapView, NULL);
-	vkDestroyImage(device, environmentMap, NULL);
-	vkFreeMemory(device, environmentMapMemory, NULL);
 
 	//free sampler
 	vkDestroySampler(device, imageSampler, NULL);
@@ -942,50 +909,6 @@ void RenderApplication::writeToUniformBuffers(uint32_t imageIndex){
 
 }
 
-void RenderApplication::createDiffuseTexture(){
-
-	Utils::createImageFromFile(
-		"resources/images/rock/rock_diff.jpg",	//File name on Disk
-		diffuseTexture,					//image
-		diffuseTextureMemory,			//image memory
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL	//Layout of image
-	);
-
-}
-
-void RenderApplication::createDiffuseTextureView(){
-	Utils::createImageView(diffuseTexture, diffuseTextureView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-}
-
-void RenderApplication::createNormalTexture(){
-	Utils::createImageFromFile(
-		"resources/images/rock/rock_norm.png",	//File name on Disk
-		normalTexture,					//image
-		normalTextureMemory,			//image memory
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL	//Layout of image
-	);
-}
-
-void RenderApplication::createNormalTextureView(){
-	Utils::createImageView(normalTexture, normalTextureView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-}
-void RenderApplication::createEnvironmentMap() {
-
-	std::vector<string> faceNames;
-	faceNames.push_back("resources/images/ocean view/right.jpg");
-	faceNames.push_back("resources/images/ocean view/left.jpg");
-	faceNames.push_back("resources/images/ocean view/top.jpg");
-	faceNames.push_back("resources/images/ocean view/bottom.jpg");
-	faceNames.push_back("resources/images/ocean view/back.jpg");
-	faceNames.push_back("resources/images/ocean view/front.jpg");
-	Utils::createCubeMapImageFromFile(faceNames, environmentMap, environmentMapMemory, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-}
-
-void RenderApplication::createEnvironmentMapView() {
-	Utils::createImageView(environmentMap, environmentMapView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, true);
-}
-
 void RenderApplication::createImageSampler(){
 	Utils::createImageSampler(imageSampler);
 }
@@ -1047,44 +970,18 @@ void RenderApplication::createDescriptorSetLayout() {
 	vertexShaderUBOBinding.descriptorCount = 1;
 	vertexShaderUBOBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-	//define a binding for our diffuse texture
-	VkDescriptorSetLayoutBinding diffuseTextureBinding = {};
-	diffuseTextureBinding.binding = 1;	//binding = 1
-	diffuseTextureBinding.descriptorCount = 1;
-	diffuseTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	diffuseTextureBinding.pImmutableSamplers = NULL;
-	diffuseTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	//define a binding for our normal texture
-	VkDescriptorSetLayoutBinding normalTextureBinding = {};
-	normalTextureBinding.binding = 2;	//binding = 2
-	normalTextureBinding.descriptorCount = 1;
-	normalTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	normalTextureBinding.pImmutableSamplers = NULL;
-	normalTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	//define a binding for our environment map
-	VkDescriptorSetLayoutBinding environmentMapBinding = {};
-	environmentMapBinding.binding = 3;	//binding 3
-	environmentMapBinding.descriptorCount = 1;
-	environmentMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	environmentMapBinding.pImmutableSamplers = NULL;
-	environmentMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	//define a binding for our fragment shader UBO
 	VkDescriptorSetLayoutBinding fragShaderUBOBinding = {};
-	fragShaderUBOBinding.binding = 4;	//binding = 4
+	fragShaderUBOBinding.binding = 1;	//binding = 1
 	fragShaderUBOBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	fragShaderUBOBinding.descriptorCount = 1;
 	fragShaderUBOBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 
     //put all bindings in an array
-    std::array<VkDescriptorSetLayoutBinding, 5> allBindings = { 
+    std::array<VkDescriptorSetLayoutBinding, 2> allBindings = { 
 		vertexShaderUBOBinding, 
-		diffuseTextureBinding,
-		normalTextureBinding, 
-		environmentMapBinding, 
 		fragShaderUBOBinding	
 	};
 
@@ -1102,17 +999,11 @@ void RenderApplication::createDescriptorSetLayout() {
 void RenderApplication::createDescriptorPool(){
 
 
-    std::array<VkDescriptorPoolSize, 5> poolSizes = {};
+    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = (uint32_t)SwapChain::images.size();
-	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[1].descriptorCount = (uint32_t)SwapChain::images.size();
-	poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[2].descriptorCount = (uint32_t)SwapChain::images.size();
-	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = (uint32_t)SwapChain::images.size();
-	poolSizes[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[4].descriptorCount = (uint32_t)SwapChain::images.size();
 	
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -1162,59 +1053,12 @@ void RenderApplication::createDescriptorSets() {
 		vertexUBODescriptorWrite.descriptorCount = 1;
 		vertexUBODescriptorWrite.pBufferInfo = &vertexUBODescriptorInfo;
 
-		// Descriptor for our diffuse texture
-		VkWriteDescriptorSet diffuseTextureDescriptorWrite = {};
-		diffuseTextureDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		diffuseTextureDescriptorWrite.dstSet = descriptorSets[i];
-		diffuseTextureDescriptorWrite.dstBinding = 1;	//binding = 1
-		diffuseTextureDescriptorWrite.dstArrayElement = 0;
-			// Descriptor info
-			VkDescriptorImageInfo diffuseTextureDescriptorInfo = {};
-			diffuseTextureDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			diffuseTextureDescriptorInfo.imageView = diffuseTextureView;
-			diffuseTextureDescriptorInfo.sampler = imageSampler;
-
-		diffuseTextureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		diffuseTextureDescriptorWrite.descriptorCount = 1;
-		diffuseTextureDescriptorWrite.pImageInfo = &diffuseTextureDescriptorInfo;
-
-		// Descriptor for our normal texture
-		VkWriteDescriptorSet normalTextureDescriptorWrite = {};
-		normalTextureDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		normalTextureDescriptorWrite.dstSet = descriptorSets[i];
-		normalTextureDescriptorWrite.dstBinding = 2;	//binding = 2
-		normalTextureDescriptorWrite.dstArrayElement = 0;
-			// Descriptor info
-			VkDescriptorImageInfo normalTextureDescriptorInfo = {};
-			normalTextureDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			normalTextureDescriptorInfo.imageView = normalTextureView;
-			normalTextureDescriptorInfo.sampler = imageSampler;
-
-		normalTextureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		normalTextureDescriptorWrite.descriptorCount = 1;
-		normalTextureDescriptorWrite.pImageInfo = &normalTextureDescriptorInfo;
-
-		// Descriptor for our environment map texture
-		VkWriteDescriptorSet environmentMapDescriptorWrite = {};
-		environmentMapDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		environmentMapDescriptorWrite.dstSet = descriptorSets[i];
-		environmentMapDescriptorWrite.dstBinding = 3;	//binding = 3
-		environmentMapDescriptorWrite.dstArrayElement = 0;
-			// Descriptor info
-			VkDescriptorImageInfo environmentMapDescriptorInfo = {};
-			environmentMapDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			environmentMapDescriptorInfo.imageView = environmentMapView;
-			environmentMapDescriptorInfo.sampler = imageSampler;
-
-		environmentMapDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		environmentMapDescriptorWrite.descriptorCount = 1;
-		environmentMapDescriptorWrite.pImageInfo = &environmentMapDescriptorInfo;
 
 		// Descriptor for our fragment shader Uniform Buffer
 		VkWriteDescriptorSet fragmentUBODescriptorWrite = {};
 		fragmentUBODescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		fragmentUBODescriptorWrite.dstSet = descriptorSets[i];
-		fragmentUBODescriptorWrite.dstBinding = 4;		//binding = 4
+		fragmentUBODescriptorWrite.dstBinding = 1;		//binding = 1
 		fragmentUBODescriptorWrite.dstArrayElement = 0;
 			// Descriptor info
 			VkDescriptorBufferInfo fragmentUBODescriptorInfo = {};
@@ -1228,11 +1072,8 @@ void RenderApplication::createDescriptorSets() {
 
 
 		//put all descriptor write info in an array
-		std::array<VkWriteDescriptorSet, 5> descriptorWrites = { 
+		std::array<VkWriteDescriptorSet, 2> descriptorWrites = { 
 			vertexUBODescriptorWrite,
-			diffuseTextureDescriptorWrite,
-			normalTextureDescriptorWrite,
-			environmentMapDescriptorWrite,
 			fragmentUBODescriptorWrite
 		};
 
@@ -1361,7 +1202,7 @@ void RenderApplication::createGraphicsPipeline(){
     //Input Assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
 
@@ -1528,7 +1369,7 @@ void RenderApplication::createRenderCommandBuffers() {
 
 			renderPassInfo.clearValueCount = (uint32_t)clearValues.size();
 			renderPassInfo.pClearValues = clearValues.data();
-
+			
 			//render pass scope
 			vkCmdBeginRenderPass(renderCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1539,14 +1380,11 @@ void RenderApplication::createRenderCommandBuffers() {
 				VkDeviceSize offsets[] = { 0 };
 				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, &vertexBuffer, offsets);
 
-				//bind index buffer
-				vkCmdBindIndexBuffer(renderCommandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
 				//bind descriptor set
 				vkCmdBindDescriptorSets(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, NULL);
 
 				//invoke graphics pipeline and draw
-				vkCmdDrawIndexed(renderCommandBuffers[i], (uint32_t)indexArray.size(), 1, 0, 0, 0);
+				vkCmdDraw(renderCommandBuffers[i], (uint32_t)vertexArray.size(), 1, 0, 0);
 
 			vkCmdEndRenderPass(renderCommandBuffers[i]);
 

@@ -17,7 +17,6 @@ layout(binding = 0) uniform UniformBufferObject {
 layout (location = 0) out vec3 modelSpacePosition;
 layout (location = 1) out vec3 modelSpaceNormal;
 layout (location = 2) out vec2 texCoord;
-layout (location = 3) out mat4 modelMatrix;
 
 void main() {
 
@@ -26,6 +25,7 @@ void main() {
     texCoord = inTexCoord;
 
     gl_Position = ubo.projection * ubo.view * ubo.model * vec4(inPosition, 1.0f);
-    modelMatrix = ubo.model;
+
+    gl_PointSize = 5.0f / gl_Position.z;
 
 }
