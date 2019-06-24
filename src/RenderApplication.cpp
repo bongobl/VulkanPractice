@@ -205,7 +205,7 @@ void RenderApplication::createAllVulkanResources() {
 	//record command buffer
 	createRenderCommandBuffers();
 
-
+	
 }
 
 void RenderApplication::initScene(){
@@ -1277,11 +1277,11 @@ void RenderApplication::createRenderCommandBuffers() {
 
 				//bind our graphics pipeline
 				vkCmdBindPipeline(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
+				
 				//bind vertex buffer
 				VkDeviceSize offsets[] = { 0 };
 				vkCmdBindVertexBuffers(renderCommandBuffers[i], 0, 1, &ParticleSystem::vertexBuffer, offsets);
-
+				
 				//bind descriptor set
 				vkCmdBindDescriptorSets(renderCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, NULL);
 
@@ -1311,4 +1311,13 @@ VkCommandPool RenderApplication::getGraphicsCmdPool() {
 
 VkQueue RenderApplication::getGraphicsQueue(){
 	return graphicsQueue;
+}
+
+VkCommandPool RenderApplication::getComputeCommandPool() {
+
+	//queues and pools which work for graphics also work for compute
+	return graphicsCommandPool;
+}
+VkQueue RenderApplication::getComputeQueue() {
+	return computeQueue;
 }

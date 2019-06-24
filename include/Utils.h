@@ -13,7 +13,14 @@
 
 using namespace std;
 
+struct UniformDataComputeShader {
+	glm::vec3 netPosition;
+	uint32_t numParticles;
+	glm::vec3 padding;
+	uint32_t pitch;
+	
 
+};
 struct UniformDataVertexShader {
 
 	glm::mat4 model;

@@ -14,10 +14,11 @@ struct Vertex {
 	glm::vec3 normal;
 	glm::vec2 texCoord;
 	float mass;
-
+	glm::vec3 velocity;
+	
 	bool operator<(const Vertex& other) const;
-
+	
 	static VkVertexInputBindingDescription getBindingDescription();
-	static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
-
+	static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions();
+	
 };

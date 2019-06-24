@@ -473,8 +473,10 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 		}
 
 		indexArray.push_back(1);
+
+		cout << "Model " << modelFilename << " positions loaded with " << vertexArray.size() << " vertices" << endl << endl;
 		return;
-	}
+	}//End positions only
 
 
 	std::map<Vertex, uint32_t> uniqueVertices = {};

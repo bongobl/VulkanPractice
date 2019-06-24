@@ -214,9 +214,15 @@ private:
 	static VkCommandPool getTransferCmdPool();
 	static VkQueue getTransferQueue();
 	
+
 	//for shadow map
 	static VkCommandPool getGraphicsCmdPool();
 	static VkQueue getGraphicsQueue();
+
+	//for particle system
+	static VkCommandPool getComputeCommandPool();
+	static VkQueue getComputeQueue();
+
 	
 	friend class Utils;
 	friend class Lighting;
