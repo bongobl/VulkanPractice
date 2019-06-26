@@ -5,15 +5,19 @@
 
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1) in;
 
+
 struct Vertex{
 	vec3 position;
-	vec3 normal;
-	vec2 texCoord;
 	float mass;
+	vec3 normal;
+	float padding0;
+	vec2 texCoord;
+	vec2 padding1;
 	vec3 velocity;
+	float padding2;
 };
 
-
+//descriptor bindings
 layout(std140, binding = 0) buffer buf
 {
 	Vertex physicsBuffer[];
@@ -30,8 +34,11 @@ layout(std140, binding = 2) uniform UniformBufferObject
 	uint numParticles;
 	vec3 padding;
 	uint pitch;
+	
 }ubo;
 
+
+//main
 void main(){
 	
 	if(gl_GlobalInvocationID.x >= ubo.pitch || gl_GlobalInvocationID.y >= ubo.pitch){
@@ -46,11 +53,9 @@ void main(){
 	if(indexVal > ubo.numParticles){
 		return;
 	}
+
+
 	vertexBuffer[indexVal] = physicsBuffer[indexVal];
 
-	//vertexBuffer[indexVal].position.y += 200;
-	//vertexBuffer[indexVal].normal.y -= 200;
-	//vertexBuffer[indexVal].texCoord.x -= 200;
-	//vertexBuffer[indexVal].mass = 250;
-	//vertexBuffer[indexVal].velocity.x += 200;
+	vertexBuffer[indexVal].position.y *= 3;
 }

@@ -11,10 +11,13 @@ using namespace std;
 
 struct Vertex {
 	glm::vec3 position;
-	glm::vec3 normal;
-	glm::vec2 texCoord;
 	float mass;
+	glm::vec3 normal;
+	float padding0;
+	glm::vec2 texCoord;
+	glm::vec2 padding1;
 	glm::vec3 velocity;
+	float padding2;
 	
 	bool operator<(const Vertex& other) const;
 	

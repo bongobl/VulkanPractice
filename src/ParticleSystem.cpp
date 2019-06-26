@@ -133,8 +133,8 @@ void ParticleSystem::writeToBuffers() {
 	Utils::copyBuffer(stagingBuffer, physicsBuffer, particleArraySize);
 
 	//copy contents of staging buffer to vertex buffer
-	Utils::copyBuffer(stagingBuffer, vertexBuffer, particleArraySize);
-
+	//Utils::copyBuffer(stagingBuffer, vertexBuffer, particleArraySize);
+	
 	
 	//destroy staging buffer
 	vkDestroyBuffer(RenderApplication::device, stagingBuffer, NULL);
@@ -148,6 +148,7 @@ void ParticleSystem::writeToUniformBuffer() {
 	computeShaderData.netPosition = glm::vec3(0, 0, 0);		//temp, will have to calculate later
 	computeShaderData.numParticles = (uint32_t)particleArray.size();
 	computeShaderData.pitch = pitch;
+	
 	void* mappedMemory;
 
 
