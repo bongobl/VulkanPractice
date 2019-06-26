@@ -39,6 +39,7 @@ VkPipeline RenderApplication::graphicsPipeline;
 std::vector<VkFence> RenderApplication::inFlightFences;
 std::vector<VkSemaphore> RenderApplication::imageAvailableSemaphores;
 std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
+std::vector<VkSemaphore> RenderApplication::startPhysicsSemaphores;
 int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
@@ -239,7 +240,7 @@ void RenderApplication::drawFrame(){
 		device,		//device
 		SwapChain::vulkanHandle,	//Vulkan swapchain handle 
 		MAX_UNSIGNED_64_BIT_VAL,	//max time to wait to acquire next image
-		imageAvailableSemaphores[currentFrame],	//semaphore to signal when image is done presenting
+		imageAvailableSemaphores[currentFrame],	//semaphore to signal when image is done presenting previous frame so we can start rendering current frame
 		VK_NULL_HANDLE,		//fence to signal when image is done presenting
 		&imageIndex			//index of image we are acquiring 
 	);
@@ -394,6 +395,7 @@ void RenderApplication::cleanup() {
 		vkDestroyFence(device, inFlightFences[i], NULL);
 		vkDestroySemaphore(device, imageAvailableSemaphores[i], NULL);
 		vkDestroySemaphore(device, renderFinishedSemaphores[i], NULL);
+		vkDestroySemaphore(device, startPhysicsSemaphores[i], NULL);
 	}
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
 	vkDestroyPipelineLayout(device, pipelineLayout, NULL);
@@ -1217,7 +1219,8 @@ void RenderApplication::createSyncObjects(){
 	inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-	
+	startPhysicsSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -1231,6 +1234,7 @@ void RenderApplication::createSyncObjects(){
 		VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &inFlightFences[i]));
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &imageAvailableSemaphores[i]));
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &renderFinishedSemaphores[i]));
+		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &startPhysicsSemaphores[i]));
 	}
 
 }

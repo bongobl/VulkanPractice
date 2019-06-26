@@ -108,6 +108,7 @@ class RenderApplication{
 	static std::vector<VkFence> inFlightFences;
 	static std::vector<VkSemaphore> imageAvailableSemaphores;
 	static std::vector<VkSemaphore> renderFinishedSemaphores;
+	static std::vector<VkSemaphore> startPhysicsSemaphores;
 	static int currentFrame;
 
     //The command buffer is used to record commands, that will be submitted to a queue.

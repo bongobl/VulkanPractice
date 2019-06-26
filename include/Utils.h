@@ -14,10 +14,15 @@
 using namespace std;
 
 struct UniformDataComputeShader {
-	glm::vec3 netPosition;
-	uint32_t numParticles;
+	glm::vec3 netPosition;	//realTime
+	uint32_t numParticles;	//startup
+
 	glm::vec3 padding;
-	uint32_t pitch;
+	uint32_t pitch;			//startup
+	
+	float deltaTime;		//realTime
+	float netMass;			//startup
+	glm::vec2 padding1;
 	
 
 };

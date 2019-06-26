@@ -12,7 +12,8 @@ static int WORKGROUP_SIZE = 32;
 class ParticleSystem{
 
 	static std::vector<Vertex> particleArray;
-	static uint32_t pitch;
+	static UniformDataComputeShader shaderData;
+
 	//physics buffer
 	static VkBuffer physicsBuffer;
 	static VkDeviceMemory physicsBufferMemory;
@@ -49,7 +50,7 @@ public:
 private:
 	static void loadParticlesFromModelFile(string filename);
 	static void createBuffers();
-	static void writeToBuffers();
+	static void writeToVertexBuffer();
 
 	static void createDescriptorSetLayout();
 	static void createDescriptorPool();

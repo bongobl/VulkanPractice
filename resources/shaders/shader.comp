@@ -32,9 +32,13 @@ layout(std140, binding = 2) uniform UniformBufferObject
 {
 	vec3 netPosition;
 	uint numParticles;
+
 	vec3 padding;
 	uint pitch;
 	
+	float deltaTime;
+	float netMass;
+	vec2 padding1;
 }ubo;
 
 
@@ -57,5 +61,5 @@ void main(){
 
 	vertexBuffer[indexVal] = physicsBuffer[indexVal];
 
-	vertexBuffer[indexVal].position.y *= 3;
+	vertexBuffer[indexVal].position *= ubo.netPosition;
 }

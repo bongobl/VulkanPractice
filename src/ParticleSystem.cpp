@@ -1,7 +1,7 @@
 #include <ParticleSystem.h>
 
 std::vector<Vertex> ParticleSystem::particleArray;
-uint32_t ParticleSystem::pitch;
+UniformDataComputeShader ParticleSystem::shaderData;
 
 VkBuffer ParticleSystem::physicsBuffer;
 VkDeviceMemory ParticleSystem::physicsBufferMemory;
@@ -22,7 +22,7 @@ void ParticleSystem::init(){
 	loadParticlesFromModelFile("resources/models/Heptoroid.obj");
 
 	createBuffers();
-	writeToBuffers();
+	writeToVertexBuffer();
 	writeToUniformBuffer();
 	
 	createDescriptorSetLayout();
@@ -67,16 +67,19 @@ void ParticleSystem::loadParticlesFromModelFile(string filename) {
 	std::vector<uint32_t> dummyIndexArray;
 	Utils::loadModel(filename, particleArray, dummyIndexArray, true);
 
+	shaderData.netMass = 0;
 	for (int i = 0; i < particleArray.size(); ++i) {
 		//storing random color in vertex's normal attribute
 		glm::vec3 randColor(Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1));
 		particleArray[i].normal = randColor;
 
 		//give particle a random mass
-		particleArray[i].mass = Utils::getRandomFloat(0, 50);
+		particleArray[i].mass = Utils::getRandomFloat(0, 5);
+		shaderData.netMass += particleArray[i].mass;
 	}
 
-	pitch = (uint32_t)ceil(sqrt(particleArray.size()));
+	shaderData.numParticles = (uint32_t)particleArray.size();
+	shaderData.pitch = (uint32_t)ceil(sqrt(particleArray.size()));
 }
 
 
@@ -108,7 +111,7 @@ void ParticleSystem::createBuffers() {
 		uniformBuffer, uniformBufferMemory
 	);
 }
-void ParticleSystem::writeToBuffers() {
+void ParticleSystem::writeToVertexBuffer() {
 
 	VkDeviceSize particleArraySize = particleArray.size() * sizeof(Vertex);
 
@@ -129,11 +132,9 @@ void ParticleSystem::writeToBuffers() {
 	memcpy(mappedMemory, particleArray.data(), (size_t)particleArraySize);
 	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
 
-	//copy contents of staging buffer to physics buffer
-	Utils::copyBuffer(stagingBuffer, physicsBuffer, particleArraySize);
 
-	//copy contents of staging buffer to vertex buffer
-	//Utils::copyBuffer(stagingBuffer, vertexBuffer, particleArraySize);
+	//copy contents of staging buffer to vertex buffer 
+	Utils::copyBuffer(stagingBuffer, vertexBuffer, particleArraySize);
 	
 	
 	//destroy staging buffer
@@ -144,21 +145,18 @@ void ParticleSystem::writeToBuffers() {
 
 void ParticleSystem::writeToUniformBuffer() {
 
-	UniformDataComputeShader computeShaderData;
-	computeShaderData.netPosition = glm::vec3(0, 0, 0);		//temp, will have to calculate later
-	computeShaderData.numParticles = (uint32_t)particleArray.size();
-	computeShaderData.pitch = pitch;
-	
+	shaderData.netPosition = glm::vec3(0.4f, 2, 1.4f);
+	shaderData.deltaTime = RenderApplication::deltaTime;
+
+
 	void* mappedMemory;
-
-
-	vkMapMemory(RenderApplication::device, uniformBufferMemory, 0, sizeof(computeShaderData), 0, &mappedMemory);
-	memcpy(mappedMemory, &computeShaderData, sizeof(computeShaderData));
+	vkMapMemory(RenderApplication::device, uniformBufferMemory, 0, sizeof(shaderData), 0, &mappedMemory);
+	memcpy(mappedMemory, &shaderData, sizeof(shaderData));
 	vkUnmapMemory(RenderApplication::device, uniformBufferMemory);
 }
 
 void ParticleSystem::createDescriptorSetLayout(){
-
+	
 	//define a binding for the physics buffer
 	VkDescriptorSetLayoutBinding physicsBufferBinding = {};
 	physicsBufferBinding.binding = 0;	//binding = 0
@@ -336,14 +334,19 @@ void ParticleSystem::createPhysicsCommandBuffer(){
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 	VK_CHECK_RESULT(vkBeginCommandBuffer(physicsCommandBuffer, &beginInfo)); // start recording commands.
-	
+		
+		//Copy from vertex buffer to physics buffer
+		VkBufferCopy copyInfo = {};
+		copyInfo.size = particleArray.size() * sizeof(Vertex);
+		vkCmdCopyBuffer(physicsCommandBuffer, vertexBuffer, physicsBuffer, 1, &copyInfo);
+
 		//Bind Compute Pipeline
 		vkCmdBindPipeline(physicsCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, physicsPipeline);
 
 		//Bind Descriptor Set
 		vkCmdBindDescriptorSets(physicsCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, physicsPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
-		uint32_t dimensionWorkGroups = (uint32_t)ceil(pitch / (float)WORKGROUP_SIZE);
+		uint32_t dimensionWorkGroups = (uint32_t)ceil(shaderData.pitch / (float)WORKGROUP_SIZE);
 
 		//run compute app
 		vkCmdDispatch(physicsCommandBuffer, dimensionWorkGroups, dimensionWorkGroups, 1);
