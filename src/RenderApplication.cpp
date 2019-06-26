@@ -185,7 +185,7 @@ void RenderApplication::createAllVulkanResources() {
 	createCommandPool();
 
 	//GPU resources
-	ParticleSystem::init();
+	ParticleSystem::init(SwapChain::images.size());
 
 	createUniformBuffers();
 
@@ -719,6 +719,17 @@ void RenderApplication::recreateAppExtentDependents(){
 		vkDestroyFramebuffer(device, swapChainFrameBuffers[i], NULL);
 	}
 
+	//destroy descriptors
+	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+
+	//free uniform buffers
+	for (size_t i = 0; i < SwapChain::images.size(); i++) {
+		vkDestroyBuffer(device, vertexShaderUBOs[i], nullptr);
+		vkFreeMemory(device, vertexShaderUBOMemories[i], nullptr);
+		vkDestroyBuffer(device, fragShaderUBOs[i], nullptr);
+		vkFreeMemory(device, fragShaderUBOMemories[i], nullptr);
+	}
+
 	//destroy depth image objects
 	vkDestroyImageView(device, depthAttachmentImageView, NULL);
 	vkDestroyImage(device, depthAttachmentImage, NULL);
@@ -734,7 +745,7 @@ void RenderApplication::recreateAppExtentDependents(){
 	//destroy swapchain
 	SwapChain::cleanUp(device);
 
-	
+
 	//we only want to recreate the following vulkan objects with a non zero app extent (width & height)
 	VkExtent2D newExtent = waitToGetNonZeroWindowExtent();
 
@@ -745,6 +756,9 @@ void RenderApplication::recreateAppExtentDependents(){
 	createGraphicsPipeline();
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
+	createUniformBuffers();
+	createDescriptorPool();
+	createDescriptorSets();
 	createSwapChainFrameBuffers();
 	createRenderCommandBuffers();
 	

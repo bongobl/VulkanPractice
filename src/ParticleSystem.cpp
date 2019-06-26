@@ -1,39 +1,39 @@
 #include <ParticleSystem.h>
 
 std::vector<Vertex> ParticleSystem::particleArray;
-UniformDataComputeShader ParticleSystem::shaderData;
+UniformDataComputeShader ParticleSystem::computeShaderData;
 
 VkBuffer ParticleSystem::physicsBuffer;
 VkDeviceMemory ParticleSystem::physicsBufferMemory;
 VkBuffer ParticleSystem::vertexBuffer;
 VkDeviceMemory ParticleSystem::vertexBufferMemory;
-VkBuffer ParticleSystem::uniformBuffer;
-VkDeviceMemory ParticleSystem::uniformBufferMemory;
+std::vector<VkBuffer> ParticleSystem::uniformBuffers;
+std::vector<VkDeviceMemory> ParticleSystem::uniformBufferMemories;
 VkDescriptorSetLayout ParticleSystem::descriptorSetLayout;
 VkDescriptorPool ParticleSystem::descriptorPool;
-VkDescriptorSet ParticleSystem::descriptorSet;
+std::vector<VkDescriptorSet> ParticleSystem::descriptorSets;
 
 VkPipelineLayout ParticleSystem::physicsPipelineLayout;
 VkPipeline ParticleSystem::physicsPipeline;
 
-VkCommandBuffer ParticleSystem::physicsCommandBuffer;
+std::vector<VkCommandBuffer> ParticleSystem::physicsCommandBuffers;
 
-void ParticleSystem::init(){
+void ParticleSystem::init(size_t numSwapChainImages){
 	loadParticlesFromModelFile("resources/models/Heptoroid.obj");
 
-	createBuffers();
+	createBuffers(numSwapChainImages);
 	writeToVertexBuffer();
-	writeToUniformBuffer();
+	writeToUniformBuffer(0);	//hard coded parameter
 	
 	createDescriptorSetLayout();
-	createDescriptorPool();
-	createDescriptorSet();
+	createDescriptorPool(numSwapChainImages);
+	createDescriptorSets(numSwapChainImages);
 
 	createPhysicsComputePipeline();
 	
-	createPhysicsCommandBuffer();
+	createPhysicsCommandBuffers();
 
-	runPhysicsCommandBuffer();
+	runPhysicsCommandBuffer(0);	//hard coded parameter
 	
 }
 void ParticleSystem::cleanUp() {
@@ -47,9 +47,11 @@ void ParticleSystem::cleanUp() {
 	vkDestroyBuffer(RenderApplication::device, vertexBuffer, NULL);
 	vkFreeMemory(RenderApplication::device, vertexBufferMemory, NULL);
 
-	//free uniform buffer
-	vkDestroyBuffer(RenderApplication::device, uniformBuffer, NULL);
-	vkFreeMemory(RenderApplication::device, uniformBufferMemory, NULL);
+	for (unsigned int i = 0; i < uniformBuffers.size(); ++i) {
+		//free uniform buffer
+		vkDestroyBuffer(RenderApplication::device, uniformBuffers[i], NULL);
+		vkFreeMemory(RenderApplication::device, uniformBufferMemories[i], NULL);
+	}
 
 	//free pipeline and layout
 	vkDestroyPipeline(RenderApplication::device, physicsPipeline, NULL);
@@ -67,24 +69,24 @@ void ParticleSystem::loadParticlesFromModelFile(string filename) {
 	std::vector<uint32_t> dummyIndexArray;
 	Utils::loadModel(filename, particleArray, dummyIndexArray, true);
 
-	shaderData.netMass = 0;
+	computeShaderData.netMass = 0;
 	for (int i = 0; i < particleArray.size(); ++i) {
 		//storing random color in vertex's normal attribute
 		glm::vec3 randColor(Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1));
 		particleArray[i].normal = randColor;
 
 		//give particle a random mass
-		particleArray[i].mass = Utils::getRandomFloat(0, 5);
-		shaderData.netMass += particleArray[i].mass;
+		particleArray[i].mass = Utils::getRandomFloat(3, 16);
+		computeShaderData.netMass += particleArray[i].mass;
 	}
 
-	shaderData.numParticles = (uint32_t)particleArray.size();
-	shaderData.pitch = (uint32_t)ceil(sqrt(particleArray.size()));
+	computeShaderData.numParticles = (uint32_t)particleArray.size();
+	computeShaderData.pitch = (uint32_t)ceil(sqrt(particleArray.size()));
 }
 
 
-void ParticleSystem::createBuffers() {
-
+void ParticleSystem::createBuffers(size_t numSwapChainImages) {
+	
 	VkDeviceSize particleArraySize = particleArray.size() * sizeof(Vertex);
 
 	//physics buffer
@@ -103,13 +105,18 @@ void ParticleSystem::createBuffers() {
 		vertexBuffer, vertexBufferMemory
 	);
 
-	//uniform buffer
-	Utils::createBuffer(
-		sizeof(UniformDataComputeShader),
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		uniformBuffer, uniformBufferMemory
-	);
+	//uniform buffers
+	uniformBuffers.resize(numSwapChainImages);
+	uniformBufferMemories.resize(numSwapChainImages);
+	
+	for (unsigned int i = 0; i < uniformBuffers.size(); ++i) {
+		Utils::createBuffer(
+			sizeof(UniformDataComputeShader),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+			uniformBuffers[i], uniformBufferMemories[i]
+		);
+	}
 }
 void ParticleSystem::writeToVertexBuffer() {
 
@@ -143,16 +150,16 @@ void ParticleSystem::writeToVertexBuffer() {
 	
 }
 
-void ParticleSystem::writeToUniformBuffer() {
+void ParticleSystem::writeToUniformBuffer(uint32_t imageIndex) {
 
-	shaderData.netPosition = glm::vec3(0.4f, 2, 1.4f);
-	shaderData.deltaTime = RenderApplication::deltaTime;
+	computeShaderData.netPosition = glm::vec3(1, 1.5f, 1);
+	computeShaderData.deltaTime = RenderApplication::deltaTime;
 
 
 	void* mappedMemory;
-	vkMapMemory(RenderApplication::device, uniformBufferMemory, 0, sizeof(shaderData), 0, &mappedMemory);
-	memcpy(mappedMemory, &shaderData, sizeof(shaderData));
-	vkUnmapMemory(RenderApplication::device, uniformBufferMemory);
+	vkMapMemory(RenderApplication::device, uniformBufferMemories[imageIndex], 0, sizeof(computeShaderData), 0, &mappedMemory);
+	memcpy(mappedMemory, &computeShaderData, sizeof(computeShaderData));
+	vkUnmapMemory(RenderApplication::device, uniformBufferMemories[imageIndex]);
 }
 
 void ParticleSystem::createDescriptorSetLayout(){
@@ -195,97 +202,106 @@ void ParticleSystem::createDescriptorSetLayout(){
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderApplication::device, &layoutInfo, NULL, &descriptorSetLayout));
 
 }
-void ParticleSystem::createDescriptorPool(){
+void ParticleSystem::createDescriptorPool(size_t numSwapChainImages){
 
 	std::array<VkDescriptorPoolSize, 3> poolSizes = {};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[0].descriptorCount = 1;
+	poolSizes[0].descriptorCount = (uint32_t)numSwapChainImages;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[1].descriptorCount = 1;
+	poolSizes[1].descriptorCount = (uint32_t)numSwapChainImages;
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[2].descriptorCount = 1;
+	poolSizes[2].descriptorCount = (uint32_t)numSwapChainImages;
 
 	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
 	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolCreateInfo.maxSets = 1;
+	descriptorPoolCreateInfo.maxSets = (uint32_t)numSwapChainImages;
 	descriptorPoolCreateInfo.poolSizeCount = (uint32_t)poolSizes.size();
 	descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
 	//Create descriptor pool.
 	VK_CHECK_RESULT(vkCreateDescriptorPool(RenderApplication::device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
 }
-void ParticleSystem::createDescriptorSet(){
+void ParticleSystem::createDescriptorSets(size_t numSwapChainImages){
+
+	descriptorSets.resize(SwapChain::images.size());
+
+	//All descriptor sets use same layout, we need one descriptor set per swapchain image
+	std::vector<VkDescriptorSetLayout> allLayouts(numSwapChainImages, descriptorSetLayout);
+
 
 	//With the pool allocated, we can now allocate the descriptor set.
 	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
 	descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	descriptorSetAllocateInfo.descriptorPool = descriptorPool; // pool to allocate from.
-	descriptorSetAllocateInfo.descriptorSetCount = 1;
-	descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
+	descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)descriptorSets.size();
+	descriptorSetAllocateInfo.pSetLayouts = allLayouts.data();
 
 
 	// allocate descriptor set.
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(RenderApplication::device, &descriptorSetAllocateInfo, &descriptorSet));
+	VK_CHECK_RESULT(vkAllocateDescriptorSets(RenderApplication::device, &descriptorSetAllocateInfo, descriptorSets.data()));
 
-	// Descriptor for our vertex shader Uniform Buffer
-	VkWriteDescriptorSet physicsBufferWrite = {};
-	physicsBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	physicsBufferWrite.dstSet = descriptorSet;
-	physicsBufferWrite.dstBinding = 0;		//binding = 0
-	physicsBufferWrite.dstArrayElement = 0;
-		// Descriptor info
-		VkDescriptorBufferInfo physicsBufferInfo = {};
-		physicsBufferInfo.buffer = physicsBuffer;
-		physicsBufferInfo.offset = 0;
-		physicsBufferInfo.range = particleArray.size() * sizeof(Vertex);
+	for (unsigned int i = 0; i < descriptorSets.size(); ++i) {
 
-	physicsBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	physicsBufferWrite.descriptorCount = 1;
-	physicsBufferWrite.pBufferInfo = &physicsBufferInfo;
+		// Descriptor for our vertex shader Uniform Buffer
+		VkWriteDescriptorSet physicsBufferWrite = {};
+		physicsBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		physicsBufferWrite.dstSet = descriptorSets[i];
+		physicsBufferWrite.dstBinding = 0;		//binding = 0
+		physicsBufferWrite.dstArrayElement = 0;
+			// Descriptor info
+			VkDescriptorBufferInfo physicsBufferInfo = {};
+			physicsBufferInfo.buffer = physicsBuffer;
+			physicsBufferInfo.offset = 0;
+			physicsBufferInfo.range = particleArray.size() * sizeof(Vertex);
 
-
-	// Descriptor for our vertex shader Uniform Buffer
-	VkWriteDescriptorSet vertexBufferWrite = {};
-	vertexBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	vertexBufferWrite.dstSet = descriptorSet;
-	vertexBufferWrite.dstBinding = 1;		//binding = 1
-	vertexBufferWrite.dstArrayElement = 0;
-		// Descriptor info
-		VkDescriptorBufferInfo vertexBufferInfo = {};
-		vertexBufferInfo.buffer = vertexBuffer;
-		vertexBufferInfo.offset = 0;
-		vertexBufferInfo.range = particleArray.size() * sizeof(Vertex);
-		
-	vertexBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	vertexBufferWrite.descriptorCount = 1;
-	vertexBufferWrite.pBufferInfo = &vertexBufferInfo;
-
-	VkWriteDescriptorSet uniformBufferWrite = {};
-	uniformBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	uniformBufferWrite.dstSet = descriptorSet;
-	uniformBufferWrite.dstBinding = 2;		//binding = 2
-	uniformBufferWrite.dstArrayElement = 0;
-		//Descriptor info
-		VkDescriptorBufferInfo uniformBufferInfo = {};
-		uniformBufferInfo.buffer = uniformBuffer;
-		uniformBufferInfo.offset = 0;
-		uniformBufferInfo.range = sizeof(UniformDataComputeShader);
-
-	uniformBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uniformBufferWrite.descriptorCount = 1;
-	uniformBufferWrite.pBufferInfo = &uniformBufferInfo;
+		physicsBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		physicsBufferWrite.descriptorCount = 1;
+		physicsBufferWrite.pBufferInfo = &physicsBufferInfo;
 
 
-	//put all descriptor write info in an array
-	std::array<VkWriteDescriptorSet, 3> descriptorWrites = {
-		physicsBufferWrite,
-		vertexBufferWrite,
-		uniformBufferWrite
-	};
+		// Descriptor for our vertex shader Uniform Buffer
+		VkWriteDescriptorSet vertexBufferWrite = {};
+		vertexBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		vertexBufferWrite.dstSet = descriptorSets[i];
+		vertexBufferWrite.dstBinding = 1;		//binding = 1
+		vertexBufferWrite.dstArrayElement = 0;
+			// Descriptor info
+			VkDescriptorBufferInfo vertexBufferInfo = {};
+			vertexBufferInfo.buffer = vertexBuffer;
+			vertexBufferInfo.offset = 0;
+			vertexBufferInfo.range = particleArray.size() * sizeof(Vertex);
 
-	// perform the update of the descriptor sets
-	vkUpdateDescriptorSets(RenderApplication::device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
+		vertexBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		vertexBufferWrite.descriptorCount = 1;
+		vertexBufferWrite.pBufferInfo = &vertexBufferInfo;
 
+		VkWriteDescriptorSet uniformBufferWrite = {};
+		uniformBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		uniformBufferWrite.dstSet = descriptorSets[i];
+		uniformBufferWrite.dstBinding = 2;		//binding = 2
+		uniformBufferWrite.dstArrayElement = 0;
+			//Descriptor info
+			VkDescriptorBufferInfo uniformBufferInfo = {};
+			uniformBufferInfo.buffer = uniformBuffers[i];
+			uniformBufferInfo.offset = 0;
+			uniformBufferInfo.range = sizeof(UniformDataComputeShader);
+
+		uniformBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		uniformBufferWrite.descriptorCount = 1;
+		uniformBufferWrite.pBufferInfo = &uniformBufferInfo;
+
+
+		//put all descriptor write info in an array
+		std::array<VkWriteDescriptorSet, 3> descriptorWrites = {
+			physicsBufferWrite,
+			vertexBufferWrite,
+			uniformBufferWrite
+		};
+
+		// perform the update of the descriptor sets
+		vkUpdateDescriptorSets(RenderApplication::device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, NULL);
+
+	}//End for
 }
 void ParticleSystem::createPhysicsComputePipeline(){
 
@@ -317,51 +333,56 @@ void ParticleSystem::createPhysicsComputePipeline(){
 	//destroy shader module
 	vkDestroyShaderModule(RenderApplication::device, computeShaderModule, NULL);
 }
-void ParticleSystem::createPhysicsCommandBuffer(){
+void ParticleSystem::createPhysicsCommandBuffers(){
 
 	//Note: RenderApplication will supply us with an already created command pool for compute operations
+
+	//we want each of our command buffers to draw to a swapchain image
+	physicsCommandBuffers.resize(SwapChain::images.size());
+
 
 	//Allocate command buffer
 	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
 	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	commandBufferAllocateInfo.commandPool = RenderApplication::getComputeCommandPool(); // specify the command pool to allocate from.
 	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	commandBufferAllocateInfo.commandBufferCount = 1; // allocate a single command buffer. 
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(RenderApplication::device, &commandBufferAllocateInfo, &physicsCommandBuffer)); // allocate command buffer.
+	commandBufferAllocateInfo.commandBufferCount = (uint32_t)physicsCommandBuffers.size();
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(RenderApplication::device, &commandBufferAllocateInfo, physicsCommandBuffers.data())); // allocate command buffer.
 
-	//Begin Info
-	VkCommandBufferBeginInfo beginInfo = {};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-	VK_CHECK_RESULT(vkBeginCommandBuffer(physicsCommandBuffer, &beginInfo)); // start recording commands.
-		
-		//Copy from vertex buffer to physics buffer
-		VkBufferCopy copyInfo = {};
-		copyInfo.size = particleArray.size() * sizeof(Vertex);
-		vkCmdCopyBuffer(physicsCommandBuffer, vertexBuffer, physicsBuffer, 1, &copyInfo);
+	for (unsigned int i = 0; i < physicsCommandBuffers.size(); ++i) {
+		//Begin Info
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+		VK_CHECK_RESULT(vkBeginCommandBuffer(physicsCommandBuffers[i], &beginInfo)); // start recording commands.
 
-		//Bind Compute Pipeline
-		vkCmdBindPipeline(physicsCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, physicsPipeline);
+			//Copy from vertex buffer to physics buffer
+			VkBufferCopy copyInfo = {};
+			copyInfo.size = particleArray.size() * sizeof(Vertex);
+			vkCmdCopyBuffer(physicsCommandBuffers[i], vertexBuffer, physicsBuffer, 1, &copyInfo);
 
-		//Bind Descriptor Set
-		vkCmdBindDescriptorSets(physicsCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, physicsPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			//Bind Compute Pipeline
+			vkCmdBindPipeline(physicsCommandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, physicsPipeline);
 
-		uint32_t dimensionWorkGroups = (uint32_t)ceil(shaderData.pitch / (float)WORKGROUP_SIZE);
+			//Bind Descriptor Set
+			vkCmdBindDescriptorSets(physicsCommandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, physicsPipelineLayout, 0, 1, &descriptorSets[i], 0, NULL);
 
-		//run compute app
-		vkCmdDispatch(physicsCommandBuffer, dimensionWorkGroups, dimensionWorkGroups, 1);
+			uint32_t dimensionWorkGroups = (uint32_t)ceil(computeShaderData.pitch / (float)WORKGROUP_SIZE);
 
-	VK_CHECK_RESULT(vkEndCommandBuffer(physicsCommandBuffer)); // end recording commands.
+			//run compute app
+			vkCmdDispatch(physicsCommandBuffers[i], dimensionWorkGroups, dimensionWorkGroups, 1);
 
+		VK_CHECK_RESULT(vkEndCommandBuffer(physicsCommandBuffers[i])); // end recording commands.
+	}//End for
 }
-void ParticleSystem::runPhysicsCommandBuffer(){
+void ParticleSystem::runPhysicsCommandBuffer(uint32_t imageIndex){
 	
 
 	//Submit Info
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1; // submit a single command buffer
-	submitInfo.pCommandBuffers = &physicsCommandBuffer;
+	submitInfo.pCommandBuffers = &physicsCommandBuffers[imageIndex];
 
 	//Testing only: create a femce
 	VkFence fence;

@@ -457,6 +457,7 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 	cout << "loading model " << modelFilename << endl;
 
 	if (positionsOnly) {
+		std::set<Vertex> uniquePositions = {};
 		for (unsigned int i = 0; i < attrib.vertices.size(); ++i) {
 
 			if (i % 3 == 0) {
@@ -467,7 +468,10 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 					attrib.vertices[i + 2]
 				};
 				
-				vertexArray.push_back(vertex);
+				if (uniquePositions.count(vertex) == 0) {
+					vertexArray.push_back(vertex);
+					uniquePositions.insert(vertex);
+				}
 			}
 			
 		}

@@ -29,6 +29,6 @@ void main() {
 
     gl_Position = ubo.projection * ubo.view * ubo.model * vec4(inPosition, 1.0f);
 
-    gl_PointSize = 7.0f / gl_Position.z;
+    gl_PointSize = mass / gl_Position.z;
 
 }

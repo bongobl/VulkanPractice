@@ -12,7 +12,7 @@ static int WORKGROUP_SIZE = 32;
 class ParticleSystem{
 
 	static std::vector<Vertex> particleArray;
-	static UniformDataComputeShader shaderData;
+	static UniformDataComputeShader computeShaderData;
 
 	//physics buffer
 	static VkBuffer physicsBuffer;
@@ -24,42 +24,42 @@ class ParticleSystem{
 
 
 	//uniform buffer
-	static VkBuffer uniformBuffer;
-	static VkDeviceMemory uniformBufferMemory;
+	static std::vector<VkBuffer> uniformBuffers;
+	static std::vector<VkDeviceMemory> uniformBufferMemories;
 
 	//descriptors
 	static VkDescriptorSetLayout descriptorSetLayout;
 	static VkDescriptorPool descriptorPool;
-	static VkDescriptorSet descriptorSet;
+	static std::vector<VkDescriptorSet> descriptorSets;
 
 	//pipeline
 	static VkPipelineLayout physicsPipelineLayout;
 	static VkPipeline physicsPipeline;
 
 	//command buffer
-	static VkCommandBuffer physicsCommandBuffer;
+	static std::vector<VkCommandBuffer> physicsCommandBuffers;
 
 	
 	
 public:
-	static void init();
+	static void init(size_t numSwapChainImages);
 	static void cleanUp();
 
-	static void runPhysicsCommandBuffer();
-	static void writeToUniformBuffer();
+	static void runPhysicsCommandBuffer(uint32_t imageIndex);
+	static void writeToUniformBuffer(uint32_t imageIndex);
 private:
 	static void loadParticlesFromModelFile(string filename);
-	static void createBuffers();
+	static void createBuffers(size_t numSwapChainImages);
 	static void writeToVertexBuffer();
 
 	static void createDescriptorSetLayout();
-	static void createDescriptorPool();
-	static void createDescriptorSet();
+	static void createDescriptorPool(size_t numSwapChainImages);
+	static void createDescriptorSets(size_t numSwapChainImages);
 
 
 	static void createPhysicsComputePipeline();
 	
-	static void createPhysicsCommandBuffer();
+	static void createPhysicsCommandBuffers();
 
 	friend class RenderApplication;
 
