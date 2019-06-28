@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects: enable
 
 #define		WORKGROUP_SIZE		32
-
+#define		PI 					3.14159265358
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1) in;
 
 
@@ -59,7 +59,14 @@ void main(){
 	}
 
 
-	vertexBuffer[indexVal] = physicsBuffer[indexVal];
+	Vertex currVertex = physicsBuffer[indexVal];
 
-	vertexBuffer[indexVal].position *= ubo.netPosition;
+	float angle = atan(currVertex.position.z, currVertex.position.x);
+	float dist = pow( pow(currVertex.position.z, 2) + pow(currVertex.position.x, 2), 0.5f);
+	float speed = ubo.deltaTime * 30000.0f / (dist * dist * currVertex.mass) ;
+	currVertex.position.x = dist * cos(angle + speed);
+	currVertex.position.z = dist * sin(angle + speed);
+	vertexBuffer[indexVal] = currVertex;
+
+
 }

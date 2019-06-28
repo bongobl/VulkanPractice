@@ -36,12 +36,15 @@ class ParticleSystem{
 	static VkPipelineLayout physicsPipelineLayout;
 	static VkPipeline physicsPipeline;
 
-	//command buffer
-	static std::vector<VkCommandBuffer> physicsCommandBuffers;
+	
 
 	
 	
 public:
+
+	//command buffer
+	static std::vector<VkCommandBuffer> physicsCommandBuffers;
+
 	static void init(size_t numSwapChainImages);
 	static void cleanUp();
 

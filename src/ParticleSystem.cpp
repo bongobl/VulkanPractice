@@ -42,17 +42,17 @@ void ParticleSystem::cleanUp() {
 	//free physics buffer
 	vkDestroyBuffer(RenderApplication::device, physicsBuffer, NULL);
 	vkFreeMemory(RenderApplication::device, physicsBufferMemory, NULL);
-
+	
 	//free vertex buffer
 	vkDestroyBuffer(RenderApplication::device, vertexBuffer, NULL);
 	vkFreeMemory(RenderApplication::device, vertexBufferMemory, NULL);
-
+	
 	for (unsigned int i = 0; i < uniformBuffers.size(); ++i) {
 		//free uniform buffer
 		vkDestroyBuffer(RenderApplication::device, uniformBuffers[i], NULL);
 		vkFreeMemory(RenderApplication::device, uniformBufferMemories[i], NULL);
 	}
-
+	
 	//free pipeline and layout
 	vkDestroyPipeline(RenderApplication::device, physicsPipeline, NULL);
 	vkDestroyPipelineLayout(RenderApplication::device, physicsPipelineLayout, NULL);
@@ -71,12 +71,17 @@ void ParticleSystem::loadParticlesFromModelFile(string filename) {
 
 	computeShaderData.netMass = 0;
 	for (int i = 0; i < particleArray.size(); ++i) {
+
+		//offset position by random value
+		glm::vec3 randOffset(Utils::getRandomFloat(-30, 30), Utils::getRandomFloat(-30, 30), Utils::getRandomFloat(-30, 30));
+		particleArray[i].position += randOffset;
+
 		//storing random color in vertex's normal attribute
 		glm::vec3 randColor(Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1));
 		particleArray[i].normal = randColor;
-
+		
 		//give particle a random mass
-		particleArray[i].mass = Utils::getRandomFloat(3, 16);
+		particleArray[i].mass = Utils::getRandomFloat(3, 30);
 		computeShaderData.netMass += particleArray[i].mass;
 	}
 
@@ -377,7 +382,7 @@ void ParticleSystem::createPhysicsCommandBuffers(){
 }
 void ParticleSystem::runPhysicsCommandBuffer(uint32_t imageIndex){
 	
-
+	
 	//Submit Info
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

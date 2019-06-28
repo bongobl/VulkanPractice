@@ -40,10 +40,12 @@ std::vector<VkFence> RenderApplication::inFlightFences;
 std::vector<VkSemaphore> RenderApplication::imageAvailableSemaphores;
 std::vector<VkSemaphore> RenderApplication::renderFinishedSemaphores;
 std::vector<VkSemaphore> RenderApplication::startPhysicsSemaphores;
+std::vector<VkSemaphore> RenderApplication::physicsDoneSemaphores;
 int RenderApplication::currentFrame;
 VkCommandPool RenderApplication::graphicsCommandPool;
 std::vector<VkCommandBuffer> RenderApplication::renderCommandBuffers;
 
+bool RenderApplication::isFirstFrame;
 float RenderApplication::currTime;
 float RenderApplication::prevTime;
 float RenderApplication::deltaTime;
@@ -178,15 +180,15 @@ void RenderApplication::createAllVulkanResources() {
 	//create swapchain with valid extent
 	VkExtent2D initialExtent = waitToGetNonZeroWindowExtent();
 	createSwapChain(initialExtent);
-
+	
 	//create descriptor and command resources
 	createDescriptorSetLayout();
 	createDescriptorPool();
 	createCommandPool();
-
+	
 	//GPU resources
 	ParticleSystem::init(SwapChain::images.size());
-
+	
 	createUniformBuffers();
 
 	createImageSampler();
@@ -211,6 +213,9 @@ void RenderApplication::createAllVulkanResources() {
 
 void RenderApplication::initScene(){
 	
+	//first frame
+	isFirstFrame = true;
+
 	//time
 	currTime = (float)glfwGetTime();
 	prevTime = (float)glfwGetTime();
@@ -245,12 +250,37 @@ void RenderApplication::drawFrame(){
 		&imageIndex			//index of image we are acquiring 
 	);
 
+
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		recreateAppExtentDependents();
 	}
 	else {
 		VK_CHECK_RESULT(result);
 	}
+
+	//Submit physics command buffer
+	ParticleSystem::writeToUniformBuffer(imageIndex);
+	
+	//Submit Info
+	VkSubmitInfo physicsSubmitInfo = {};
+	physicsSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	physicsSubmitInfo.waitSemaphoreCount = 0;
+	if (!isFirstFrame) {
+		physicsSubmitInfo.waitSemaphoreCount = 1;
+		physicsSubmitInfo.pWaitSemaphores = &startPhysicsSemaphores[prevFrameIndex(currentFrame)];
+
+		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
+		physicsSubmitInfo.pWaitDstStageMask = waitStages;
+	}
+	physicsSubmitInfo.commandBufferCount = 1; // submit a single command buffer
+	physicsSubmitInfo.pCommandBuffers = &ParticleSystem::physicsCommandBuffers[imageIndex];
+	physicsSubmitInfo.signalSemaphoreCount = 1;
+	physicsSubmitInfo.pSignalSemaphores = &physicsDoneSemaphores[currentFrame];
+
+	//submit to queue
+	VK_CHECK_RESULT(vkQueueSubmit(RenderApplication::getComputeQueue(), 1, &physicsSubmitInfo, NULL));
+	
+	//End Submit physics command buffer
 
 
 	//update uniform data for this frame
@@ -260,16 +290,19 @@ void RenderApplication::drawFrame(){
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkSemaphore waitToRenderSems[] = { imageAvailableSemaphores[currentFrame]};
-	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	submitInfo.waitSemaphoreCount = 1;
+	VkSemaphore waitToRenderSems[] = { physicsDoneSemaphores[currentFrame], imageAvailableSemaphores[currentFrame]};
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	submitInfo.waitSemaphoreCount = 2;
 	submitInfo.pWaitSemaphores = waitToRenderSems;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &renderCommandBuffers[imageIndex];
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = &renderFinishedSemaphores[currentFrame];
 
+	VkSemaphore afterRenderSems[] = { startPhysicsSemaphores[currentFrame],renderFinishedSemaphores[currentFrame] };
+	submitInfo.signalSemaphoreCount = 2;
+	submitInfo.pSignalSemaphores = afterRenderSems;
+
+	//locking fence again for this frame
 	vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
 	//SUBMIT A RENDER COMMAND TO THIS IMAGE
@@ -297,6 +330,8 @@ void RenderApplication::drawFrame(){
 	}
 
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+	isFirstFrame = false;
 }
 
 void RenderApplication::updateScene() {
@@ -396,6 +431,7 @@ void RenderApplication::cleanup() {
 		vkDestroySemaphore(device, imageAvailableSemaphores[i], NULL);
 		vkDestroySemaphore(device, renderFinishedSemaphores[i], NULL);
 		vkDestroySemaphore(device, startPhysicsSemaphores[i], NULL);
+		vkDestroySemaphore(device, physicsDoneSemaphores[i], NULL);
 	}
 	vkDestroyPipeline(device, graphicsPipeline, NULL);
 	vkDestroyPipelineLayout(device, pipelineLayout, NULL);
@@ -1234,6 +1270,7 @@ void RenderApplication::createSyncObjects(){
 	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 	startPhysicsSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+	physicsDoneSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -1249,6 +1286,7 @@ void RenderApplication::createSyncObjects(){
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &imageAvailableSemaphores[i]));
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &renderFinishedSemaphores[i]));
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &startPhysicsSemaphores[i]));
+		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, NULL, &physicsDoneSemaphores[i]))
 	}
 
 }
@@ -1313,6 +1351,12 @@ void RenderApplication::createRenderCommandBuffers() {
 	
 }
 
+int RenderApplication::prevFrameIndex(const int currIndex){
+	if(currIndex == 0){
+		return MAX_FRAMES_IN_FLIGHT - 1;
+	}
+	return currIndex - 1;
+}
 VkCommandPool RenderApplication::getTransferCmdPool(){
 
 	//queues and pools which work for graphics also work for transfer

@@ -33,7 +33,7 @@ const bool enableValidationLayers = true;
 
 class RenderApplication{
 
-	//test glfw window
+	//glfw window
 	static GLFWwindow* window;
 	static bool windowResized;
 
@@ -109,6 +109,7 @@ class RenderApplication{
 	static std::vector<VkSemaphore> imageAvailableSemaphores;
 	static std::vector<VkSemaphore> renderFinishedSemaphores;
 	static std::vector<VkSemaphore> startPhysicsSemaphores;
+	static std::vector<VkSemaphore> physicsDoneSemaphores;
 	static int currentFrame;
 
     //The command buffer is used to record commands, that will be submitted to a queue.
@@ -118,6 +119,9 @@ class RenderApplication{
 	static std::vector<VkCommandBuffer> renderCommandBuffers;
 
 	//SCENE VARIABLES
+
+	//if first frame
+	static bool isFirstFrame;
 
 	//time variables
 	static float currTime;
@@ -211,11 +215,12 @@ private:
 	static void updateLightRotation();
 	static void updateCameraMatrix();
 
+	static int prevFrameIndex(const int currIndex);
+
 	//to allow Utils class to perform transfer operations
 	static VkCommandPool getTransferCmdPool();
 	static VkQueue getTransferQueue();
 	
-
 	//for shadow map
 	static VkCommandPool getGraphicsCmdPool();
 	static VkQueue getGraphicsQueue();
@@ -224,7 +229,6 @@ private:
 	static VkCommandPool getComputeCommandPool();
 	static VkQueue getComputeQueue();
 
-	
 	friend class Utils;
 	friend class Lighting;
 	friend class ParticleSystem;
