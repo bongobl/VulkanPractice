@@ -34,6 +34,6 @@ void main() {
 	if(length(coord) > 0.5)                  //outside of circle radius?
 	    discard;
 
-
+    outColor.a = 1 - 2 * length(coord);
 
 }

@@ -11,8 +11,10 @@
 static int WORKGROUP_SIZE = 32;
 class ParticleSystem{
 
+	//cpu side data
 	static std::vector<Vertex> particleArray;
 	static UniformDataComputeShader computeShaderData;
+	static glm::vec4 netPosition;
 
 	//physics buffer
 	static VkBuffer physicsBuffer;
@@ -26,6 +28,11 @@ class ParticleSystem{
 	//uniform buffer
 	static std::vector<VkBuffer> uniformBuffers;
 	static std::vector<VkDeviceMemory> uniformBufferMemories;
+
+	//nextFrameData
+	static VkBuffer nextFrameInfo;
+	static VkDeviceMemory nextFrameInfoMemory;
+
 
 	//descriptors
 	static VkDescriptorSetLayout descriptorSetLayout;
@@ -53,6 +60,7 @@ private:
 	static void loadParticlesFromModelFile(string filename);
 	static void createBuffers(size_t numSwapChainImages);
 	static void writeToVertexBuffer();
+	static void writeToNextFrameInfo();
 
 	static void createDescriptorSetLayout();
 	static void createDescriptorPool(size_t numSwapChainImages);

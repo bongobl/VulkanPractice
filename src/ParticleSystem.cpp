@@ -2,6 +2,7 @@
 
 std::vector<Vertex> ParticleSystem::particleArray;
 UniformDataComputeShader ParticleSystem::computeShaderData;
+glm::vec4 ParticleSystem::netPosition;
 
 VkBuffer ParticleSystem::physicsBuffer;
 VkDeviceMemory ParticleSystem::physicsBufferMemory;
@@ -9,6 +10,10 @@ VkBuffer ParticleSystem::vertexBuffer;
 VkDeviceMemory ParticleSystem::vertexBufferMemory;
 std::vector<VkBuffer> ParticleSystem::uniformBuffers;
 std::vector<VkDeviceMemory> ParticleSystem::uniformBufferMemories;
+VkBuffer ParticleSystem::nextFrameInfo;
+VkDeviceMemory ParticleSystem::nextFrameInfoMemory;
+
+
 VkDescriptorSetLayout ParticleSystem::descriptorSetLayout;
 VkDescriptorPool ParticleSystem::descriptorPool;
 std::vector<VkDescriptorSet> ParticleSystem::descriptorSets;
@@ -23,7 +28,7 @@ void ParticleSystem::init(size_t numSwapChainImages){
 
 	createBuffers(numSwapChainImages);
 	writeToVertexBuffer();
-	writeToUniformBuffer(0);	//hard coded parameter
+	writeToNextFrameInfo();
 	
 	createDescriptorSetLayout();
 	createDescriptorPool(numSwapChainImages);
@@ -33,8 +38,6 @@ void ParticleSystem::init(size_t numSwapChainImages){
 	
 	createPhysicsCommandBuffers(numSwapChainImages);
 
-	runPhysicsCommandBuffer(0);	//hard coded parameter
-	
 }
 
 void ParticleSystem::refresh(size_t numSwapChainImages){
@@ -87,6 +90,10 @@ void ParticleSystem::cleanUp() {
 		vkFreeMemory(RenderApplication::device, uniformBufferMemories[i], NULL);
 	}
 	
+	//free nextFrameInfo
+	vkDestroyBuffer(RenderApplication::device, nextFrameInfo, NULL);
+	vkFreeMemory(RenderApplication::device, nextFrameInfoMemory, NULL);
+
 	//free pipeline and layout
 	vkDestroyPipeline(RenderApplication::device, physicsPipeline, NULL);
 	vkDestroyPipelineLayout(RenderApplication::device, physicsPipelineLayout, NULL);
@@ -107,17 +114,22 @@ void ParticleSystem::loadParticlesFromModelFile(string filename) {
 	for (int i = 0; i < particleArray.size(); ++i) {
 
 		//offset position by random value
-		glm::vec3 randOffset(Utils::getRandomFloat(-30, 30), Utils::getRandomFloat(-30, 30), Utils::getRandomFloat(-30, 30));
+		glm::vec3 randOffset(Utils::getRandomFloat(-35, 35), Utils::getRandomFloat(-35, 35), Utils::getRandomFloat(-35, 35));
 		particleArray[i].position += randOffset;
 
 		//storing random color in vertex's normal attribute
 		glm::vec3 randColor(Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1));
 		particleArray[i].normal = randColor;
-		
+
 		//give particle a random mass
-		particleArray[i].mass = Utils::getRandomFloat(3, 30);
+		particleArray[i].mass = Utils::getRandomFloat(3, 40);
 		computeShaderData.netMass += particleArray[i].mass;
+
+		//add to running total
+		netPosition += glm::vec4(particleArray[i].position * particleArray[i].mass, 0);
 	}
+
+	netPosition = netPosition / computeShaderData.netMass;
 
 	computeShaderData.numParticles = (uint32_t)particleArray.size();
 	computeShaderData.pitch = (uint32_t)ceil(sqrt(particleArray.size()));
@@ -156,6 +168,16 @@ void ParticleSystem::createBuffers(size_t numSwapChainImages) {
 			uniformBuffers[i], uniformBufferMemories[i]
 		);
 	}
+
+	//nextFrameInfo
+	//physics buffer
+	Utils::createBuffer(
+		sizeof(glm::vec4),
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		nextFrameInfo, nextFrameInfoMemory
+	);
+
 }
 void ParticleSystem::writeToVertexBuffer() {
 
@@ -189,9 +211,37 @@ void ParticleSystem::writeToVertexBuffer() {
 	
 }
 
+void ParticleSystem::writeToNextFrameInfo() {
+
+
+	//create staging buffer
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	Utils::createBuffer(
+		sizeof(glm::vec4),
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+		stagingBuffer, stagingBufferMemory
+	);
+
+	//copy contents of our particle array into the staging buffer
+	void* mappedMemory;
+	vkMapMemory(RenderApplication::device, stagingBufferMemory, 0, sizeof(glm::vec4), 0, &mappedMemory);
+	memcpy(mappedMemory, &netPosition, (size_t)sizeof(glm::vec4));
+	vkUnmapMemory(RenderApplication::device, stagingBufferMemory);
+
+
+	//copy contents of staging buffer to vertex buffer 
+	Utils::copyBuffer(stagingBuffer, nextFrameInfo, sizeof(glm::vec4));
+
+
+	//destroy staging buffer
+	vkDestroyBuffer(RenderApplication::device, stagingBuffer, NULL);
+	vkFreeMemory(RenderApplication::device, stagingBufferMemory, NULL);
+}
 void ParticleSystem::writeToUniformBuffer(uint32_t imageIndex) {
 
-	computeShaderData.netPosition = glm::vec3(1, 1.5f, 1);
 	computeShaderData.deltaTime = RenderApplication::deltaTime;
 
 

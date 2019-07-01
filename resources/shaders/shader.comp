@@ -32,18 +32,17 @@ layout(std140, binding = 1) buffer buf2
 
 layout(std140, binding = 2) uniform UniformBufferObject
 {
-	vec3 netPosition;
 	uint numParticles;
-
-	vec3 padding;
 	uint pitch;
-	
 	float deltaTime;
 	float netMass;
-	vec2 padding1;
 }ubo;
 
-shared vec3 avgPosition;
+//use later
+layout(std140, binding = 3) coherent buffer buf3
+{
+	vec4 netPosition;
+}nextFrameInfo;
 
 //main
 void main(){
@@ -69,6 +68,8 @@ void main(){
 	currVertex.position.x = dist * cos(angle + speed);
 	currVertex.position.z = dist * sin(angle + speed);
 	vertexBuffer[indexVal] = currVertex;
+
+	//vertexBuffer[indexVal] = physicsBuffer[indexVal];
 
 
 }
