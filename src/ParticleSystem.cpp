@@ -31,9 +31,43 @@ void ParticleSystem::init(size_t numSwapChainImages){
 
 	createPhysicsComputePipeline();
 	
-	createPhysicsCommandBuffers();
+	createPhysicsCommandBuffers(numSwapChainImages);
 
 	runPhysicsCommandBuffer(0);	//hard coded parameter
+	
+}
+
+void ParticleSystem::refresh(size_t numSwapChainImages){
+
+	//free command buffers (while keeping command pool)
+	vkFreeCommandBuffers(RenderApplication::device, RenderApplication::getComputeCommandPool(), (uint32_t)physicsCommandBuffers.size(), physicsCommandBuffers.data());
+
+	//destroy descriptors
+	vkDestroyDescriptorPool(RenderApplication::device, descriptorPool, nullptr);
+
+	//free uniform buffers
+	for (size_t i = 0; i < uniformBuffers.size(); i++) {
+		vkDestroyBuffer(RenderApplication::device, uniformBuffers[i], nullptr);
+		vkFreeMemory(RenderApplication::device, uniformBufferMemories[i], nullptr);
+	}
+
+	
+	//create uniform buffers
+	uniformBuffers.resize(numSwapChainImages);
+	uniformBufferMemories.resize(numSwapChainImages);
+	
+	for (unsigned int i = 0; i < uniformBuffers.size(); ++i) {
+		Utils::createBuffer(
+			sizeof(UniformDataComputeShader),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+			uniformBuffers[i], uniformBufferMemories[i]
+		);
+	}
+
+	createDescriptorPool(numSwapChainImages);
+	createDescriptorSets(numSwapChainImages);
+	createPhysicsCommandBuffers(numSwapChainImages);
 	
 }
 void ParticleSystem::cleanUp() {
@@ -228,7 +262,7 @@ void ParticleSystem::createDescriptorPool(size_t numSwapChainImages){
 }
 void ParticleSystem::createDescriptorSets(size_t numSwapChainImages){
 
-	descriptorSets.resize(SwapChain::images.size());
+	descriptorSets.resize(numSwapChainImages);
 
 	//All descriptor sets use same layout, we need one descriptor set per swapchain image
 	std::vector<VkDescriptorSetLayout> allLayouts(numSwapChainImages, descriptorSetLayout);
@@ -338,12 +372,12 @@ void ParticleSystem::createPhysicsComputePipeline(){
 	//destroy shader module
 	vkDestroyShaderModule(RenderApplication::device, computeShaderModule, NULL);
 }
-void ParticleSystem::createPhysicsCommandBuffers(){
+void ParticleSystem::createPhysicsCommandBuffers(size_t numSwapChainImages){
 
 	//Note: RenderApplication will supply us with an already created command pool for compute operations
 
 	//we want each of our command buffers to draw to a swapchain image
-	physicsCommandBuffers.resize(SwapChain::images.size());
+	physicsCommandBuffers.resize(numSwapChainImages);
 
 
 	//Allocate command buffer

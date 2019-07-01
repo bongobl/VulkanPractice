@@ -792,12 +792,13 @@ void RenderApplication::recreateAppExtentDependents(){
 	createGraphicsPipeline();
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
-	createUniformBuffers();
-	createDescriptorPool();
-	createDescriptorSets();
+	createUniformBuffers();	//yes
+	createDescriptorPool();	//yes
+	createDescriptorSets();	//yes
 	createSwapChainFrameBuffers();
-	createRenderCommandBuffers();
+	createRenderCommandBuffers();	//yes
 	
+	ParticleSystem::refresh(SwapChain::images.size());
 }
 
 

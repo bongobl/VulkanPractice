@@ -3,6 +3,8 @@
 
 #define		WORKGROUP_SIZE		32
 #define		PI 					3.14159265358
+
+
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1) in;
 
 
@@ -41,6 +43,7 @@ layout(std140, binding = 2) uniform UniformBufferObject
 	vec2 padding1;
 }ubo;
 
+shared vec3 avgPosition;
 
 //main
 void main(){
@@ -58,12 +61,11 @@ void main(){
 		return;
 	}
 
-
 	Vertex currVertex = physicsBuffer[indexVal];
 
 	float angle = atan(currVertex.position.z, currVertex.position.x);
 	float dist = pow( pow(currVertex.position.z, 2) + pow(currVertex.position.x, 2), 0.5f);
-	float speed = ubo.deltaTime * 30000.0f / (dist * dist * currVertex.mass) ;
+	float speed = ubo.deltaTime * 3000.0f / (pow(dist, 1.5f) * pow(currVertex.mass, 0.5f)) ;
 	currVertex.position.x = dist * cos(angle + speed);
 	currVertex.position.z = dist * sin(angle + speed);
 	vertexBuffer[indexVal] = currVertex;

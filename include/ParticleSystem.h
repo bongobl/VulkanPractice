@@ -36,9 +36,7 @@ class ParticleSystem{
 	static VkPipelineLayout physicsPipelineLayout;
 	static VkPipeline physicsPipeline;
 
-	
 
-	
 	
 public:
 
@@ -46,6 +44,7 @@ public:
 	static std::vector<VkCommandBuffer> physicsCommandBuffers;
 
 	static void init(size_t numSwapChainImages);
+	static void refresh(size_t numSwapChainImages);
 	static void cleanUp();
 
 	static void runPhysicsCommandBuffer(uint32_t imageIndex);
@@ -62,7 +61,7 @@ private:
 
 	static void createPhysicsComputePipeline();
 	
-	static void createPhysicsCommandBuffers();
+	static void createPhysicsCommandBuffers(size_t numSwapChainImages);
 
 	friend class RenderApplication;
 
