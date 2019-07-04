@@ -14,7 +14,6 @@ class ParticleSystem{
 	//cpu side data
 	static std::vector<Vertex> particleArray;
 	static UniformDataComputeShader computeShaderData;
-	static glm::vec4 netPosition;
 
 	//physics buffer
 	static VkBuffer physicsBuffer;
@@ -29,9 +28,6 @@ class ParticleSystem{
 	static std::vector<VkBuffer> uniformBuffers;
 	static std::vector<VkDeviceMemory> uniformBufferMemories;
 
-	//nextFrameData
-	static VkBuffer nextFrameInfo;
-	static VkDeviceMemory nextFrameInfoMemory;
 
 
 	//descriptors
@@ -43,7 +39,7 @@ class ParticleSystem{
 	static VkPipelineLayout physicsPipelineLayout;
 	static VkPipeline physicsPipeline;
 
-
+	
 	
 public:
 
@@ -53,15 +49,15 @@ public:
 	static void init(size_t numSwapChainImages);
 	static void refresh(size_t numSwapChainImages);
 	static void cleanUp();
-
+	
 	static void runPhysicsCommandBuffer(uint32_t imageIndex);
 	static void writeToUniformBuffer(uint32_t imageIndex);
 private:
+	static void generateParticlesInSphere(float radius, uint32_t numParticles);
 	static void loadParticlesFromModelFile(string filename);
 	static void createBuffers(size_t numSwapChainImages);
 	static void writeToVertexBuffer();
-	static void writeToNextFrameInfo();
-
+	
 	static void createDescriptorSetLayout();
 	static void createDescriptorPool(size_t numSwapChainImages);
 	static void createDescriptorSets(size_t numSwapChainImages);

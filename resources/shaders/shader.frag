@@ -2,10 +2,9 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 //from vertex shader
-layout(location = 0) in vec3 modelSpacePosition;
-layout(location = 1) in vec3 modelSpaceNormal;
-layout(location = 2) in vec2 texCoord;
-
+layout (location = 0) in vec3 modelSpacePosition;
+layout (location = 1) in vec3 modelSpaceNormal;
+layout (location = 2) in vec2 texCoord;
 
 //Descriptor Bindings
 layout(binding = 4) uniform UniformBufferObject{
@@ -34,6 +33,5 @@ void main() {
 	if(length(coord) > 0.5)                  //outside of circle radius?
 	    discard;
 
-    outColor.a = 1 - 2 * length(coord);
-
+    outColor.a = 1 - 2 * pow(length(coord),1.0/2);
 }

@@ -2,8 +2,8 @@
 #extension GL_ARB_separate_shader_objects: enable
 
 #define		WORKGROUP_SIZE		32
-#define		PI 					3.14159265358
-
+#define		GRAV_CONSTANT 		2
+#define 	CAGE_FORCE			0.2f
 
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1) in;
 
@@ -38,11 +38,6 @@ layout(std140, binding = 2) uniform UniformBufferObject
 	float netMass;
 }ubo;
 
-//use later
-layout(std140, binding = 3) coherent buffer buf3
-{
-	vec4 netPosition;
-}nextFrameInfo;
 
 //main
 void main(){
@@ -62,14 +57,40 @@ void main(){
 
 	Vertex currVertex = physicsBuffer[indexVal];
 
-	float angle = atan(currVertex.position.z, currVertex.position.x);
-	float dist = pow( pow(currVertex.position.z, 2) + pow(currVertex.position.x, 2), 0.5f);
-	float speed = ubo.deltaTime * 3000.0f / (pow(dist, 1.5f) * pow(currVertex.mass, 0.5f)) ;
-	currVertex.position.x = dist * cos(angle + speed);
-	currVertex.position.z = dist * sin(angle + speed);
+	//float angle = atan(currVertex.position.z, currVertex.position.x);
+	//float dist = pow( pow(currVertex.position.z, 2) + pow(currVertex.position.x, 2), 0.5f);
+	//float speed = ubo.deltaTime * 3000.0f / (pow(dist, 1.5f) * pow(currVertex.mass, 0.5f)) ;
+	//currVertex.position.x = dist * cos(angle + speed);
+	//currVertex.position.z = dist * sin(angle + speed);
+	
+
+	//calculate net force on particle
+	vec3 netForce = vec3(0,0,0);
+	for(int i = 0; i < ubo.numParticles; ++i){
+
+		Vertex otherVertex = physicsBuffer[i];
+
+		if(otherVertex.position != currVertex.position){
+			vec3 forceDir = otherVertex.position - currVertex.position;
+			float forceMag = otherVertex.mass / (length(forceDir) * length(forceDir));
+			netForce += forceMag * normalize(forceDir);
+		}
+	}
+
+	//vec3 forceDir = vec3(0,0,0) - currVertex.position;
+
+	netForce = netForce * GRAV_CONSTANT * currVertex.mass;
+	netForce += -currVertex.position * currVertex.mass * CAGE_FORCE;
+
+	//calc particle's acceleration
+	vec3 acc = netForce / currVertex.mass;
+
+	//calc new velocity
+	currVertex.velocity = currVertex.velocity + acc * ubo.deltaTime;
+	
+	//calc new position
+	currVertex.position = currVertex.position + currVertex.velocity * ubo.deltaTime;
+
+	//assign to particle in vertex buffer
 	vertexBuffer[indexVal] = currVertex;
-
-	//vertexBuffer[indexVal] = physicsBuffer[indexVal];
-
-
 }

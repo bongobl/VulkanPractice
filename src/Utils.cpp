@@ -20,6 +20,7 @@
 
 ///////////////////////////////Utils//////////////////////////////////
 
+float Utils::PI = 3.1415926535f;
 void Utils::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 	VkMemoryPropertyFlags propertyFlags, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
 	

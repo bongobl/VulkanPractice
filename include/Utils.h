@@ -45,7 +45,7 @@ struct UniformDataFragShader {
 class Utils{
 
 public: 
-
+	static float PI;
 	static void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 		VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 
