@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects: enable
 
 #define		WORKGROUP_SIZE		32
-#define		GRAV_CONSTANT 		2
+#define		GRAV_CONSTANT 		24
 #define 	CAGE_FORCE			0.2f
 
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1) in;
@@ -56,12 +56,6 @@ void main(){
 	}
 
 	Vertex currVertex = physicsBuffer[indexVal];
-
-	//float angle = atan(currVertex.position.z, currVertex.position.x);
-	//float dist = pow( pow(currVertex.position.z, 2) + pow(currVertex.position.x, 2), 0.5f);
-	//float speed = ubo.deltaTime * 3000.0f / (pow(dist, 1.5f) * pow(currVertex.mass, 0.5f)) ;
-	//currVertex.position.x = dist * cos(angle + speed);
-	//currVertex.position.z = dist * sin(angle + speed);
 	
 
 	//calculate net force on particle
@@ -77,19 +71,19 @@ void main(){
 		}
 	}
 
-	//vec3 forceDir = vec3(0,0,0) - currVertex.position;
-
 	netForce = netForce * GRAV_CONSTANT * currVertex.mass;
 	netForce += -currVertex.position * currVertex.mass * CAGE_FORCE;
+	netForce += 2.0f * -currVertex.velocity;
 
 	//calc particle's acceleration
 	vec3 acc = netForce / currVertex.mass;
 
 	//calc new velocity
+	vec3 oldVelocity = currVertex.velocity;
 	currVertex.velocity = currVertex.velocity + acc * ubo.deltaTime;
-	
+
 	//calc new position
-	currVertex.position = currVertex.position + currVertex.velocity * ubo.deltaTime;
+	currVertex.position = currVertex.position + oldVelocity * ubo.deltaTime + 0.5f * acc * ubo.deltaTime * ubo.deltaTime;
 
 	//assign to particle in vertex buffer
 	vertexBuffer[indexVal] = currVertex;

@@ -118,8 +118,9 @@ void ParticleSystem::generateParticlesInSphere(float radius, uint32_t numParticl
 
 		vertex.position *= radius * pow(rMult, (1.0f/3.0f));
 
-		//glm::vec3 randOffset(Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius));
-		//vertex.position = randOffset;
+		//use cube instead
+		glm::vec3 randOffset(Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius));
+		vertex.position = randOffset;
 		
 		//storing random color in vertex's normal attribute
 		glm::vec3 randColor(Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1));

@@ -57,7 +57,7 @@ float RenderApplication::mouseWheelDelta = 0;
 glm::mat4 RenderApplication::modelCorrect = glm::scale(glm::mat4(1.0f), glm::vec3(0.03f,0.03f,0.03f));
 glm::mat4 RenderApplication::cameraHeading = glm::mat4(1.0f);
 glm::mat4 RenderApplication::cameraPitch = glm::mat4(1.0f);
-glm::mat4 RenderApplication::cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 12));
+glm::mat4 RenderApplication::cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 20));
 glm::mat3 RenderApplication::lightOrientation(1.0f);
 
 void RenderApplication::run() {
@@ -377,7 +377,7 @@ void RenderApplication::updateCameraMatrix() {
 		cameraPitch = rotDeltaY * cameraPitch;
 	}
 	
-	cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -mouseWheelDelta * 0.2f)) * cameraZoom;
+	cameraZoom = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -mouseWheelDelta * 0.3f)) * cameraZoom;
 	
 	
 }
