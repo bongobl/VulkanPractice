@@ -18,8 +18,11 @@ struct UniformDataComputeShader {
 	uint32_t pitch;
 	float deltaTime;
 	float netMass;
-	
 
+	int stride;
+	glm::vec3 padding;
+	
+	
 };
 struct UniformDataVertexShader {
 
@@ -87,7 +90,10 @@ public:
 	static void calcTrackBallDeltas(glm::vec2 mousePosition, glm::vec2 prevMousePosition, VkExtent2D appExtent,
 		glm::vec3 &rotationAxis, float &rotationAngle);
 	static glm::vec3 trackBallMap(glm::vec2 mousePosition, VkExtent2D appExtent);
+
+	static glm::vec3 randomPointInSphere(float radius);
 	static float getRandomFloat(float min, float max);
+
 };
 
 // Used for validating return values of Vulkan API calls.

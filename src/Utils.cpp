@@ -488,7 +488,7 @@ void Utils::loadModel(std::string modelFilename, std::vector<Vertex> &vertexArra
 	for (const auto& shape : shapes) {
 		for (const auto& index : shape.mesh.indices) {
 			Vertex vertex = {};
-
+			
 			vertex.position = {
 				attrib.vertices[3 * index.vertex_index + 0],
 				attrib.vertices[3 * index.vertex_index + 1],
@@ -785,7 +785,25 @@ glm::vec3 Utils::trackBallMap(glm::vec2 mousePosition, VkExtent2D appExtent) {
 	return v;
 }
 
+glm::vec3 Utils::randomPointInSphere(float radius) {
 
+	glm::vec3 point;
+
+	float s = Utils::getRandomFloat(0, 1);
+	float t = Utils::getRandomFloat(0, 1);
+	float rMult = Utils::getRandomFloat(0, 1);
+
+	float u = 2 * Utils::PI * s;
+	float v = sqrt(t * (1 - t));
+
+	point.x = 2 * v * cos(u);
+	point.y = 1 - 2 * t;
+	point.z = 2 * v * sin(u);
+
+	point *= radius * pow(rMult, (1.0f / 3.0f));
+
+	return point;
+}
 float Utils::getRandomFloat(float min, float max) {
 
 	static bool firstTime = true;

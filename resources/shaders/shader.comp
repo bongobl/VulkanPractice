@@ -36,6 +36,9 @@ layout(std140, binding = 2) uniform UniformBufferObject
 	uint pitch;
 	float deltaTime;
 	float netMass;
+
+	int stride;
+	vec3 padding;
 }ubo;
 
 
@@ -60,17 +63,25 @@ void main(){
 
 	//calculate net force on particle
 	vec3 netForce = vec3(0,0,0);
-	for(int i = 0; i < ubo.numParticles; ++i){
 
-		Vertex otherVertex = physicsBuffer[i];
+	uint otherIndex = indexVal;
+	for(int i = 0; i < ubo.numParticles; i += ubo.stride){
+
+		Vertex otherVertex = physicsBuffer[otherIndex];
 
 		if(otherVertex.position != currVertex.position){
 			vec3 forceDir = otherVertex.position - currVertex.position;
 			float forceMag = otherVertex.mass / (length(forceDir) * length(forceDir));
 			netForce += forceMag * normalize(forceDir);
 		}
+
+		otherIndex += ubo.stride;
+		if(otherIndex > ubo.numParticles){
+			otherIndex -= ubo.numParticles;
+		}
 	}
 
+	netForce = netForce * ubo.stride;
 	netForce = netForce * GRAV_CONSTANT * currVertex.mass;
 	netForce += -currVertex.position * currVertex.mass * CAGE_FORCE;
 	netForce += 2.0f * -currVertex.velocity;

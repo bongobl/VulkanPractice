@@ -22,7 +22,7 @@ std::vector<VkCommandBuffer> ParticleSystem::physicsCommandBuffers;
 
 void ParticleSystem::init(size_t numSwapChainImages){
 	//loadParticlesFromModelFile("resources/models/Heptoroid.obj");
-	generateParticlesInSphere(250, 16000);
+	generateParticlesInSphere(250, 20000);
 	
 	createBuffers(numSwapChainImages);
 	writeToVertexBuffer();
@@ -105,18 +105,7 @@ void ParticleSystem::generateParticlesInSphere(float radius, uint32_t numParticl
 		Vertex vertex = {};
 		
 		//offset position by random value
-		float s = Utils::getRandomFloat(0, 1);
-		float t = Utils::getRandomFloat(0, 1);
-		float rMult = Utils::getRandomFloat(0, 1);
-		
-		float u = 2 * Utils::PI * s;
-		float v = sqrt(t * (1 - t));
-
-		vertex.position.x = 2 * v * cos(u);
-		vertex.position.y = 1 - 2 * t;
-		vertex.position.z = 2 * v * sin(u);
-
-		vertex.position *= radius * pow(rMult, (1.0f/3.0f));
+		vertex.position = Utils::randomPointInSphere(radius);
 
 		//use cube instead
 		glm::vec3 randOffset(Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius));
@@ -130,7 +119,7 @@ void ParticleSystem::generateParticlesInSphere(float radius, uint32_t numParticl
 		vertex.mass = Utils::getRandomFloat(3, 40);
 		
 		//give a particle a random initial velocity
-		vertex.velocity = glm::vec3(Utils::getRandomFloat(-4, 4), Utils::getRandomFloat(-4, 4), Utils::getRandomFloat(-4, 4));
+		vertex.velocity = Utils::randomPointInSphere(200);
 		
 		//put particle in array
 		particleArray.push_back(vertex);
@@ -138,6 +127,7 @@ void ParticleSystem::generateParticlesInSphere(float radius, uint32_t numParticl
 
 	computeShaderData.numParticles = (uint32_t)particleArray.size();
 	computeShaderData.pitch = (uint32_t)ceil(sqrt(particleArray.size()));
+	computeShaderData.stride = std::max(1, (int)(particleArray.size() / NUM_SUBJECT_PARTICLES));
 }
 void ParticleSystem::loadParticlesFromModelFile(string filename) {
 	

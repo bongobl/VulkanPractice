@@ -9,12 +9,13 @@
 #include <RenderApplication.h>
 
 static int WORKGROUP_SIZE = 32;
+static int NUM_SUBJECT_PARTICLES = 3000;
 class ParticleSystem{
 
 	//cpu side data
 	static std::vector<Vertex> particleArray;
 	static UniformDataComputeShader computeShaderData;
-
+	
 	//physics buffer
 	static VkBuffer physicsBuffer;
 	static VkDeviceMemory physicsBufferMemory;

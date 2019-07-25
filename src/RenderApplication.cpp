@@ -135,6 +135,11 @@ void RenderApplication::mouseButtonCallback(GLFWwindow* window, int button, int 
 void RenderApplication::cursorMovedCallback(GLFWwindow* window, double xpos, double ypos) {
 	mousePosition = glm::vec2(xpos, ypos);
 
+	glm::vec2 res = glm::vec2(SwapChain::extent.width, SwapChain::extent.height);
+	
+	glm::vec2 procPos = glm::scale(glm::mat4(1.0f), glm::vec3(2 / res.x, 2 / -res.y, 1)) * glm::translate(glm::mat4(1.0f), glm::vec3(-res.x / 2, -res.y / 2, 0)) * glm::vec4(mousePosition, 0, 1);
+	cout << "(" << procPos.x << ", " << procPos.y << ")" << endl;
+
 }
 
 void RenderApplication::mouseWheelCallback(GLFWwindow* window, double xpos, double ypos) {
@@ -1222,7 +1227,7 @@ void RenderApplication::createGraphicsPipeline(){
 	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
-
+	
 	//Color blending (global settings)
 	VkPipelineColorBlendStateCreateInfo colorBlending = {};
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
