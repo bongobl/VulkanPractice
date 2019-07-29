@@ -17,12 +17,13 @@ std::vector<VkDescriptorSet> ParticleSystem::descriptorSets;
 
 VkPipelineLayout ParticleSystem::physicsPipelineLayout;
 VkPipeline ParticleSystem::physicsPipeline;
+glm::vec3 ParticleSystem::userPosition;
 
 std::vector<VkCommandBuffer> ParticleSystem::physicsCommandBuffers;
 
 void ParticleSystem::init(size_t numSwapChainImages){
 	//loadParticlesFromModelFile("resources/models/Heptoroid.obj");
-	generateParticlesInSphere(250, 20000);
+	generateParticlesInSphere(250, 30000);
 	
 	createBuffers(numSwapChainImages);
 	writeToVertexBuffer();
@@ -37,6 +38,30 @@ void ParticleSystem::init(size_t numSwapChainImages){
 
 }
 
+void ParticleSystem::update(glm::vec2 mousePosition, glm::mat4 cameraMatrix, float cameraFOV){
+	
+	glm::vec2 res = glm::vec2(SwapChain::extent.width, SwapChain::extent.height);
+	
+	//find mouse homogenous position
+	glm::vec2 homogPosition = glm::scale(glm::mat4(1.0f), glm::vec3(2 / res.x, 2 / -res.y, 1)) * glm::translate(glm::mat4(1.0f), glm::vec3(-res.x / 2, -res.y / 2, 0)) * glm::vec4(mousePosition, 0, 1);
+	//cout << "(" << homogPosition.x << ", " << homogPosition.y << ")" << endl;
+
+	float camDist = glm::length(cameraMatrix* glm::vec4(0, 0, 0, 1));
+
+	float scaleY = camDist * tan(cameraFOV / 2);
+	float scaleX = scaleY * (res.x / res.y);
+
+	//cout << camDist << ", " << scaleX << ", " << scaleY << endl;
+
+	glm::vec4 camSpacePosition = glm::scale(glm::mat4(1.0f), glm::vec3(scaleX, scaleY, 1)) * glm::vec4(homogPosition, 0, 1);
+	camSpacePosition.z = -camDist;
+
+	cout << "(" << camSpacePosition.x << ", " << camSpacePosition.y << ", " << camSpacePosition.z << ", " << camSpacePosition.w << ")" << endl;
+
+	userPosition = cameraMatrix * camSpacePosition;
+
+	//cout << "(" << userPosition.x << ", " << userPosition.y << ", " << userPosition.z << ")" << endl;
+}
 void ParticleSystem::refresh(size_t numSwapChainImages){
 
 	//free command buffers (while keeping command pool)
@@ -229,7 +254,7 @@ void ParticleSystem::writeToVertexBuffer() {
 void ParticleSystem::writeToUniformBuffer(uint32_t imageIndex) {
 
 	computeShaderData.deltaTime = RenderApplication::deltaTime;
-	
+	computeShaderData.userPosition = userPosition;
 
 	void* mappedMemory;
 	vkMapMemory(RenderApplication::device, uniformBufferMemories[imageIndex], 0, sizeof(computeShaderData), 0, &mappedMemory);

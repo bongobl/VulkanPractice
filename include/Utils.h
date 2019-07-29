@@ -17,10 +17,10 @@ struct UniformDataComputeShader {
 	uint32_t numParticles;
 	uint32_t pitch;
 	float deltaTime;
-	float netMass;
+	float netMass;	//don't need anymore
 
 	int stride;
-	glm::vec3 padding;
+	glm::vec3 userPosition;
 	
 	
 };

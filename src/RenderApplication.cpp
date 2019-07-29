@@ -77,7 +77,9 @@ void RenderApplication::run() {
 	
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
+
 		drawFrame();
+
 		updateScene();
 	}
 
@@ -134,11 +136,6 @@ void RenderApplication::mouseButtonCallback(GLFWwindow* window, int button, int 
 }
 void RenderApplication::cursorMovedCallback(GLFWwindow* window, double xpos, double ypos) {
 	mousePosition = glm::vec2(xpos, ypos);
-
-	glm::vec2 res = glm::vec2(SwapChain::extent.width, SwapChain::extent.height);
-	
-	glm::vec2 procPos = glm::scale(glm::mat4(1.0f), glm::vec3(2 / res.x, 2 / -res.y, 1)) * glm::translate(glm::mat4(1.0f), glm::vec3(-res.x / 2, -res.y / 2, 0)) * glm::vec4(mousePosition, 0, 1);
-	cout << "(" << procPos.x << ", " << procPos.y << ")" << endl;
 
 }
 
@@ -217,7 +214,8 @@ void RenderApplication::createAllVulkanResources() {
 }
 
 void RenderApplication::initScene(){
-	
+	 
+
 	//first frame
 	isFirstFrame = true;
 
@@ -353,6 +351,8 @@ void RenderApplication::updateScene() {
 
 	updateLightRotation();
 	updateCameraMatrix();
+	ParticleSystem::update(mousePosition, cameraHeading * cameraPitch * cameraZoom, glm::radians(45.0f));
+
 
 	mouseWheelDelta = 0;
 	prevMousePosition = mousePosition;
@@ -798,11 +798,11 @@ void RenderApplication::recreateAppExtentDependents(){
 	createGraphicsPipeline();
 	createDepthAttachmentImage();
 	createDepthAttachmentImageView();
-	createUniformBuffers();	//yes
-	createDescriptorPool();	//yes
-	createDescriptorSets();	//yes
+	createUniformBuffers();	
+	createDescriptorPool();	
+	createDescriptorSets();	
 	createSwapChainFrameBuffers();
-	createRenderCommandBuffers();	//yes
+	createRenderCommandBuffers();	
 	
 	ParticleSystem::refresh(SwapChain::images.size());
 }

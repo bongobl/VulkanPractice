@@ -40,7 +40,8 @@ class ParticleSystem{
 	static VkPipelineLayout physicsPipelineLayout;
 	static VkPipeline physicsPipeline;
 
-	
+	//user 3D mouse position
+	static glm::vec3 userPosition;
 	
 public:
 
@@ -48,6 +49,7 @@ public:
 	static std::vector<VkCommandBuffer> physicsCommandBuffers;
 
 	static void init(size_t numSwapChainImages);
+	static void update(glm::vec2 mousePosition, glm::mat4 cameraMatrix, float cameraFOV);
 	static void refresh(size_t numSwapChainImages);
 	static void cleanUp();
 	

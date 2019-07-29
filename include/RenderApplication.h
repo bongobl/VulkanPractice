@@ -228,7 +228,7 @@ private:
 	//for particle system
 	static VkCommandPool getComputeCommandPool();
 	static VkQueue getComputeQueue();
-
+	
 	friend class Utils;
 	friend class Lighting;
 	friend class ParticleSystem;

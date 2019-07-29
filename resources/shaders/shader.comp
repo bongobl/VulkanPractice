@@ -38,7 +38,7 @@ layout(std140, binding = 2) uniform UniformBufferObject
 	float netMass;
 
 	int stride;
-	vec3 padding;
+	vec3 userPosition;
 }ubo;
 
 
