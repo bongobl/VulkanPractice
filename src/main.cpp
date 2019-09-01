@@ -18,7 +18,7 @@ int main() {
 	cout << "Result: (" << result.x << ", " << result.y << ")" << endl;
 	*/
     try {
-		RenderApplication::run();
+		  RenderApplication::run();
     }
     catch (const std::runtime_error& e) {
         cout << "Exception Thrown: " << e.what() << endl;

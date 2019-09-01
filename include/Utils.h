@@ -20,8 +20,7 @@ struct UniformDataComputeShader {
 	float netMass;	//don't need anymore
 
 	int stride;
-	glm::vec3 userPosition;
-	
+	glm::vec3 userPos;
 	
 };
 struct UniformDataVertexShader {

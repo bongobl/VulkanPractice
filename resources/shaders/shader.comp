@@ -2,8 +2,8 @@
 #extension GL_ARB_separate_shader_objects: enable
 
 #define		WORKGROUP_SIZE		32
-#define		GRAV_CONSTANT 		24
-#define 	CAGE_FORCE			0.2f
+#define		GRAV_CONSTANT 		0.001
+#define 	CAGE_FORCE			0.02f
 
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1) in;
 
@@ -38,7 +38,9 @@ layout(std140, binding = 2) uniform UniformBufferObject
 	float netMass;
 
 	int stride;
-	vec3 userPosition;
+	float upX;
+	float upY;
+	float upZ;
 }ubo;
 
 
@@ -84,7 +86,14 @@ void main(){
 	netForce = netForce * ubo.stride;
 	netForce = netForce * GRAV_CONSTANT * currVertex.mass;
 	netForce += -currVertex.position * currVertex.mass * CAGE_FORCE;
-	netForce += 2.0f * -currVertex.velocity;
+	netForce += 5.0f * -currVertex.velocity;
+	
+	
+	//force from cursor
+	vec3 cursorToParticle = currVertex.position - vec3(ubo.upX, ubo.upY, ubo.upZ);
+	if(length(cursorToParticle) < 30){
+		netForce = normalize(cursorToParticle) * 3000 / pow(length(cursorToParticle),2);
+	}
 
 	//calc particle's acceleration
 	vec3 acc = netForce / currVertex.mass;

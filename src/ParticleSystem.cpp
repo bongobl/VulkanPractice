@@ -23,7 +23,7 @@ std::vector<VkCommandBuffer> ParticleSystem::physicsCommandBuffers;
 
 void ParticleSystem::init(size_t numSwapChainImages){
 	//loadParticlesFromModelFile("resources/models/Heptoroid.obj");
-	generateParticlesInSphere(250, 30000);
+	generateParticlesInSphere(15, 20000);
 	
 	createBuffers(numSwapChainImages);
 	writeToVertexBuffer();
@@ -46,7 +46,7 @@ void ParticleSystem::update(glm::vec2 mousePosition, glm::mat4 cameraMatrix, flo
 	glm::vec2 homogPosition = glm::scale(glm::mat4(1.0f), glm::vec3(2 / res.x, 2 / -res.y, 1)) * glm::translate(glm::mat4(1.0f), glm::vec3(-res.x / 2, -res.y / 2, 0)) * glm::vec4(mousePosition, 0, 1);
 	//cout << "(" << homogPosition.x << ", " << homogPosition.y << ")" << endl;
 
-	float camDist = glm::length(cameraMatrix* glm::vec4(0, 0, 0, 1));
+	float camDist = glm::length(cameraMatrix * glm::vec4(0, 0, 0, 1));
 
 	float scaleY = camDist * tan(cameraFOV / 2);
 	float scaleX = scaleY * (res.x / res.y);
@@ -56,11 +56,11 @@ void ParticleSystem::update(glm::vec2 mousePosition, glm::mat4 cameraMatrix, flo
 	glm::vec4 camSpacePosition = glm::scale(glm::mat4(1.0f), glm::vec3(scaleX, scaleY, 1)) * glm::vec4(homogPosition, 0, 1);
 	camSpacePosition.z = -camDist;
 
-	cout << "(" << camSpacePosition.x << ", " << camSpacePosition.y << ", " << camSpacePosition.z << ", " << camSpacePosition.w << ")" << endl;
+	//cout << "(" << camSpacePosition.x << ", " << camSpacePosition.y << ", " << camSpacePosition.z << ", " << camSpacePosition.w << ")" << endl;
 
 	userPosition = cameraMatrix * camSpacePosition;
 
-	//cout << "(" << userPosition.x << ", " << userPosition.y << ", " << userPosition.z << ")" << endl;
+
 }
 void ParticleSystem::refresh(size_t numSwapChainImages){
 
@@ -133,8 +133,8 @@ void ParticleSystem::generateParticlesInSphere(float radius, uint32_t numParticl
 		vertex.position = Utils::randomPointInSphere(radius);
 
 		//use cube instead
-		glm::vec3 randOffset(Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius));
-		vertex.position = randOffset;
+		//glm::vec3 randOffset(Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius), Utils::getRandomFloat(-radius, radius));
+		//vertex.position = randOffset;
 		
 		//storing random color in vertex's normal attribute
 		glm::vec3 randColor(Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1), Utils::getRandomFloat(0, 1));
@@ -145,6 +145,7 @@ void ParticleSystem::generateParticlesInSphere(float radius, uint32_t numParticl
 		
 		//give a particle a random initial velocity
 		vertex.velocity = Utils::randomPointInSphere(200);
+		vertex.velocity = glm::vec3(0,0,0);
 		
 		//put particle in array
 		particleArray.push_back(vertex);
@@ -244,17 +245,21 @@ void ParticleSystem::writeToVertexBuffer() {
 	//copy contents of staging buffer to vertex buffer 
 	Utils::copyBuffer(stagingBuffer, vertexBuffer, particleArraySize);
 	
-	
+
 	//destroy staging buffer
 	vkDestroyBuffer(RenderApplication::device, stagingBuffer, NULL);
 	vkFreeMemory(RenderApplication::device, stagingBufferMemory, NULL);
-	
+
 }
+
 
 void ParticleSystem::writeToUniformBuffer(uint32_t imageIndex) {
 
 	computeShaderData.deltaTime = RenderApplication::deltaTime;
-	computeShaderData.userPosition = userPosition;
+	computeShaderData.userPos = userPosition;
+
+	computeShaderData.netMass = userPosition.x;
+	//cout << "(" << userPosition.x << ", " << userPosition.y << ", " << userPosition.z << ")" << endl;
 
 	void* mappedMemory;
 	vkMapMemory(RenderApplication::device, uniformBufferMemories[imageIndex], 0, sizeof(computeShaderData), 0, &mappedMemory);
@@ -342,7 +347,7 @@ void ParticleSystem::createDescriptorSets(size_t numSwapChainImages){
 
 	for (unsigned int i = 0; i < descriptorSets.size(); ++i) {
 
-		// Descriptor for our vertex shader Uniform Buffer
+		// Descriptor for our physics buffer
 		VkWriteDescriptorSet physicsBufferWrite = {};
 		physicsBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		physicsBufferWrite.dstSet = descriptorSets[i];
@@ -359,7 +364,7 @@ void ParticleSystem::createDescriptorSets(size_t numSwapChainImages){
 		physicsBufferWrite.pBufferInfo = &physicsBufferInfo;
 
 
-		// Descriptor for our vertex shader Uniform Buffer
+		// Descriptor for our vertex buffer
 		VkWriteDescriptorSet vertexBufferWrite = {};
 		vertexBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		vertexBufferWrite.dstSet = descriptorSets[i];
@@ -375,6 +380,7 @@ void ParticleSystem::createDescriptorSets(size_t numSwapChainImages){
 		vertexBufferWrite.descriptorCount = 1;
 		vertexBufferWrite.pBufferInfo = &vertexBufferInfo;
 
+		// Descriptor for our uniform buffer
 		VkWriteDescriptorSet uniformBufferWrite = {};
 		uniformBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		uniformBufferWrite.dstSet = descriptorSets[i];
