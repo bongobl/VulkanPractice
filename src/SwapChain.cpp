@@ -136,13 +136,19 @@ VkSurfaceFormatKHR SwapChain::chooseSurfaceFormat() {
 
 VkPresentModeKHR SwapChain::choosePresentMode() {
 
+	//always available and provides VSync so in practice, I will always use
+	return VK_PRESENT_MODE_FIFO_KHR;
+
+
 	VkPresentModeKHR bestAvailableMode = VK_PRESENT_MODE_FIFO_KHR;
 
 	for (const auto& availablePresentMode : availableSurfacePresentModes) {
 		if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+			cout << "Using VK_PRESENT_MODE_MAILBOX_KHR" << endl;
 			return availablePresentMode;
 		}
 		else if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+			cout << "Using VK_PRESENT_MODE_IMMEDIATE_KHR" << endl;
 			bestAvailableMode = availablePresentMode;
 		}
 	}

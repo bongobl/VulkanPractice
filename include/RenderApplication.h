@@ -180,6 +180,7 @@ private:
 	static void windowResizeCallback(GLFWwindow* resizedWindow, int newWidth, int newHeight);
 	static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 	static void cursorMovedCallback(GLFWwindow* window, double xpos, double ypos);
+	static void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 	
 	static VkExtent2D waitToGetNonZeroWindowExtent();	//continuously loops until window width/height are non-zero, then returns the extent

@@ -105,12 +105,42 @@ void RenderApplication::initGLFWWindow(){
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	window = glfwCreateWindow(desiredInitialExtent.width,desiredInitialExtent.height, "Test Window", NULL, NULL);
+
+
+	//find screen resolution
+	const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+
+    int montior_width = mode->width;
+    int monitor_height = mode->height;
+    int refreshRate = mode->refreshRate;
+
+    cout << montior_width << endl;
+
+    //run this line for fullscreen
+    //window = glfwCreateWindow(montior_width,monitor_height, "Basic Render", glfwGetPrimaryMonitor(), NULL);
+    
+    //run this line for windowed mode
+    window = glfwCreateWindow(desiredInitialExtent.width,desiredInitialExtent.height, "Test Window", NULL, NULL);
+	
 
 	//setup callbacks
 	glfwSetFramebufferSizeCallback(window, &windowResizeCallback);
-	glfwSetMouseButtonCallback(window, mouseButtonCallback);
-	glfwSetCursorPosCallback(window, cursorMovedCallback);
+	glfwSetMouseButtonCallback(window, &mouseButtonCallback);
+	glfwSetCursorPosCallback(window, &cursorMovedCallback);
+	glfwSetKeyCallback(window, &keyboardCallback);
+}
+
+void RenderApplication::keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods){
+	if (action == GLFW_PRESS)
+	{
+		// Check if escape was pressed
+		if (key == GLFW_KEY_ESCAPE)
+		{
+			// Close the window. This causes the program to also terminate.
+			glfwSetWindowShouldClose(window, GL_TRUE);
+		}
+
+	}
 }
 
 //this function is called repetitively until the user stops resizing the window
